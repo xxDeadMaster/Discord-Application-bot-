@@ -118,9 +118,9 @@ export async function replaceQuestions(roleId, prompts) {
 
 export async function createSubmission(s) {
   const { rows } = await query(
-    `INSERT INTO submissions (guild_id, user_id, user_tag, role_id, role_name, category_name, answers)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [config.guildId, s.userId, s.userTag, s.roleId, s.roleName, s.categoryName, JSON.stringify(s.answers)],
+    `INSERT INTO submissions (guild_id, user_id, user_tag, role_id, role_name, category_name, answers, role_emoji, user_avatar)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [config.guildId, s.userId, s.userTag, s.roleId, s.roleName, s.categoryName, JSON.stringify(s.answers), s.roleEmoji || null, s.userAvatar || null],
   );
   return rows[0];
 }
@@ -180,12 +180,12 @@ export async function listSubmissions({ status, roleId, search, limit = 50, offs
 
 /* ---------- Tickets ---------- */
 
-export async function createTicket({ openerId, openerTag, topic, typeId = null, typeName = null, answers = [] }) {
+export async function createTicket({ openerId, openerTag, topic, typeId = null, typeName = null, typeEmoji = null, answers = [] }) {
   const { rows } = await query(
-    `INSERT INTO tickets (guild_id, number, opener_id, opener_tag, topic, type_id, type_name, answers)
-     VALUES ($1, (SELECT COALESCE(MAX(number), 0) + 1 FROM tickets WHERE guild_id = $1), $2, $3, $4, $5, $6, $7)
+    `INSERT INTO tickets (guild_id, number, opener_id, opener_tag, topic, type_id, type_name, answers, type_emoji)
+     VALUES ($1, (SELECT COALESCE(MAX(number), 0) + 1 FROM tickets WHERE guild_id = $1), $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
-    [config.guildId, openerId, openerTag, topic, typeId, typeName, JSON.stringify(answers)],
+    [config.guildId, openerId, openerTag, topic, typeId, typeName, JSON.stringify(answers), typeEmoji],
   );
   return rows[0];
 }

@@ -10,7 +10,11 @@ import {
 } from '../db.js';
 import { client, getGuild } from './client.js';
 import { startInterview } from './interviews.js';
-import { COLORS, answerFields, dashboardLink, ephemeral, isStaff, truncate, unix } from './ui.js';
+import { bannerAttachment } from './banner.js';
+import {
+  BRAND, COLORS, STATUS_LABEL, accountAge, answerFields, dashboardLink, ephemeral, footer, isStaff, notice, optionEmoji, progressBar,
+  truncate, unix, withEmoji,
+} from './ui.js';
 
 /**
  * Applications in progress, keyed by user ID.
@@ -42,30 +46,32 @@ function armTimer(userId) {
   s.timer = setTimeout(async () => {
     const ended = endSession(userId);
     if (!ended) return;
-    await ended.dm.send(`Your **${ended.roleName}** application expired after ${config.dmTimeoutMinutes} minutes without a reply. Pick your role again in the server to restart.`).catch(() => {});
+    await ended.dm.send({ embeds: [notice(`Your **${ended.roleName}** application expired after ${config.dmTimeoutMinutes} minutes without a reply. Pick your role again in the server to restart.`, 'warn')] }).catch(() => {});
   }, config.dmTimeoutMinutes * 60 * 1000);
 }
 
 function questionEmbed(s) {
   return new EmbedBuilder()
-    .setColor(COLORS.brand)
-    .setAuthor({ name: `${s.roleName} application` })
+    .setColor(COLORS.sky)
+    .setAuthor({ name: withEmoji(s.roleEmoji, `${s.roleName} application`) })
     .setTitle(`Question ${s.index + 1} of ${s.questions.length}`)
-    .setDescription(truncate(s.questions[s.index].prompt, 4000))
-    .setFooter({ text: 'Reply with your answer. Type cancel to stop.' });
+    .setDescription(`\`${progressBar(s.index, s.questions.length)}\`\n\n${truncate(s.questions[s.index].prompt, 3800)}`)
+    .setFooter(footer('💬 Reply with your answer · type cancel to stop', client));
 }
 
 function reviewMessage(s) {
   const { fields, cut } = answerFields(s.answers);
   const embed = new EmbedBuilder()
     .setColor(COLORS.brand)
-    .setTitle(`Review your ${s.roleName} application`)
-    .setDescription('Look over your answers. Nothing is sent to staff until you press **Submit**.' + (cut ? '\n*Long answers are shortened here, but staff see them in full.*' : ''))
-    .addFields(fields);
+    .setAuthor({ name: withEmoji(s.roleEmoji, `${s.roleName} application`) })
+    .setTitle('📝 Review your answers')
+    .setDescription(`\`${progressBar(1, 1)}\`\nAll done! Look over your answers. Nothing is sent to staff until you press **Submit**.` + (cut ? '\n*Long answers are shortened here, but staff see them in full.*' : ''))
+    .addFields(fields)
+    .setFooter(footer('Almost there', client));
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('dm:submit').setLabel('Submit application').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('dm:restart').setLabel('Start over').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('dm:cancel').setLabel('Cancel').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('dm:submit').setLabel('Submit application').setEmoji('🚀').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('dm:restart').setLabel('Start over').setEmoji('🔄').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('dm:cancel').setLabel('Cancel').setEmoji('✖️').setStyle(ButtonStyle.Danger),
   );
   return { embeds: [embed], components: [row] };
 }
@@ -81,23 +87,36 @@ export async function handleCategorySelect(interaction) {
   const roles = open ? (await listRoles(categoryId, { enabledOnly: true })).filter((r) => r.question_count > 0) : [];
 
   if (blockedRole(interaction.member, settings)) {
-    await interaction.reply({ content: BLOCKED_MESSAGE, flags: ephemeral });
+    await interaction.reply({ embeds: [notice(BLOCKED_MESSAGE, 'blocked')], flags: ephemeral });
   } else if (category?.enabled && !open) {
     const d = describeSchedule(category, tz);
-    await interaction.reply({ content: `**${category.name}** is closed right now.${d.changesAt ? ` It opens <t:${unix(d.changesAt)}:F>.` : ''}`, flags: ephemeral });
+    await interaction.reply({ embeds: [notice(`**${category.name}** is closed right now.${d.changesAt ? ` It opens <t:${unix(d.changesAt)}:F> (<t:${unix(d.changesAt)}:R>).` : ''}`, 'warn')], flags: ephemeral });
   } else if (!roles.length) {
-    await interaction.reply({ content: 'Nothing is open in that category right now.', flags: ephemeral });
+    await interaction.reply({ embeds: [notice('Nothing is open in that category right now.', 'warn')], flags: ephemeral });
   } else {
     const select = new StringSelectMenuBuilder()
       .setCustomId('apply:role')
-      .setPlaceholder('Choose a role')
-      .addOptions(roles.slice(0, 25).map((r) => ({
-        label: truncate(r.name, 100),
-        value: String(r.id),
-        description: truncate([r.description, `${r.question_count} question${r.question_count === 1 ? '' : 's'}`].filter(Boolean).join(' · '), 100),
-      })));
+      .setPlaceholder('🎯 Choose a role')
+      .addOptions(roles.slice(0, 25).map((r) => {
+        const o = {
+          label: truncate(r.name, 100),
+          value: String(r.id),
+          description: truncate([r.description, `${r.question_count} question${r.question_count === 1 ? '' : 's'}`].filter(Boolean).join(' · '), 100),
+        };
+        const e = optionEmoji(r.emoji);
+        if (e) o.emoji = e;
+        return o;
+      }));
+    const banner = bannerAttachment(category.name, BRAND, 'category.png');
+    const embed = new EmbedBuilder()
+      .setColor(COLORS.brand)
+      .setTitle(withEmoji(category.emoji, category.name))
+      .setDescription(`Which role are you applying for?\n\n${roles.slice(0, 25).map((r) => `${r.emoji || '•'} **${r.name}**${r.description ? ` · ${r.description}` : ''}`).join('\n')}`)
+      .setFooter(footer('Only you can see this', client));
+    if (banner) embed.setImage(banner.url);
     await interaction.reply({
-      content: `**${category.name}**: which role are you applying for?`,
+      embeds: [embed],
+      files: banner ? [banner.file] : [],
       components: [new ActionRowBuilder().addComponents(select)],
       flags: ephemeral,
     });
@@ -109,14 +128,14 @@ export async function handleCategorySelect(interaction) {
 
 export async function handleRoleSelect(interaction) {
   await interaction.deferUpdate();
-  const say = (content, components = []) => interaction.editReply({ content, components });
+  const say = (text, components = [], kind = 'warn') => interaction.editReply({ content: '', embeds: [notice(text, kind)], files: [], attachments: [], components });
 
   const userId = interaction.user.id;
   const role = await getRole(Number(interaction.values[0]));
   if (!role || !role.enabled) return say('That role is not open anymore.');
 
   const settings = await getSettings();
-  if (blockedRole(interaction.member, settings)) return say(BLOCKED_MESSAGE);
+  if (blockedRole(interaction.member, settings)) return say(BLOCKED_MESSAGE, [], 'blocked');
   const category = await getCategory(role.category_id);
   if (!isCategoryOpen(category, settings.timezone)) {
     const d = category ? describeSchedule(category, settings.timezone) : {};
@@ -143,31 +162,37 @@ export async function handleRoleSelect(interaction) {
 
   const session = {
     userId, roleId: role.id, roleName: role.name, categoryName: role.category_name,
-    questions, answers: [], index: 0, stage: 'asking', dm: null, timer: null,
+    roleEmoji: role.emoji || '', questions, answers: [], index: 0, stage: 'asking', dm: null, timer: null,
   };
 
   try {
     session.dm = await interaction.user.createDM();
-    await session.dm.send({
-      embeds: [new EmbedBuilder()
-        .setColor(COLORS.brand)
-        .setTitle(`${role.name} application`)
-        .setDescription(`Thanks for applying! I'll ask you **${questions.length}** question${questions.length === 1 ? '' : 's'}, one at a time. Just reply here.\n\nType **cancel** at any time to stop. If you don't reply for ${config.dmTimeoutMinutes} minutes, the application expires.`)],
-    });
+    const banner = bannerAttachment(`${role.name} Application`, role.category_name, 'role.png');
+    const intro = new EmbedBuilder()
+      .setColor(COLORS.brand)
+      .setTitle(withEmoji(role.emoji, `${role.name} application`))
+      .setDescription(`Thanks for applying, ${interaction.user}! 👋\n\nI'll ask you **${questions.length}** question${questions.length === 1 ? '' : 's'}, one at a time. Just reply here with your answer.`)
+      .addFields(
+        { name: '⏱️ No rush', value: `You have ${config.dmTimeoutMinutes} minutes per answer.`, inline: true },
+        { name: '✖️ Changed your mind?', value: 'Type **cancel** at any time.', inline: true },
+      )
+      .setFooter(footer(role.category_name, client));
+    if (banner) intro.setImage(banner.url);
+    await session.dm.send({ embeds: [intro], files: banner ? [banner.file] : [] });
     await session.dm.send({ embeds: [questionEmbed(session)] });
   } catch (err) {
     if (err.code === 50007) {
-      return say("I couldn't send you a DM. Turn on direct messages from server members in your privacy settings, then pick your role again.");
+      return say("I couldn't send you a DM. Turn on **direct messages from server members** in your privacy settings, then pick your role again.", [], 'error');
     }
     console.error('[apply] failed to start DM:', err);
-    return say('Something went wrong starting your application. Please try again.');
+    return say('Something went wrong starting your application. Please try again.', [], 'error');
   }
 
   sessions.set(userId, session);
   armTimer(userId);
 
-  const link = new ButtonBuilder().setLabel('Open DMs').setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/@me/${session.dm.id}`);
-  return say(`Check your DMs! I sent you the **${role.name}** application.`, [new ActionRowBuilder().addComponents(link)]);
+  const link = new ButtonBuilder().setLabel('Open DMs').setEmoji('📬').setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/@me/${session.dm.id}`);
+  return say(`Check your DMs! I sent you the **${withEmoji(role.emoji, role.name)}** application.`, [new ActionRowBuilder().addComponents(link)], 'success');
 }
 
 /* ---------- DM answers ---------- */
@@ -180,24 +205,24 @@ export async function handleDirectMessage(message) {
   if (s.stage === 'review') {
     if (text.toLowerCase() === 'cancel') {
       endSession(s.userId);
-      await message.channel.send('Application cancelled. Nothing was sent to staff.');
+      await message.channel.send({ embeds: [notice('Application cancelled. Nothing was sent to staff.', 'info')] });
     } else {
-      await message.channel.send('Use the buttons above to submit, start over or cancel.');
+      await message.channel.send({ embeds: [notice('Use the buttons above to **submit**, **start over** or **cancel**.', 'info')] });
     }
     return;
   }
 
   if (!text) {
-    await message.channel.send('Please answer in text.');
+    await message.channel.send({ embeds: [notice('Please answer in text.', 'warn')] });
     return;
   }
   if (text.toLowerCase() === 'cancel') {
     endSession(s.userId);
-    await message.channel.send('Application cancelled. Nothing was sent to staff. You can apply again from the server.');
+    await message.channel.send({ embeds: [notice('Application cancelled. Nothing was sent to staff. You can apply again from the server.', 'info')] });
     return;
   }
   if (text.length > config.maxAnswerLength) {
-    await message.channel.send(`That answer is ${text.length} characters. Please keep it under ${config.maxAnswerLength}.`);
+    await message.channel.send({ embeds: [notice(`That answer is ${text.length} characters. Please keep it under ${config.maxAnswerLength}.`, 'warn')] });
     return;
   }
 
@@ -217,12 +242,12 @@ export async function handleDmButton(interaction) {
   const action = interaction.customId.split(':')[1];
   const s = sessions.get(interaction.user.id);
   if (!s || s.stage !== 'review') {
-    return interaction.update({ content: 'This application is no longer active.', components: [] });
+    return interaction.update({ content: '', embeds: [notice('This application is no longer active.', 'info')], components: [] });
   }
 
   if (action === 'cancel') {
     endSession(s.userId);
-    return interaction.update({ content: 'Application cancelled. Nothing was sent to staff.', embeds: [], components: [] });
+    return interaction.update({ content: '', embeds: [notice('Application cancelled. Nothing was sent to staff.', 'info')], components: [] });
   }
 
   if (action === 'restart') {
@@ -230,7 +255,7 @@ export async function handleDmButton(interaction) {
     s.index = 0;
     s.stage = 'asking';
     armTimer(s.userId);
-    await interaction.update({ content: 'Starting over.', embeds: [], components: [] });
+    await interaction.update({ content: '', embeds: [notice('Starting over from question 1.', 'info')], components: [] });
     return interaction.channel.send({ embeds: [questionEmbed(s)] });
   }
 
@@ -240,20 +265,26 @@ export async function handleDmButton(interaction) {
 
   const role = await getRole(s.roleId);
   if (!role) {
-    return interaction.followUp('That role was removed while you were applying, so the application could not be submitted.');
+    return interaction.followUp({ embeds: [notice('That role was removed while you were applying, so the application could not be submitted.', 'error')] });
   }
   const settingsNow = await getSettings();
   if ((settingsNow.blocked_role_ids || []).length) {
     const member = await (await getGuild()).members.fetch(s.userId).catch(() => null);
-    if (blockedRole(member, settingsNow)) return interaction.followUp(BLOCKED_MESSAGE);
+    if (blockedRole(member, settingsNow)) return interaction.followUp({ embeds: [notice(BLOCKED_MESSAGE, 'blocked')] });
   }
 
   const sub = await createSubmission({
     userId: s.userId, userTag: interaction.user.tag, roleId: role.id, roleName: role.name,
-    categoryName: role.category_name, answers: s.answers,
+    categoryName: role.category_name, answers: s.answers, roleEmoji: role.emoji || null,
+    userAvatar: interaction.user.displayAvatarURL?.({ size: 128 }) || null,
   });
 
-  await interaction.followUp(`Submitted! Staff will review your **${role.name}** application, and I'll DM you the result here.`);
+  await interaction.followUp({ embeds: [new EmbedBuilder()
+    .setColor(COLORS.accepted)
+    .setTitle('🚀 Application submitted!')
+    .setDescription(`Thanks! Staff will review your **${withEmoji(role.emoji, role.name)}** application, and I'll DM you the result right here.`)
+    .addFields({ name: '📨 Application', value: `#${sub.id}`, inline: true }, { name: '⏳ Status', value: 'Waiting for review', inline: true })
+    .setFooter(footer('Good luck!', client))] });
 
   await postSubmission(sub, role).catch((err) => console.error('[apply] could not post submission:', err));
 }
@@ -266,46 +297,49 @@ export function submissionMessage(sub, tally = { yes: 0, no: 0 }) {
   const color = { pending: COLORS.pending, accepted: COLORS.accepted, denied: COLORS.denied }[sub.status] ?? COLORS.muted;
   const url = dashboardLink(`/submissions/${sub.id}`);
 
-  const lines = [`**Staff votes:** ${tally.yes} yes · ${tally.no} no`];
-  if (sub.interview_status === 'active' && sub.interview_channel_id) lines.push(`**Interview:** in progress in <#${sub.interview_channel_id}> (started by ${sub.interview_by_tag})`);
-  if (sub.interview_status === 'done') lines.push(`**Interview:** held${sub.interview_by_tag ? ` (started by ${sub.interview_by_tag})` : ''}`);
-  if (sub.interview_status === 'expired') lines.push('**Interview:** nobody joined, channel removed');
+  const parts = [STATUS_LABEL[sub.status] || sub.status, `👍 **${tally.yes}** · 👎 **${tally.no}**`];
+  if (sub.interview_status === 'active' && sub.interview_channel_id) parts.push(`🎙️ Interview live in <#${sub.interview_channel_id}>`);
+  if (sub.interview_status === 'done') parts.push('🎙️ Interview held');
+  if (sub.interview_status === 'expired') parts.push('🎙️ Interview missed');
 
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(truncate(`New application · ${sub.role_name}`, 256))
+    .setAuthor({ name: '📨 New application' })
+    .setTitle(truncate(`${withEmoji(sub.role_emoji, sub.role_name)} · ${sub.category_name}`, 256))
     .setURL(url)
-    .setDescription(lines.join('\n'))
+    .setDescription(parts.join('  ·  '))
     .addFields(
-      { name: 'Applicant', value: `<@${sub.user_id}> (${sub.user_tag})`, inline: true },
-      { name: 'Category', value: truncate(sub.category_name, 1024), inline: true },
-      { name: 'Submitted', value: `<t:${unix(sub.created_at)}:R>`, inline: true },
+      { name: '👤 Applicant', value: `<@${sub.user_id}>\n${sub.user_tag}`, inline: true },
+      { name: '📅 Account age', value: accountAge(sub.user_id), inline: true },
+      { name: '⏱️ Submitted', value: `<t:${unix(sub.created_at)}:R>`, inline: true },
       ...fields,
     )
-    .setFooter({ text: `Application #${sub.id}${cut ? ' · long answers shortened, full text on the dashboard' : ''}` });
+    .setFooter(footer(`Application #${sub.id}${cut ? ' · full answers on the dashboard' : ''}`, client));
+  if (sub.user_avatar) embed.setThumbnail(sub.user_avatar);
 
   if (sub.status !== 'pending') {
     const verb = sub.status === 'accepted' ? 'Accepted' : 'Denied';
     embed.addFields({
-      name: 'Decision',
+      name: sub.status === 'accepted' ? '✅ Decision' : '❌ Decision',
       value: truncate(`${verb} by ${sub.reviewed_by ? `<@${sub.reviewed_by}>` : sub.reviewed_by_tag} <t:${unix(sub.reviewed_at)}:R>${sub.reason ? `\nReason: ${sub.reason}` : ''}`, 1024),
     });
   }
 
   const rows = [];
-  const link = url.startsWith('https://') ? new ButtonBuilder().setLabel('Open on dashboard').setStyle(ButtonStyle.Link).setURL(url) : null;
+  const link = url.startsWith('https://') ? new ButtonBuilder().setLabel('Dashboard').setEmoji('🔗').setStyle(ButtonStyle.Link).setURL(url) : null;
   if (sub.status === 'pending') {
     const interviewing = sub.interview_status === 'active';
     rows.push(new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`sub:vote:yes:${sub.id}`).setLabel(`Vote yes · ${tally.yes}`).setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`sub:vote:no:${sub.id}`).setLabel(`Vote no · ${tally.no}`).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`sub:vote:yes:${sub.id}`).setLabel(String(tally.yes)).setEmoji('👍').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`sub:vote:no:${sub.id}`).setLabel(String(tally.no)).setEmoji('👎').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`sub:interview:${sub.id}`)
-        .setLabel(interviewing ? 'Interview running' : sub.interview_status ? 'New interview' : 'Interview')
+        .setLabel(interviewing ? 'Interview live' : sub.interview_status ? 'New interview' : 'Interview')
+        .setEmoji('🎙️')
         .setStyle(ButtonStyle.Primary),
     ));
     const second = [
-      new ButtonBuilder().setCustomId(`sub:accept:${sub.id}`).setLabel('Accept').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`sub:deny:${sub.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`sub:accept:${sub.id}`).setLabel('Accept').setEmoji('✅').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`sub:deny:${sub.id}`).setLabel('Deny').setEmoji('✖️').setStyle(ButtonStyle.Danger),
     ];
     if (link) second.push(link);
     rows.push(new ActionRowBuilder().addComponents(second));
@@ -384,11 +418,12 @@ export async function decideSubmission({ submissionId, decision, reviewerId, rev
     const user = await client.users.fetch(sub.user_id);
     const embed = new EmbedBuilder()
       .setColor(decision === 'accepted' ? COLORS.accepted : COLORS.denied)
-      .setTitle(decision === 'accepted' ? 'Application accepted' : 'Application update')
+      .setTitle(decision === 'accepted' ? '🎉 Application accepted!' : '📩 Application update')
       .setDescription(decision === 'accepted'
-        ? `Good news! Your **${sub.role_name}** application in **${guild.name}** was accepted.`
-        : `Thanks for applying for **${sub.role_name}** in **${guild.name}**. Your application was not accepted this time.`);
-    if (reason) embed.addFields({ name: 'Note from staff', value: truncate(reason, 1024) });
+        ? `Congrats! Your **${withEmoji(sub.role_emoji, sub.role_name)}** application was accepted. Welcome to the team!`
+        : `Thanks for applying for **${withEmoji(sub.role_emoji, sub.role_name)}**. Your application wasn't accepted this time, but you're welcome to try again later.`)
+      .setFooter(footer(`Application #${sub.id}`, client));
+    if (reason) embed.addFields({ name: '💬 Note from staff', value: truncate(reason, 1024) });
     await user.send({ embeds: [embed] });
     notes.push('Applicant notified by DM.');
   } catch {
@@ -403,7 +438,7 @@ export async function decideSubmission({ submissionId, decision, reviewerId, rev
 async function requireStaff(interaction) {
   const settings = await getSettings();
   if (isStaff(interaction.member, settings)) return true;
-  await interaction.reply({ content: 'Only staff can review applications.', flags: ephemeral });
+  await interaction.reply({ embeds: [notice('Only staff can review applications.', 'blocked')], flags: ephemeral });
   return false;
 }
 
@@ -416,14 +451,14 @@ export async function handleReviewButton(interaction) {
   if (action === 'vote') {
     await interaction.deferReply({ flags: ephemeral });
     const r = await castVote({ submissionId: Number(id), userId: interaction.user.id, userTag: interaction.user.tag, vote: parts[2] });
-    if (!r.ok) return interaction.editReply(r.error);
-    return interaction.editReply(`${r.vote ? `You voted **${r.vote}**.` : 'Your vote was removed.'} Votes now: ${r.tally.yes} yes · ${r.tally.no} no.`);
+    if (!r.ok) return interaction.editReply({ embeds: [notice(r.error, 'error')] });
+    return interaction.editReply({ embeds: [notice(`${r.vote ? `You voted **${r.vote === 'yes' ? '👍 yes' : '👎 no'}**.` : 'Your vote was removed.'} Votes now: 👍 ${r.tally.yes} · 👎 ${r.tally.no}`, 'success')] });
   }
 
   if (action === 'interview') {
     await interaction.deferReply({ flags: ephemeral });
     const r = await startInterview({ submissionId: Number(id), staffId: interaction.user.id, staffTag: interaction.user.tag });
-    return interaction.editReply(r.ok ? `Interview channel ready: <#${r.channelId}>. ${r.notes.join(' ')}` : r.error);
+    return interaction.editReply({ embeds: [r.ok ? notice(`Interview channel ready: <#${r.channelId}>. ${r.notes.join(' ')}`, 'success') : notice(r.error, 'error')] });
   }
 
   if (action === 'deny') {
@@ -433,7 +468,7 @@ export async function handleReviewButton(interaction) {
       .addComponents(new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('reason')
-          .setLabel('Reason (sent to the applicant, optional)')
+          .setLabel('Note to the applicant (optional)')
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(false)
           .setMaxLength(500),
@@ -445,7 +480,7 @@ export async function handleReviewButton(interaction) {
   const result = await decideSubmission({
     submissionId: Number(id), decision: 'accepted', reviewerId: interaction.user.id, reviewerTag: interaction.user.tag,
   });
-  return interaction.editReply(result.ok ? `Accepted. ${result.notes.join(' ')}` : result.error);
+  return interaction.editReply({ embeds: [result.ok ? notice(`Accepted. ${result.notes.join(' ')}`, 'success') : notice(result.error, 'error')] });
 }
 
 export async function handleDenyModal(interaction) {
@@ -456,7 +491,7 @@ export async function handleDenyModal(interaction) {
   const result = await decideSubmission({
     submissionId: id, decision: 'denied', reviewerId: interaction.user.id, reviewerTag: interaction.user.tag, reason,
   });
-  return interaction.editReply(result.ok ? `Denied. ${result.notes.join(' ')}` : result.error);
+  return interaction.editReply({ embeds: [result.ok ? notice(`Denied. ${result.notes.join(' ')}`, 'success') : notice(result.error, 'error')] });
 }
 
 /** Removes the staff review cards in Discord for deleted submissions. Failures are ignored. */

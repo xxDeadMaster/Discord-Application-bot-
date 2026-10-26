@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Orbit logo">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#123A8A"/>
+      <stop offset="55%" stop-color="#0A1B44"/>
+      <stop offset="100%" stop-color="#04060C"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4C9BFF" stop-opacity="0.65"/>
+      <stop offset="60%" stop-color="#1F6FEB" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#1F6FEB" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#CFE3FF"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4A97FF"/>
+      <stop offset="100%" stop-color="#1D63DB"/>
+    </linearGradient>
+    <linearGradient id="right" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1450C8"/>
+      <stop offset="100%" stop-color="#0A2C73"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2F7BFF"/>
+      <stop offset="45%" stop-color="#BFE0FF"/>
+      <stop offset="60%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#2F7BFF"/>
+    </linearGradient>
+    <radialGradient id="moon" cx="38%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#9FCBFF"/>
+    </radialGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+    <clipPath id="circle"><circle cx="256" cy="256" r="248"/></clipPath>
+    <clipPath id="backHalf"><rect x="-200" y="-200" width="912" height="480"/></clipPath>
+    <clipPath id="frontHalf"><rect x="-200" y="280" width="912" height="500"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#circle)">
+    <circle cx="256" cy="256" r="248" fill="url(#bg)"/>
+    <!-- stars -->
+    <g fill="#FFFFFF">
+      <circle cx="104" cy="122" r="3" opacity="0.7"/>
+      <circle cx="402" cy="104" r="2.5" opacity="0.6"/>
+      <circle cx="430" cy="196" r="2" opacity="0.45"/>
+      <circle cx="86" cy="250" r="2" opacity="0.4"/>
+      <circle cx="150" cy="430" r="2.5" opacity="0.45"/>
+      <circle cx="372" cy="440" r="2" opacity="0.4"/>
+      <path d="M392 150 l4 10 l10 4 l-10 4 l-4 10 l-4 -10 l-10 -4 l10 -4 z" opacity="0.85"/>
+    </g>
+    <circle cx="256" cy="262" r="215" fill="url(#glow)"/>
+
+    <!-- ring: back half (behind the cube) -->
+    <g transform="rotate(-16 256 280)">
+      <ellipse cx="256" cy="280" rx="230" ry="74" fill="none" stroke="#1F6FEB" stroke-width="20" opacity="0.45" clip-path="url(#backHalf)"/>
+    </g>
+
+    <!-- cube -->
+    <g stroke-linejoin="round" transform="translate(256 264) scale(1.14) translate(-256 -264)">
+      <polygon points="256,128 374,196 256,264 138,196" fill="url(#top)" stroke="#FFFFFF" stroke-width="6"/>
+      <polygon points="138,196 256,264 256,400 138,332" fill="url(#left)" stroke="#4A97FF" stroke-width="6"/>
+      <polygon points="374,196 374,332 256,400 256,264" fill="url(#right)" stroke="#1450C8" stroke-width="6"/>
+      <!-- block seams -->
+      <g stroke-width="5" stroke-linecap="round">
+        <path d="M315 162 L197 230 M197 162 L315 230" stroke="#9CC4F5" opacity="0.55"/>
+        <path d="M197 230 L197 366 M138 264 L256 332" stroke="#0E3E9E" opacity="0.45"/>
+        <path d="M315 230 L315 366 M256 332 L374 264" stroke="#051A47" opacity="0.5"/>
+      </g>
+      <!-- rim light on the front edge -->
+      <path d="M138 196 L256 264 L374 196" fill="none" stroke="#FFFFFF" stroke-width="5" opacity="0.9"/>
+      <path d="M256 264 L256 400" fill="none" stroke="#8EC2FF" stroke-width="4" opacity="0.7"/>
+    </g>
+
+    <!-- ring: front half (over the cube) -->
+    <g transform="rotate(-16 256 280)">
+      <ellipse cx="256" cy="280" rx="230" ry="74" fill="none" stroke="#2F7BFF" stroke-width="32" opacity="0.35" filter="url(#soft)" clip-path="url(#frontHalf)"/>
+      <ellipse cx="256" cy="280" rx="230" ry="74" fill="none" stroke="url(#ring)" stroke-width="21" stroke-linecap="round" clip-path="url(#frontHalf)"/>
+      <!-- orbiting moon -->
+      <circle cx="455" cy="317" r="30" fill="#4C9BFF" opacity="0.5" filter="url(#soft)"/>
+      <circle cx="455" cy="317" r="21" fill="url(#moon)"/>
+    </g>
+  </g>
+  <circle cx="256" cy="256" r="246" fill="none" stroke="#2F7BFF" stroke-width="4" opacity="0.55"/>
+</svg>

@@ -7,6 +7,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY src ./src
+COPY assets ./assets
 
 EXPOSE 3000
-CMD ["node", "src/index.js"]
+CMD ["node", "--max-old-space-size=160", "src/index.js"]

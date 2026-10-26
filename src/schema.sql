@@ -215,3 +215,23 @@ CREATE TABLE IF NOT EXISTS loa_requests (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS loa_status_idx ON loa_requests (guild_id, status);
+
+-- Emoji shown in dropdowns and titles (unicode or <:name:id>)
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS emoji TEXT;
+ALTER TABLE app_roles ADD COLUMN IF NOT EXISTS emoji TEXT;
+ALTER TABLE ticket_types ADD COLUMN IF NOT EXISTS emoji TEXT;
+-- Sensible defaults the first time (only where none is set yet)
+UPDATE app_roles SET emoji = CASE
+    WHEN name ILIKE '%admin%' THEN '🛡️' WHEN name ILIKE '%mod%' THEN '🔨' WHEN name ILIKE '%dev%' OR name ILIKE '%script%' THEN '💻'
+    WHEN name ILIKE '%build%' THEN '🧱' WHEN name ILIKE '%anim%' THEN '🎬' WHEN name ILIKE '%ui%' OR name ILIKE '%design%' THEN '🎨'
+    WHEN name ILIKE '%event%' THEN '🎉' WHEN name ILIKE '%support%' OR name ILIKE '%helper%' THEN '🤝' WHEN name ILIKE '%test%' THEN '🧪'
+    ELSE '⭐' END
+  WHERE emoji IS NULL;
+UPDATE app_categories SET emoji = CASE WHEN name ILIKE '%roblox%' THEN '🎮' WHEN name ILIKE '%discord%' THEN '💬' WHEN name ILIKE '%content%' OR name ILIKE '%creator%' THEN '🎥' ELSE '📋' END
+  WHERE emoji IS NULL;
+UPDATE ticket_types SET emoji = CASE WHEN name ILIKE '%report%' THEN '🚨' WHEN name ILIKE '%partner%' THEN '🤝' WHEN name ILIKE '%appeal%' THEN '⚖️'
+    WHEN name ILIKE '%bug%' THEN '🐞' ELSE '💬' END
+  WHERE emoji IS NULL;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS role_emoji TEXT;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS user_avatar TEXT;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS type_emoji TEXT;

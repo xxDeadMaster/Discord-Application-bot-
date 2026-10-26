@@ -8,7 +8,9 @@ import {
 } from '../db.js';
 import { config } from '../config.js';
 import { client, getGuild } from './client.js';
-import { COLORS, dashboardLink, ephemeral, isStaff, truncate, unix } from './ui.js';
+import {
+  COLORS, dashboardLink, ephemeral, footer, isStaff, notice, optionEmoji, truncate, unix, withEmoji,
+} from './ui.js';
 
 /**
  * Open tickets, keyed by channel ID, kept in memory so messages and the inactivity check
@@ -52,18 +54,23 @@ export async function loadOpenTickets() {
 
 export function ticketCard(ticket, opener) {
   const answers = Array.isArray(ticket.answers) && ticket.answers.length ? ticket.answers : [{ q: 'Topic', a: ticket.topic }];
+  const claimed = Boolean(ticket.claimed_by);
   const embed = new EmbedBuilder()
-    .setColor(ticket.claimed_by ? COLORS.accepted : COLORS.brand)
-    .setTitle(truncate(`Ticket #${pad(ticket.number)}${ticket.type_name ? ` · ${ticket.type_name}` : ''}`, 256))
-    .setDescription(`Thanks for reaching out, ${opener || `<@${ticket.opener_id}>`}. Staff will be with you soon.`)
+    .setColor(claimed ? COLORS.accepted : COLORS.sky)
+    .setAuthor({ name: '🎫 Support ticket' })
+    .setTitle(truncate(withEmoji(ticket.type_emoji, `Ticket #${pad(ticket.number)}${ticket.type_name ? ` · ${ticket.type_name}` : ''}`), 256))
+    .setDescription([
+      `Thanks for reaching out, ${opener || `<@${ticket.opener_id}>`}! A staff member will be with you soon.`,
+      'Add screenshots or extra details below while you wait.',
+    ].join('\n'))
     .addFields(
-      ...answers.slice(0, 5).map((x) => ({ name: truncate(x.q, 256), value: truncate(x.a || '(no answer)', 1024) })),
-      { name: 'Claimed by', value: ticket.claimed_by ? `<@${ticket.claimed_by}> <t:${unix(ticket.claimed_at)}:R>` : 'Nobody yet' },
+      ...answers.slice(0, 5).map((x) => ({ name: truncate(`❓ ${x.q}`, 256), value: truncate(`> ${(x.a || '(no answer)').replace(/\n/g, '\n> ')}`, 1024) })),
+      { name: 'Claimed by', value: claimed ? `✋ <@${ticket.claimed_by}> · <t:${unix(ticket.claimed_at)}:R>` : '⏳ Waiting for staff' },
     )
-    .setFooter({ text: 'Everything in this channel is saved to the ticket transcript.' });
+    .setFooter(footer('Everything here is saved to the transcript', client));
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('ticket:claim').setLabel(ticket.claimed_by ? 'Unclaim' : 'Claim').setStyle(ticket.claimed_by ? ButtonStyle.Secondary : ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('ticket:close').setLabel('Close ticket').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('ticket:claim').setLabel(claimed ? 'Unclaim' : 'Claim').setEmoji(claimed ? '↩️' : '✋').setStyle(claimed ? ButtonStyle.Secondary : ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('ticket:close').setLabel('Close ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger),
   );
   return { embeds: [embed], components: [row] };
 }
@@ -102,7 +109,7 @@ function questionModal(type) {
 async function alreadyOpen(interaction) {
   const existing = await findOpenTicketForUser(interaction.user.id);
   if (existing?.channel_id) {
-    await interaction.reply({ content: `You already have an open ticket: <#${existing.channel_id}>`, flags: ephemeral });
+    await interaction.reply({ embeds: [notice(`You already have an open ticket: <#${existing.channel_id}>`, 'warn')], flags: ephemeral });
     return true;
   }
   return false;
@@ -118,7 +125,7 @@ export async function handleTypeSelect(interaction) {
   interaction.message.edit({ components: interaction.message.components }).catch(() => {});
   if (await alreadyOpen(interaction)) return;
   const type = await getTicketType(Number(interaction.values[0]));
-  if (!type || !type.enabled) return interaction.reply({ content: 'That ticket type is not available anymore.', flags: ephemeral });
+  if (!type || !type.enabled) return interaction.reply({ embeds: [notice('That ticket type is not available anymore.', 'error')], flags: ephemeral });
   return interaction.showModal(questionModal(type));
 }
 
@@ -137,10 +144,10 @@ export async function handleOpenModal(interaction) {
   const topic = answers[0]?.a || '(no topic)';
 
   const existing = await findOpenTicketForUser(user.id);
-  if (existing?.channel_id) return interaction.editReply(`You already have an open ticket: <#${existing.channel_id}>`);
+  if (existing?.channel_id) return interaction.editReply({ embeds: [notice(`You already have an open ticket: <#${existing.channel_id}>`, 'warn')] });
 
   const guild = await getGuild();
-  const ticket = await createTicket({ openerId: user.id, openerTag: user.tag, topic, typeId: type?.id || null, typeName: type?.name || null, answers });
+  const ticket = await createTicket({ openerId: user.id, openerTag: user.tag, topic, typeId: type?.id || null, typeName: type?.name || null, typeEmoji: type?.emoji || null, answers });
 
   const perms = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory,
     PermissionFlagsBits.AttachFiles, PermissionFlagsBits.EmbedLinks];
@@ -165,7 +172,7 @@ export async function handleOpenModal(interaction) {
   } catch (err) {
     await deleteTicket(ticket.id);
     console.error('[tickets] could not create channel:', err);
-    return interaction.editReply('I could not create your ticket channel. Please tell a staff member (the bot needs Manage Channels and Manage Roles).');
+    return interaction.editReply({ embeds: [notice('I could not create your ticket channel. Please tell a staff member (the bot needs Manage Channels and Manage Roles).', 'error')] });
   }
 
   await setTicketChannel(ticket.id, channel.id);
@@ -179,7 +186,7 @@ export async function handleOpenModal(interaction) {
   });
   await updateTicket(ticket.id, { welcome_message_id: msg.id });
 
-  return interaction.editReply(`Your ticket is open: ${channel}`);
+  return interaction.editReply({ embeds: [notice(`Your ticket is open: ${channel}`, 'success')] });
 }
 
 /* ---------- Claiming ---------- */
@@ -210,7 +217,9 @@ export async function toggleClaim({ ticketId, userId, userTag, member, settings 
   await refreshWelcome(updated);
   const channel = ticket.channel_id ? await client.channels.fetch(ticket.channel_id).catch(() => null) : null;
   await channel?.send({
-    content: unclaim ? `<@${userId}> unclaimed this ticket. Another staff member can pick it up.` : `<@${userId}> claimed this ticket and will help you.`,
+    embeds: [unclaim
+      ? notice(`<@${userId}> unclaimed this ticket. Another staff member can pick it up.`, 'info')
+      : { color: COLORS.accepted, description: `✋ <@${userId}> claimed this ticket and will help you.` }],
     allowedMentions: { users: [] },
   }).catch(() => {});
   return { ok: true, ticket: updated, claimed: !unclaim };
@@ -218,10 +227,10 @@ export async function toggleClaim({ ticketId, userId, userTag, member, settings 
 
 export async function handleClaimButton(interaction) {
   const entry = openTickets.get(interaction.channelId);
-  if (!entry) return interaction.reply({ content: 'This ticket is already closed.', flags: ephemeral });
+  if (!entry) return interaction.reply({ embeds: [notice('This ticket is already closed.', 'info')], flags: ephemeral });
   const settings = await getSettings();
   const r = await toggleClaim({ ticketId: entry.ticketId, userId: interaction.user.id, userTag: interaction.user.tag, member: interaction.member, settings });
-  return interaction.reply({ content: r.ok ? (r.claimed ? 'You claimed this ticket.' : 'You unclaimed this ticket.') : r.error, flags: ephemeral });
+  return interaction.reply({ embeds: [r.ok ? notice(r.claimed ? 'You claimed this ticket.' : 'You unclaimed this ticket.', 'success') : notice(r.error, 'blocked')], flags: ephemeral });
 }
 
 /* ---------- Recording messages + inactivity ---------- */
@@ -249,10 +258,10 @@ export async function recordTicketMessage(message) {
 
 export async function handleKeepOpen(interaction) {
   const entry = openTickets.get(interaction.channelId);
-  if (!entry) return interaction.update({ content: 'This ticket is already closed.', components: [] });
+  if (!entry) return interaction.update({ content: '', embeds: [notice('This ticket is already closed.', 'info')], components: [] });
   entry.last = Date.now();
   entry.warnedAt = null;
-  return interaction.update({ content: `${interaction.user} kept this ticket open.`, components: [], allowedMentions: { users: [] } });
+  return interaction.update({ content: '', embeds: [notice(`${interaction.user} kept this ticket open.`, 'success')], components: [], allowedMentions: { users: [] } });
 }
 
 /** One pass of the inactivity check. Runs from memory; only touches the database to close. */
@@ -264,9 +273,9 @@ export async function checkInactiveTickets(now = Date.now()) {
       entry.warnedAt = now;
       const channel = await client.channels.fetch(channelId).catch(() => null);
       await channel?.send({
-        content: `This ticket has had no messages for ${autoCloseHours} hour${autoCloseHours === 1 ? '' : 's'}. It will close automatically in 1 hour unless someone replies.`,
+        embeds: [notice(`This ticket has had no messages for ${autoCloseHours} hour${autoCloseHours === 1 ? '' : 's'}. It will close automatically in 1 hour unless someone replies.`, 'warn')],
         components: [new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('ticket:keepopen').setLabel('Keep it open').setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId('ticket:keepopen').setLabel('Keep it open').setEmoji('🔓').setStyle(ButtonStyle.Secondary),
         )],
       }).catch(() => {});
     } else if (entry.warnedAt && now - entry.warnedAt >= WARNING_GRACE_MS && entry.last < entry.warnedAt) {
@@ -285,17 +294,17 @@ export function startAutoClose() {
 
 export async function handleCloseButton(interaction) {
   if (!openTickets.has(interaction.channelId)) {
-    return interaction.reply({ content: 'This ticket is already closed.', flags: ephemeral });
+    return interaction.reply({ embeds: [notice('This ticket is already closed.', 'info')], flags: ephemeral });
   }
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('ticket:closeconfirm').setLabel('Yes, close it').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('ticket:closeconfirm').setLabel('Yes, close it').setEmoji('🔒').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('ticket:closecancel').setLabel('Keep it open').setStyle(ButtonStyle.Secondary),
   );
-  return interaction.reply({ content: 'Close this ticket? The channel will be deleted and a transcript saved.', components: [row], flags: ephemeral });
+  return interaction.reply({ embeds: [notice('Close this ticket? The channel will be deleted and a transcript saved.', 'warn')], components: [row], flags: ephemeral });
 }
 
 export async function handleCloseCancel(interaction) {
-  return interaction.update({ content: 'Okay, the ticket stays open.', components: [] });
+  return interaction.update({ embeds: [notice('Okay, the ticket stays open.', 'success')], components: [] });
 }
 
 export function transcriptText(ticket, messages) {
@@ -321,8 +330,18 @@ export function transcriptText(ticket, messages) {
 
 function ratingRow(ticketId) {
   return new ActionRowBuilder().addComponents(
-    [1, 2, 3, 4, 5].map((n) => new ButtonBuilder().setCustomId(`trate:${ticketId}:${n}`).setLabel(`${n} ★`).setStyle(n >= 4 ? ButtonStyle.Success : ButtonStyle.Secondary)),
+    [1, 2, 3, 4, 5].map((n) => new ButtonBuilder().setCustomId(`trate:${ticketId}:${n}`).setLabel(String(n)).setEmoji('⭐').setStyle(n >= 4 ? ButtonStyle.Primary : ButtonStyle.Secondary)),
   );
+}
+
+/** The DM sent to the opener when their ticket closes; `footerLine` is the rating prompt or the thanks. */
+function closedDmEmbed(ticket, footerLine) {
+  return new EmbedBuilder()
+    .setColor(COLORS.sky)
+    .setAuthor({ name: '🔒 Ticket closed' })
+    .setTitle(truncate(withEmoji(ticket.type_emoji, `Ticket #${pad(ticket.number)}${ticket.type_name ? ` · ${ticket.type_name}` : ''}`), 256))
+    .setDescription(`Your ticket was closed. A copy of the conversation is attached.\n\n${footerLine}`)
+    .setFooter(footer('Support', client));
 }
 
 async function finishClose(ticket, { deleteChannel = true } = {}) {
@@ -337,7 +356,9 @@ async function finishClose(ticket, { deleteChannel = true } = {}) {
       const log = await client.channels.fetch(settings.ticket_log_channel_id);
       const embed = new EmbedBuilder()
         .setColor(COLORS.muted)
-        .setTitle(truncate(`Ticket #${pad(ticket.number)} closed${ticket.type_name ? ` · ${ticket.type_name}` : ''}`, 256))
+        .setAuthor({ name: '🔒 Ticket closed' })
+        .setTitle(truncate(withEmoji(ticket.type_emoji, `Ticket #${pad(ticket.number)}${ticket.type_name ? ` · ${ticket.type_name}` : ''}`), 256))
+        .setFooter(footer('Transcript attached', client))
         .setURL(link.startsWith('https://') ? link : null)
         .addFields(
           { name: 'Opened by', value: `<@${ticket.opener_id}> (${ticket.opener_tag})`, inline: true },
@@ -357,7 +378,7 @@ async function finishClose(ticket, { deleteChannel = true } = {}) {
   try {
     const opener = await client.users.fetch(ticket.opener_id);
     await opener.send({
-      content: `Your ticket **#${pad(ticket.number)}** was closed. Here's a copy of the conversation.\n\n**How did we do?** Tap a rating from 1 (bad) to 5 (great).`,
+      embeds: [closedDmEmbed(ticket, '**How did we do?** Tap a rating from 1 (bad) to 5 (great).')],
       files: [file],
       components: [ratingRow(ticket.id)],
     });
@@ -366,7 +387,7 @@ async function finishClose(ticket, { deleteChannel = true } = {}) {
   if (deleteChannel && ticket.channel_id) {
     const channel = await client.channels.fetch(ticket.channel_id).catch(() => null);
     if (channel) {
-      await channel.send('Closing this ticket in 5 seconds…').catch(() => {});
+      await channel.send({ embeds: [notice('Closing this ticket in 5 seconds…', 'info')] }).catch(() => {});
       setTimeout(() => channel.delete(`Ticket #${pad(ticket.number)} closed`).catch((e) => console.warn('[tickets] delete failed:', e.message)), 5000);
     }
   }
@@ -378,19 +399,20 @@ export async function handleRating(interaction) {
   const rating = Number(n);
   const ticket = await getTicket(Number(id));
   if (!ticket || ticket.opener_id !== interaction.user.id || !(rating >= 1 && rating <= 5)) {
-    return interaction.reply({ content: 'This rating is not for you.', flags: ephemeral });
+    return interaction.reply({ embeds: [notice('This rating is not for you.', 'blocked')], flags: ephemeral });
   }
+  const stars = (n) => `${'⭐'.repeat(n)}${'☆'.repeat(5 - n)}`;
   if (ticket.rating) {
-    return interaction.update({ content: `${interaction.message.content.split('\n\n')[0]}\n\nYou already rated this ticket ${ticket.rating}/5. Thanks!`, components: [] });
+    return interaction.update({ content: '', embeds: [closedDmEmbed(ticket, `You already rated this ticket ${stars(ticket.rating)} **${ticket.rating}/5**. Thanks!`)], components: [] });
   }
   await updateTicket(ticket.id, { rating, rated_at: new Date() });
-  return interaction.update({ content: `${interaction.message.content.split('\n\n')[0]}\n\nThanks for rating us **${rating}/5**!`, components: [] });
+  return interaction.update({ content: '', embeds: [closedDmEmbed(ticket, `Thanks for rating us ${stars(rating)} **${rating}/5**!`)], components: [] });
 }
 
 export async function handleCloseConfirm(interaction) {
   const entry = openTickets.get(interaction.channelId);
-  if (!entry) return interaction.update({ content: 'This ticket is already closed.', components: [] });
-  await interaction.update({ content: 'Closing the ticket…', components: [] });
+  if (!entry) return interaction.update({ embeds: [notice('This ticket is already closed.', 'info')], components: [] });
+  await interaction.update({ embeds: [notice('Closing the ticket…', 'info')], components: [] });
   const ticket = await closeTicket(entry.ticketId, interaction.user.id, interaction.user.tag);
   if (!ticket) return;
   await finishClose(ticket);
@@ -416,12 +438,13 @@ export async function closeTicketFromDashboard(ticketId, userId, userTag) {
 export async function ticketPanelComponents() {
   const types = (await listTicketTypes({ enabledOnly: true })).slice(0, 25);
   if (!types.length) {
-    return [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('ticket:open').setLabel('Open a ticket').setStyle(ButtonStyle.Primary))];
+    return [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('ticket:open').setLabel('Open a ticket').setEmoji('🎫').setStyle(ButtonStyle.Primary))];
   }
   return [new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder().setCustomId('ticket:type').setPlaceholder('What do you need help with?').addOptions(types.map((t) => {
+    new StringSelectMenuBuilder().setCustomId('ticket:type').setPlaceholder('🎫 What do you need help with?').addOptions(types.map((t) => {
       const o = { label: truncate(t.name, 100), value: String(t.id) };
       if (t.description) o.description = truncate(t.description, 100);
+      if (t.emoji) o.emoji = optionEmoji(t.emoji);
       return o;
     })),
   )];

@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { getSettings, getSubmission, getSubmissionByInterviewChannel, listActiveInterviews, setInterview } from '../db.js';
 import { refreshCard } from './applications.js';
 import { client, getGuild } from './client.js';
-import { COLORS, answerFields, truncate } from './ui.js';
+import { COLORS, answerFields, footer, truncate, withEmoji } from './ui.js';
 
 /** If nobody joins an interview channel within this time, it is removed. */
 const UNUSED_TIMEOUT_MS = 30 * 60 * 1000;
@@ -92,9 +92,11 @@ export async function startInterview({ submissionId, staffId, staffTag }) {
       allowedMentions: { users: [sub.user_id] },
       embeds: [new EmbedBuilder()
         .setColor(COLORS.brand)
-        .setTitle(truncate(`Interview · ${sub.role_name} application #${sub.id}`, 256))
-        .setDescription(`Applicant: <@${sub.user_id}> (${sub.user_tag})\nStarted by ${staffTag}. This channel deletes itself when everyone has left.`)
-        .addFields(fields)],
+        .setAuthor({ name: '🎙️ Interview' })
+        .setTitle(truncate(withEmoji(sub.role_emoji, `${sub.role_name} application #${sub.id}`), 256))
+        .setDescription(`**Applicant:** <@${sub.user_id}> (${sub.user_tag})\n**Started by:** ${staffTag}\n\n🧹 This channel deletes itself when everyone has left.`)
+        .addFields(fields)
+        .setFooter(footer(`Application #${sub.id}`, client))],
     });
   } catch (err) {
     notes.push('Could not post the answers in the channel chat.');
@@ -106,11 +108,13 @@ export async function startInterview({ submissionId, staffId, staffTag }) {
     const user = await client.users.fetch(sub.user_id);
     await user.send({
       embeds: [new EmbedBuilder()
-        .setColor(COLORS.brand)
+        .setColor(COLORS.sky)
+        .setAuthor({ name: '🎙️ Interview invite' })
         .setTitle('You have an interview!')
-        .setDescription(`Staff in **${guild.name}** want to interview you about your **${sub.role_name}** application.\n\nJoin the voice channel: <#${channel.id}>`)],
+        .setDescription(`Staff in **${guild.name}** want to talk about your **${withEmoji(sub.role_emoji, sub.role_name)}** application.\n\nJoin the voice channel when you're ready: <#${channel.id}>`)
+        .setFooter(footer(`Application #${sub.id}`, client))],
       components: [new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setLabel('Join interview').setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/${guild.id}/${channel.id}`),
+        new ButtonBuilder().setLabel('Join interview').setEmoji('🎙️').setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/${guild.id}/${channel.id}`),
       )],
     });
     notes.push('Applicant invited by DM.');

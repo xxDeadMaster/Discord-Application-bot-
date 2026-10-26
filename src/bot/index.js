@@ -4,6 +4,7 @@ import {
   handleCategorySelect, handleDenyModal, handleDirectMessage, handleDmButton, handleReviewButton, handleRoleSelect,
 } from './applications.js';
 import { client } from './client.js';
+import { syncProfile } from './profile.js';
 import { handleInterviewChannelDelete, handleVoiceState, loadActiveInterviews } from './interviews.js';
 import { startPanelScheduler } from './panels.js';
 import { handleCommand, handleLoaButton, handleLoaModal, loadLoaSchedule, registerCommands } from './staff.js';
@@ -81,6 +82,7 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`[bot] logged in as ${c.user.tag}`);
   const guild = await c.guilds.fetch(config.guildId).catch(() => null);
   if (!guild) console.warn(`[bot] not in server ${config.guildId} yet. Invite it with the link on the dashboard.`);
+  syncProfile(c).catch((err) => console.warn('[profile] sync failed:', err.message));
   if (guild) {
     await registerCommands(guild);
     await guild.members.fetch().catch((err) => console.warn('[bot] could not load member list (turn on Server Members Intent):', err.message));

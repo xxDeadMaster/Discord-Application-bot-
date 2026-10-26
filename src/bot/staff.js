@@ -8,7 +8,14 @@ import {
 } from '../db.js';
 import { tzParts } from '../schedule.js';
 import { client, getGuild } from './client.js';
-import { COLORS, ephemeral, isStaff, truncate, unix } from './ui.js';
+import {
+  COLORS, ephemeral, footer, isStaff, notice, truncate, unix,
+} from './ui.js';
+
+/** 🟥🟥⬛ style meter: filled for active strikes, at least 3 slots. */
+const strikeMeter = (n) => `${'🟥'.repeat(n)}${'⬛'.repeat(Math.max(3 - n, 0))}`;
+/** Puts a plain-text reply into a notice embed so every bot reply looks the same. */
+const say = (text, kind = 'info') => ({ content: '', embeds: [notice(text, kind)] });
 
 /* ---------- Who can do what ---------- */
 
@@ -99,9 +106,10 @@ export async function issueStrike({ userId, userTag, reason, issuerId, issuerTag
   try {
     const user = await client.users.fetch(userId);
     const guild = await getGuild();
-    await user.send({ embeds: [new EmbedBuilder().setColor(COLORS.denied).setTitle(`Staff strike ${count}`)
-      .setDescription(`You received a staff strike in **${guild.name}**. You now have **${count}** active strike${count === 1 ? '' : 's'}.`)
-      .addFields({ name: 'Reason', value: truncate(reason, 1024) })] });
+    await user.send({ embeds: [new EmbedBuilder().setColor(COLORS.denied).setAuthor({ name: '⚠️ Staff strike' }).setTitle(`Strike ${count}`)
+      .setDescription(`You received a staff strike in **${guild.name}**.\n${strikeMeter(count)} **${count}** active strike${count === 1 ? '' : 's'}`)
+      .addFields({ name: 'Reason', value: truncate(reason, 1024) })
+      .setFooter(footer('Staff team', client))] });
     notes.push('They were told by DM.');
   } catch { notes.push('Could not DM them.'); }
 
@@ -109,13 +117,13 @@ export async function issueStrike({ userId, userTag, reason, issuerId, issuerTag
   await logTo(settings.strike_log_channel_id, {
     content: alert ? `<@&${settings.manager_role_id}> <@${userId}> has reached **${count} strikes**.` : undefined,
     allowedMentions: { roles: alert ? [settings.manager_role_id] : [] },
-    embeds: [new EmbedBuilder().setColor(COLORS.denied).setTitle(`Strike ${count} · ${userTag}`)
+    embeds: [new EmbedBuilder().setColor(COLORS.denied).setAuthor({ name: '⚠️ Strike given' }).setTitle(`Strike ${count} · ${userTag}`)
       .addFields(
         { name: 'Member', value: `<@${userId}>`, inline: true },
         { name: 'Issued by', value: issuerId ? `<@${issuerId}>` : issuerTag, inline: true },
-        { name: 'Active strikes', value: String(count), inline: true },
+        { name: 'Active strikes', value: `${strikeMeter(count)} ${count}`, inline: true },
         { name: 'Reason', value: truncate(reason, 1024) },
-      ).setFooter({ text: `Strike #${strike.id}` })],
+      ).setFooter(footer(`Strike #${strike.id}`, client))],
   });
   return { ok: true, strike, count, notes };
 }
@@ -136,8 +144,9 @@ export async function removeStrike({ strikeId, userId, byTag }) {
   const roleNote = await syncStrikeRoles(target.user_id, count, settings);
   if (roleNote) notes.push(roleNote);
   await logTo(settings.strike_log_channel_id, {
-    embeds: [new EmbedBuilder().setColor(COLORS.accepted).setTitle(`Strike removed · ${target.user_tag}`)
-      .setDescription(`Strike #${target.id} was removed by ${byTag}. <@${target.user_id}> now has **${count}** active strike${count === 1 ? '' : 's'}.`)],
+    embeds: [new EmbedBuilder().setColor(COLORS.accepted).setAuthor({ name: '✅ Strike removed' }).setTitle(`Strike removed · ${target.user_tag}`)
+      .setDescription(`Strike #${target.id} was removed by ${byTag}.\n<@${target.user_id}> now has ${strikeMeter(count)} **${count}** active strike${count === 1 ? '' : 's'}.`)
+      .setFooter(footer(`Strike #${target.id}`, client))],
   });
   return { ok: true, count, strike: target, notes };
 }
@@ -149,19 +158,20 @@ const loaSchedule = new Map(); // id -> { id, user_id, start_date, end_date, rol
 
 function loaCard(loa) {
   const color = { pending: COLORS.pending, approved: COLORS.accepted, denied: COLORS.denied }[loa.status] ?? COLORS.muted;
-  const embed = new EmbedBuilder().setColor(color).setTitle(`LOA request · ${loa.user_tag}`)
+  const icon = { pending: '⏳', approved: '✅', denied: '❌', cancelled: '🚫', ended: '👋' }[loa.status] || '•';
+  const embed = new EmbedBuilder().setColor(color).setAuthor({ name: '🌴 Leave of absence' }).setTitle(`LOA request · ${loa.user_tag}`)
     .addFields(
       { name: 'Member', value: `<@${loa.user_id}>`, inline: true },
-      { name: 'From', value: prettyDate(loa.start_date), inline: true },
-      { name: 'Until', value: prettyDate(loa.end_date), inline: true },
+      { name: 'From', value: `📅 ${prettyDate(loa.start_date)}`, inline: true },
+      { name: 'Until', value: `📅 ${prettyDate(loa.end_date)}`, inline: true },
       { name: 'Reason', value: truncate(loa.reason || '(none)', 1024) },
-    ).setFooter({ text: `LOA #${loa.id}` });
+    ).setFooter(footer(`LOA #${loa.id}`, client));
   if (loa.status !== 'pending') {
-    embed.addFields({ name: 'Status', value: `${loa.status[0].toUpperCase()}${loa.status.slice(1)}${loa.reviewed_by_tag ? ` by ${loa.reviewed_by_tag}` : ''}` });
+    embed.addFields({ name: 'Status', value: `${icon} ${loa.status[0].toUpperCase()}${loa.status.slice(1)}${loa.reviewed_by_tag ? ` by ${loa.reviewed_by_tag}` : ''}` });
   }
   const components = loa.status === 'pending' ? [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`loa:approve:${loa.id}`).setLabel('Approve').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`loa:deny:${loa.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`loa:approve:${loa.id}`).setLabel('Approve').setEmoji('✅').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`loa:deny:${loa.id}`).setLabel('Deny').setEmoji('✖️').setStyle(ButtonStyle.Danger),
   )] : [];
   return { embeds: [embed], components };
 }
@@ -236,7 +246,9 @@ export async function decideLoa({ id, approve, byId, byTag }) {
   try {
     const user = await client.users.fetch(loa.user_id);
     await user.send({ embeds: [new EmbedBuilder().setColor(approve ? COLORS.accepted : COLORS.denied)
-      .setTitle(approve ? 'LOA approved' : 'LOA denied')
+      .setAuthor({ name: '🌴 Leave of absence' })
+      .setTitle(approve ? '✅ LOA approved' : '❌ LOA denied')
+      .setFooter(footer('Staff team', client))
       .setDescription(`Your leave from **${prettyDate(loa.start_date)}** to **${prettyDate(loa.end_date)}** was ${approve ? 'approved' : 'denied'} by ${byTag}.`)] });
     notes.push('They were told by DM.');
   } catch { notes.push('Could not DM them.'); }
@@ -338,27 +350,31 @@ export async function handleCommand(interaction) {
     if (sub === 'list') {
       const who = target || interaction.user;
       if (who.id !== interaction.user.id && !isManager(interaction.member, settings) && !isStaff(interaction.member, settings)) {
-        return interaction.reply({ content: 'Only staff can see other people\'s strikes.', flags: ephemeral });
+        return interaction.reply({ ...say('Only staff can see other people\'s strikes.', 'blocked'), flags: ephemeral });
       }
       const list = await listStrikes({ userId: who.id });
       const active = list.filter((s) => !s.revoked_at);
       const lines = list.slice(0, 15).map((s) => `${s.revoked_at ? '~~' : ''}#${s.id} · <t:${unix(s.created_at)}:d> · ${truncate(s.reason, 120)} (by ${s.issued_by_tag})${s.revoked_at ? '~~ removed' : ''}`);
-      return interaction.reply({ content: `**${who.tag}** has **${active.length}** active strike${active.length === 1 ? '' : 's'}.\n${lines.join('\n') || 'No strikes.'}`, flags: ephemeral, allowedMentions: { users: [] } });
+      const embed = new EmbedBuilder().setColor(active.length ? COLORS.denied : COLORS.accepted).setAuthor({ name: '⚠️ Strikes' })
+        .setTitle(truncate(who.tag, 256))
+        .setDescription(truncate(`${strikeMeter(active.length)} **${active.length}** active strike${active.length === 1 ? '' : 's'}\n\n${lines.join('\n') || 'No strikes. 🎉'}`, 4096))
+        .setFooter(footer(null, client));
+      return interaction.reply({ embeds: [embed], flags: ephemeral, allowedMentions: { users: [] } });
     }
-    if (!isManager(interaction.member, settings)) return interaction.reply({ content: 'Only managers can give or remove strikes.', flags: ephemeral });
-    if (target.bot) return interaction.reply({ content: "Bots can't get strikes.", flags: ephemeral });
+    if (!isManager(interaction.member, settings)) return interaction.reply({ ...say('Only managers can give or remove strikes.', 'blocked'), flags: ephemeral });
+    if (target.bot) return interaction.reply({ ...say("Bots can't get strikes.", 'error'), flags: ephemeral });
     await interaction.deferReply({ flags: ephemeral });
     if (sub === 'add') {
       const r = await issueStrike({ userId: target.id, userTag: target.tag, reason: interaction.options.getString('reason'), issuerId: interaction.user.id, issuerTag: interaction.user.tag });
-      return interaction.editReply(r.ok ? `Gave ${target} strike ${r.count}. ${r.notes.join(' ')}` : r.error);
+      return interaction.editReply(r.ok ? say(`Gave ${target} strike ${r.count}. ${strikeMeter(r.count)}\n${r.notes.join(' ')}`, 'success') : say(r.error, 'error'));
     }
     const r = await removeStrike({ userId: target.id, byTag: interaction.user.tag });
-    return interaction.editReply(r.ok ? `Removed a strike. ${target} now has ${r.count}. ${r.notes.join(' ')}` : r.error);
+    return interaction.editReply(r.ok ? say(`Removed a strike. ${target} now has ${r.count}. ${strikeMeter(r.count)}\n${r.notes.join(' ')}`, 'success') : say(r.error, 'error'));
   }
 
   if (interaction.commandName === 'loa') {
     if (!isStaff(interaction.member, settings) && !isManager(interaction.member, settings)) {
-      return interaction.reply({ content: 'LOA requests are for staff.', flags: ephemeral });
+      return interaction.reply({ ...say('LOA requests are for staff.', 'blocked'), flags: ephemeral });
     }
     if (sub === 'request') {
       const modal = new ModalBuilder().setCustomId('loa:modal').setTitle('Leave of absence').addComponents(
@@ -369,10 +385,10 @@ export async function handleCommand(interaction) {
       return interaction.showModal(modal);
     }
     const open = await findOpenLoa(interaction.user.id);
-    if (!open) return interaction.reply({ content: "You don't have an LOA to end.", flags: ephemeral });
+    if (!open) return interaction.reply({ ...say("You don't have an LOA to end.", 'info'), flags: ephemeral });
     await interaction.deferReply({ flags: ephemeral });
     const r = await endLoa({ id: open.id, byTag: interaction.user.tag });
-    return interaction.editReply(r.ok ? (r.loa.status === 'cancelled' ? 'Your LOA request was cancelled.' : 'Welcome back! Your LOA has ended.') : r.error);
+    return interaction.editReply(r.ok ? say(r.loa.status === 'cancelled' ? 'Your LOA request was cancelled.' : 'Welcome back! Your LOA has ended. 👋', 'success') : say(r.error, 'error'));
   }
   return null;
 }
@@ -385,17 +401,17 @@ export async function handleLoaModal(interaction) {
     reason: interaction.fields.getTextInputValue('reason'),
   });
   return interaction.editReply(r.ok
-    ? `Your LOA request (${prettyDate(r.loa.start_date)} to ${prettyDate(r.loa.end_date)}) was sent to managers. I'll DM you when it's reviewed.`
-    : r.error);
+    ? say(`🌴 Your LOA request (**${prettyDate(r.loa.start_date)}** to **${prettyDate(r.loa.end_date)}**) was sent to managers. I'll DM you when it's reviewed.`, 'success')
+    : say(r.error, 'error'));
 }
 
 export async function handleLoaButton(interaction) {
   const [, action, id] = interaction.customId.split(':');
   const settings = await getSettings();
-  if (!isManager(interaction.member, settings)) return interaction.reply({ content: 'Only managers can review LOA requests.', flags: ephemeral });
+  if (!isManager(interaction.member, settings)) return interaction.reply({ ...say('Only managers can review LOA requests.', 'blocked'), flags: ephemeral });
   await interaction.deferReply({ flags: ephemeral });
   const r = await decideLoa({ id: Number(id), approve: action === 'approve', byId: interaction.user.id, byTag: interaction.user.tag });
-  return interaction.editReply(r.ok ? `${action === 'approve' ? 'Approved' : 'Denied'}. ${r.notes.join(' ')}` : r.error);
+  return interaction.editReply(r.ok ? say(`${action === 'approve' ? 'Approved' : 'Denied'}. ${r.notes.join(' ')}`, 'success') : say(r.error, 'error'));
 }
 
 export const _staffState = { loaSchedule };

@@ -1,13 +1,74 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { config } from '../config.js';
 
+/** Orbit theme: BloxVerse black, blue and white. Status colors only for status. */
 export const COLORS = {
-  brand: 0x3a6be0,
-  pending: 0xe0a83a,
-  accepted: 0x1f8a55,
-  denied: 0xc8413a,
-  muted: 0x5c6478,
+  brand: 0x1f6feb, // BloxVerse blue: panels, main messages
+  sky: 0x58a6ff, // lighter blue: DMs, info, tickets
+  white: 0xf2f5fa, // neutral notices
+  pending: 0xffc24b,
+  accepted: 0x2fb27a,
+  denied: 0xe5484d,
+  muted: 0x2c3547,
 };
+
+/** Text name used in footers and banners. */
+export const BRAND = 'BloxVerse Community';
+
+/** Footer with the bot's avatar: "BloxVerse Community · Application #12". */
+export function footer(text, client) {
+  const icon = client?.user?.displayAvatarURL?.({ size: 64 });
+  const t = text ? `${BRAND} · ${text}` : BRAND;
+  return icon ? { text: truncate(t, 2048), iconURL: icon } : { text: truncate(t, 2048) };
+}
+
+/** "▰▰▰▱▱▱ 50%" style progress bar. */
+export function progressBar(done, total, width = 20) {
+  const ratio = total ? Math.min(Math.max(done / total, 0), 1) : 0;
+  const filled = Math.round(ratio * width);
+  return `${'▰'.repeat(filled)}${'▱'.repeat(width - filled)} ${Math.round(ratio * 100)}%`;
+}
+
+/** Status line used on cards, e.g. "⏳ **PENDING**". */
+export const STATUS_LABEL = {
+  pending: '⏳ **PENDING**',
+  accepted: '✅ **ACCEPTED**',
+  denied: '❌ **DENIED**',
+  open: '🟢 **OPEN**',
+  closed: '🔒 **CLOSED**',
+};
+
+/** How old a Discord account is, from its snowflake ID ("2 years", "3 months", "5 days"). */
+export function accountAge(userId) {
+  try {
+    const created = Number((BigInt(userId) >> 22n) + 1420070400000n);
+    const days = Math.floor((Date.now() - created) / 86400000);
+    if (days >= 365) { const y = Math.floor(days / 365); return `${y} year${y === 1 ? '' : 's'}`; }
+    if (days >= 30) { const m = Math.floor(days / 30); return `${m} month${m === 1 ? '' : 's'}`; }
+    return `${days} day${days === 1 ? '' : 's'}`;
+  } catch {
+    return 'unknown';
+  }
+}
+
+/** A single emoji from user input, or null. Accepts unicode emoji or <:name:id> custom emoji. */
+export function cleanEmoji(value) {
+  const v = String(value ?? '').trim();
+  if (!v) return null;
+  if (/^<a?:\w{2,32}:\d{17,20}>$/.test(v)) return v;
+  const m = v.match(/^\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}])*/u);
+  return m ? m[0] : null;
+}
+
+/** Emoji for select menu options ({ name } or { id, name, animated }). */
+export function optionEmoji(emoji) {
+  if (!emoji) return undefined;
+  const custom = /^<(a?):(\w+):(\d+)>$/.exec(emoji);
+  return custom ? { id: custom[3], name: custom[2], animated: custom[1] === 'a' } : { name: emoji };
+}
+
+/** "🛡️ Admin" when an emoji is set, otherwise just "Admin". */
+export const withEmoji = (emoji, text) => (emoji ? `${emoji} ${text}` : text);
 
 /** Permissions the bot needs. Used for the invite link on the dashboard. */
 export const BOT_PERMISSIONS =
@@ -66,3 +127,16 @@ export function isStaff(member, settings) {
 }
 
 export const ephemeral = 64; // MessageFlags.Ephemeral
+
+/** Small one-line message embed: notice('Check your DMs!', 'success'). */
+const NOTICE = {
+  info: { color: COLORS.sky, emoji: '💬' },
+  success: { color: COLORS.accepted, emoji: '✅' },
+  warn: { color: COLORS.pending, emoji: '⏳' },
+  error: { color: COLORS.denied, emoji: '⛔' },
+  blocked: { color: COLORS.denied, emoji: '🚫' },
+};
+export function notice(text, kind = 'info') {
+  const k = NOTICE[kind] || NOTICE.info;
+  return { color: k.color, description: truncate(`${k.emoji} ${text}`, 4096) };
+}
