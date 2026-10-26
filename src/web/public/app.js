@@ -223,8 +223,7 @@ document.querySelectorAll('[data-tabs]').forEach((bar) => {
   if (!start && hash) {
     const el = document.getElementById(hash);
     const panel = el?.closest('[data-tab-panel]');
-    const extra = el?.closest('[data-tab-extra]')?.dataset.tabExtra;
-    start = tabs.find((t) => panelOf(t) === panel || (extra && t.dataset.tab === extra));
+    start = tabs.find((t) => panelOf(t) === panel);
   }
   if (!start) {
     let saved = null;
@@ -253,25 +252,4 @@ document.querySelectorAll('[data-collapse-all]').forEach((btn) => {
   list.addEventListener('input', (e) => { if (e.target.matches('textarea')) fit(e.target); });
   new MutationObserver(() => list.querySelectorAll('textarea').forEach(fit)).observe(list, { childList: true });
   window.addEventListener('resize', () => list.querySelectorAll('textarea').forEach(fit));
-})();
-
-/* ---------- Copy buttons ---------- */
-document.querySelectorAll('[data-copy]').forEach((btn) => {
-  btn.addEventListener('click', async () => {
-    const input = document.getElementById(btn.dataset.copy);
-    try { await navigator.clipboard.writeText(input.value); } catch { input.select(); document.execCommand('copy'); }
-    const old = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = old; }, 1500);
-  });
-});
-
-/* ---------- Extra blocks that belong to a tab but sit outside its form ---------- */
-(() => {
-  const extras = document.querySelectorAll('[data-tab-extra]');
-  if (!extras.length) return;
-  const sync = () => {
-    const active = document.querySelector('[data-tabs] [aria-selected="true"]')?.dataset.tab;
-    extras.forEach((el) => { el.hidden = Boolean(active) && el.dataset.tabExtra !== active; });
-  };
-  document.querySelectorAll('[data-tabs] [data-tab]').forEach((t) => { t.addEventListener('click', sync); t.addEventListener('keyup', sync); });
-  sync();
 })();

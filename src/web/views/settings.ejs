@@ -173,42 +173,4 @@ const tabsList = [
     <span class="muted small">Saves every tab.</span>
   </div>
 </form>
-<div class="stack" data-tab-extra="general" style="margin-top: 20px;">
-  <section class="card" id="connector">
-    <div class="card-head">
-      <h2>Claude connector</h2>
-      <% if (connector.enabled) { %><span class="pill pill-open">On</span><% } else { %><span class="pill pill-off">Off</span><% } %>
-    </div>
-    <p class="muted small">Lets Claude read and handle applications and tickets for you: in Claude, go to <strong>Customize → Connectors → Add custom connector</strong>, paste the URL below, and add a request header <code>Authorization</code> with the value <code>Bearer</code> followed by your key. Anyone with the key has full access, so keep it private.</p>
-    <div class="field">
-      <label for="connector-url">Connector URL</label>
-      <div class="input-pair">
-        <input id="connector-url" value="<%= connector.url %>" readonly>
-        <button type="button" class="btn" data-copy="connector-url">Copy</button>
-      </div>
-    </div>
-    <% if (connector.newKey) { %>
-      <div class="field key-reveal">
-        <label for="connector-key">Your new key (shown only this once)</label>
-        <div class="input-pair">
-          <input id="connector-key" value="Bearer <%= connector.newKey %>" readonly>
-          <button type="button" class="btn btn-primary" data-copy="connector-key">Copy</button>
-        </div>
-        <p class="help">Paste this whole line (including "Bearer") as the Authorization header value.</p>
-      </div>
-    <% } %>
-    <div class="tab-actions">
-      <form method="post" action="/settings/connector/create" <%= connector.enabled ? 'data-confirm="Make a new key? The old key stops working right away, so you will need to update it in Claude."' : '' %>>
-        <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <button class="btn <%= connector.enabled ? '' : 'btn-primary' %>" type="submit"><%- include('partials/icon', { name: 'check', size: 16 }) %> <%= connector.enabled ? 'Make a new key' : 'Turn on and make a key' %></button>
-      </form>
-      <% if (connector.enabled) { %>
-        <form method="post" action="/settings/connector/remove" data-confirm="Turn off the Claude connector? Claude will lose access right away.">
-          <input type="hidden" name="_csrf" value="<%= csrf %>">
-          <button class="btn btn-danger-ghost" type="submit">Turn off</button>
-        </form>
-      <% } %>
-    </div>
-  </section>
-</div>
 <%- include('partials/foot') %>

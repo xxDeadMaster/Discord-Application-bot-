@@ -549,4 +549,3 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .hero-chip { background: rgba(8, 18, 46, 0.72); backdrop-filter: blur(4px); }
 .hero-chip-main { background: #fff; }
 .ptabs { position: sticky; }
-.key-reveal input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; border-color: var(--accent); }
