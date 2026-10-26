@@ -1,46 +1,67 @@
 <%- include('partials/head') %>
 <div class="page-head">
-  <h1>Submissions</h1>
+  <div class="page-head-text">
+    <h1>Submissions</h1>
+    <p>Every application people have sent in. Open one to read it and accept or deny.</p>
+  </div>
 </div>
 
-<form method="get" action="/submissions" class="filters">
-  <div class="tabs" role="group" aria-label="Filter by status">
-    <% [['', 'All'], ['pending', 'Pending'], ['accepted', 'Accepted'], ['denied', 'Denied']].forEach(([v, l]) => { %>
-      <a class="tab <%= status === v ? 'active' : '' %>" href="/submissions?status=<%= v %><%= search ? '&q=' + encodeURIComponent(search) : '' %>"><%= l %></a>
-    <% }) %>
-  </div>
-  <input type="hidden" name="status" value="<%= status %>">
-  <label class="sr" for="q">Search by username or user ID</label>
-  <input id="q" name="q" value="<%= search %>" placeholder="Search username or user ID">
-  <button class="btn" type="submit">Search</button>
-</form>
+<div class="toolbar">
+  <form method="get" action="/submissions" class="filters">
+    <div class="tabs" role="group" aria-label="Filter by status">
+      <% [['', 'All'], ['pending', 'Pending'], ['accepted', 'Accepted'], ['denied', 'Denied']].forEach(([v, l]) => { %>
+        <a class="tab <%= status === v ? 'active' : '' %>" href="/submissions?status=<%= v %><%= search ? '&q=' + encodeURIComponent(search) : '' %>"><%= l %></a>
+      <% }) %>
+    </div>
+    <input type="hidden" name="status" value="<%= status %>">
+    <div class="search">
+      <%- include('partials/icon', { name: 'search', size: 16 }) %>
+      <label class="sr" for="q">Search by username or user ID</label>
+      <input id="q" name="q" value="<%= search %>" placeholder="Search username or user ID">
+    </div>
+  </form>
+</div>
 
 <section class="card flush">
   <% if (!subs.length) { %>
     <p class="muted pad">No applications match.</p>
   <% } else { %>
+  <form method="post" action="/submissions/delete" data-bulk data-confirm-bulk="Delete {n} application(s)? Their cards in Discord are removed too. This can't be undone.">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <input type="hidden" name="back" value="<%= path %>?status=<%= status %>&q=<%= encodeURIComponent(search) %>">
+    <% if (isAdmin) { %>
+    <div class="bulk-bar">
+      <span class="muted" data-bulk-count>Select applications to delete them</span>
+      <button class="btn btn-danger btn-sm" type="submit" data-bulk-submit disabled><%- include('partials/icon', { name: 'trash', size: 16 }) %> Delete selected</button>
+    </div>
+    <% } %>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>#</th><th>Applicant</th><th>Role</th><th>Status</th><th>Submitted</th><th>Reviewed by</th></tr></thead>
+        <thead><tr>
+          <% if (isAdmin) { %><th class="check-col"><label class="sr" for="select-all">Select all</label><input type="checkbox" id="select-all" data-select-all></th><% } %>
+          <th>#</th><th>Applicant</th><th>Role</th><th>Status</th><th>Submitted</th><th>Reviewed by</th>
+        </tr></thead>
         <tbody>
           <% subs.forEach(s => { %>
             <tr>
-              <td><a href="/submissions/<%= s.id %>"><%= s.id %></a></td>
-              <td><a href="/submissions/<%= s.id %>"><strong><%= s.user_tag %></strong></a></td>
+              <% if (isAdmin) { %><td class="check-col"><label class="sr" for="sel-<%= s.id %>">Select application <%= s.id %></label><input type="checkbox" id="sel-<%= s.id %>" name="ids" value="<%= s.id %>" data-row-check></td><% } %>
+              <td class="muted"><%= s.id %></td>
+              <td><a class="cell-link" href="/submissions/<%= s.id %>"><%= s.user_tag %></a></td>
               <td><%= s.role_name %> <span class="muted small">· <%= s.category_name %></span></td>
               <td><%- include('partials/status', { status: s.status }) %></td>
-              <td><time datetime="<%= new Date(s.created_at).toISOString() %>"></time></td>
-              <td><%= s.reviewed_by_tag || '—' %></td>
+              <td class="muted"><time datetime="<%= new Date(s.created_at).toISOString() %>"></time></td>
+              <td class="muted"><%= s.reviewed_by_tag || '—' %></td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
+  </form>
   <% } %>
 </section>
 
 <nav class="pager" aria-label="Pages">
-  <% if (page > 1) { %><a class="btn btn-ghost" href="?status=<%= status %>&q=<%= encodeURIComponent(search) %>&page=<%= page - 1 %>">Newer</a><% } %>
-  <% if (hasMore) { %><a class="btn btn-ghost" href="?status=<%= status %>&q=<%= encodeURIComponent(search) %>&page=<%= page + 1 %>">Older</a><% } %>
+  <% if (page > 1) { %><a class="btn btn-ghost btn-sm" href="?status=<%= status %>&q=<%= encodeURIComponent(search) %>&page=<%= page - 1 %>">Newer</a><% } %>
+  <% if (hasMore) { %><a class="btn btn-ghost btn-sm" href="?status=<%= status %>&q=<%= encodeURIComponent(search) %>&page=<%= page + 1 %>">Older</a><% } %>
 </nav>
 <%- include('partials/foot') %>

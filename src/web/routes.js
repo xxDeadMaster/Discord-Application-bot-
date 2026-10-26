@@ -1,12 +1,12 @@
 import { ChannelType } from 'discord.js';
 import express from 'express';
-import { decideSubmission } from '../bot/applications.js';
+import { decideSubmission, removeReviewMessages } from '../bot/applications.js';
 import { publishPanel, refreshApplyPanelQuietly } from '../bot/panels.js';
 import { closeTicketFromDashboard, transcriptText } from '../bot/tickets.js';
 import { MAX_QUESTIONS, inviteUrl } from '../bot/ui.js';
 import { config } from '../config.js';
 import {
-  dashboardCounts, getCategory, getRole, getSettings, getSubmission, getTicket, listCategories, listQuestions,
+  dashboardCounts, deleteClosedTickets, deleteSubmissions, getCategory, getRole, getSettings, getSubmission, getTicket, listCategories, listQuestions,
   listRoles, listSubmissions, listTicketMessages, listTickets, query, replaceQuestions, updateSettings,
 } from '../db.js';
 import { requireAdmin } from './auth.js';
@@ -235,6 +235,45 @@ routes.post('/applications/roles/:id/delete', requireAdmin, async (req, res) => 
 /* ---------- Submissions ---------- */
 
 const PAGE = 50;
+
+/* ---------- Deleting (admins only) ---------- */
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const backTo = (req, fallback) => {
+  const r = String(req.body.back || '');
+  return r.startsWith('/') && !r.startsWith('//') ? r : fallback;
+};
+
+routes.post('/submissions/delete', requireAdmin, async (req, res) => {
+  const rows = await deleteSubmissions(toArray(req.body.ids));
+  await removeReviewMessages(rows);
+  flash(req, rows.length ? 'success' : 'error', rows.length ? `Deleted ${plural(rows.length, 'application')}.` : 'Pick at least one application to delete.');
+  res.redirect(backTo(req, '/submissions'));
+});
+
+routes.post('/submissions/:id/delete', requireAdmin, async (req, res) => {
+  const id = idParam(req);
+  const rows = id ? await deleteSubmissions([id]) : [];
+  await removeReviewMessages(rows);
+  flash(req, rows.length ? 'success' : 'error', rows.length ? `Deleted application #${id}.` : 'That application was already deleted.');
+  res.redirect('/submissions');
+});
+
+routes.post('/tickets/delete', requireAdmin, async (req, res) => {
+  const { deleted, skippedOpen } = await deleteClosedTickets(toArray(req.body.ids));
+  const parts = [];
+  if (deleted) parts.push(`Deleted ${plural(deleted, 'ticket')}.`);
+  if (skippedOpen) parts.push(`${plural(skippedOpen, 'open ticket')} kept: close ${skippedOpen === 1 ? 'it' : 'them'} first.`);
+  flash(req, deleted ? 'success' : 'error', parts.join(' ') || 'Pick at least one ticket to delete.');
+  res.redirect(backTo(req, '/tickets'));
+});
+
+routes.post('/tickets/:id/delete', requireAdmin, async (req, res) => {
+  const id = idParam(req);
+  const { deleted } = id ? await deleteClosedTickets([id]) : { deleted: 0 };
+  flash(req, deleted ? 'success' : 'error', deleted ? 'Ticket and transcript deleted.' : 'Only closed tickets can be deleted. Close it first.');
+  res.redirect(deleted ? '/tickets' : `/tickets/${id}`);
+});
 
 routes.get('/submissions', async (req, res) => {
   const status = ['pending', 'accepted', 'denied'].includes(req.query.status) ? req.query.status : '';

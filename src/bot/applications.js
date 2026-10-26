@@ -378,3 +378,15 @@ export async function handleDenyModal(interaction) {
   });
   return interaction.editReply(result.ok ? `Denied. ${result.notes.join(' ')}` : result.error);
 }
+
+/** Removes the staff review cards in Discord for deleted submissions. Failures are ignored. */
+export async function removeReviewMessages(rows) {
+  for (const row of rows) {
+    if (!row.review_channel_id || !row.review_message_id) continue;
+    try {
+      const channel = await client.channels.fetch(row.review_channel_id);
+      const msg = await channel.messages.fetch(row.review_message_id);
+      await msg.delete();
+    } catch { /* already gone, or no access */ }
+  }
+}

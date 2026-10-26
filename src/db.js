@@ -266,3 +266,29 @@ export async function dashboardCounts() {
   );
   return rows[0];
 }
+
+/* ---------- Deleting ---------- */
+
+const cleanIds = (ids) => [...new Set(ids.map((n) => Number.parseInt(n, 10)).filter((n) => Number.isSafeInteger(n) && n > 0))];
+
+/** Deletes submissions and returns the deleted rows (so their Discord cards can be removed). */
+export async function deleteSubmissions(ids) {
+  const list = cleanIds(ids);
+  if (!list.length) return [];
+  const { rows } = await query(
+    'DELETE FROM submissions WHERE guild_id = $1 AND id = ANY($2::int[]) RETURNING id, review_channel_id, review_message_id',
+    [config.guildId, list],
+  );
+  return rows;
+}
+
+/** Deletes closed tickets and their transcripts. Open tickets are skipped. Returns { deleted, skippedOpen }. */
+export async function deleteClosedTickets(ids) {
+  const list = cleanIds(ids);
+  if (!list.length) return { deleted: 0, skippedOpen: 0 };
+  const { rows } = await query(
+    `DELETE FROM tickets WHERE guild_id = $1 AND id = ANY($2::int[]) AND status = 'closed' RETURNING id`,
+    [config.guildId, list],
+  );
+  return { deleted: rows.length, skippedOpen: list.length - rows.length };
+}

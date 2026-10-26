@@ -4,7 +4,7 @@ import express from 'express';
 import { getGuild } from '../bot/client.js';
 import { inviteUrl, isStaff } from '../bot/ui.js';
 import { config } from '../config.js';
-import { getSettings } from '../db.js';
+import { dashboardCounts, getSettings } from '../db.js';
 
 export const authRouter = express.Router();
 
@@ -100,6 +100,7 @@ export async function requireLogin(req, res, next) {
     res.locals.member = member;
     res.locals.guild = guild;
     res.locals.isAdmin = member.permissions.has(PermissionFlagsBits.ManageGuild);
+    res.locals.navCounts = await dashboardCounts();
     next();
   } catch (err) {
     next(err);

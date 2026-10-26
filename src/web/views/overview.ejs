@@ -1,36 +1,45 @@
 <%- include('partials/head') %>
 <div class="page-head">
-  <h1>Overview</h1>
+  <div class="page-head-text">
+    <h1>Overview</h1>
+    <p>What's waiting for staff right now.</p>
+  </div>
 </div>
 
 <section class="stats">
   <a class="stat" href="/submissions?status=pending">
-    <span class="stat-num"><%= counts.pending %></span>
-    <span class="stat-label">Pending applications</span>
+    <span class="stat-icon warn"><%- include('partials/icon', { name: 'clock', size: 20 }) %></span>
+    <span class="stat-text"><span class="stat-num"><%= counts.pending %></span><span class="stat-label">Pending applications</span></span>
   </a>
   <a class="stat" href="/submissions">
-    <span class="stat-num"><%= counts.submissions %></span>
-    <span class="stat-label">All applications</span>
+    <span class="stat-icon"><%- include('partials/icon', { name: 'inbox', size: 20 }) %></span>
+    <span class="stat-text"><span class="stat-num"><%= counts.submissions %></span><span class="stat-label">All applications</span></span>
   </a>
   <a class="stat" href="/tickets?status=open">
-    <span class="stat-num"><%= counts.open_tickets %></span>
-    <span class="stat-label">Open tickets</span>
+    <span class="stat-icon green"><%- include('partials/icon', { name: 'ticket', size: 20 }) %></span>
+    <span class="stat-text"><span class="stat-num"><%= counts.open_tickets %></span><span class="stat-label">Open tickets</span></span>
   </a>
   <a class="stat" href="/tickets">
-    <span class="stat-num"><%= counts.tickets %></span>
-    <span class="stat-label">All tickets</span>
+    <span class="stat-icon"><%- include('partials/icon', { name: 'list', size: 20 }) %></span>
+    <span class="stat-text"><span class="stat-num"><%= counts.tickets %></span><span class="stat-label">All tickets</span></span>
   </a>
 </section>
 
-<% if (isAdmin && checklist.some(c => !c.done)) { %>
+<% if (isAdmin && checklist.some(c => !c.done)) { const done = checklist.filter(c => c.done).length; %>
 <section class="card">
-  <h2>Finish setting up</h2>
+  <div class="card-head">
+    <h2>Finish setting up</h2>
+    <span class="muted small"><%= done %> of <%= checklist.length %> done</span>
+  </div>
+  <div class="progress" aria-hidden="true"><span style="width: <%= Math.round(done / checklist.length * 100) %>%"></span></div>
   <ol class="checklist">
     <% checklist.forEach(c => { %>
       <li class="<%= c.done ? 'done' : '' %>">
-        <span class="check" aria-hidden="true"><%= c.done ? '✓' : '' %></span>
-        <a href="<%= c.href %>"><%= c.text %></a>
-        <span class="sr"><%= c.done ? '(done)' : '(to do)' %></span>
+        <a href="<%= c.href %>">
+          <span class="check" aria-hidden="true"><% if (c.done) { %><%- include('partials/icon', { name: 'check', size: 14 }) %><% } %></span>
+          <span><%= c.text %></span>
+          <span class="sr"><%= c.done ? '(done)' : '(to do)' %></span>
+        </a>
       </li>
     <% }) %>
   </ol>
@@ -38,21 +47,21 @@
 </section>
 <% } %>
 
-<div class="grid-2">
+<div class="grid-2" style="gap: 20px;">
   <section class="card">
     <div class="card-head">
       <h2>Latest applications</h2>
       <a href="/submissions" class="small">See all</a>
     </div>
     <% if (!recentSubs.length) { %>
-      <p class="muted">No applications yet.</p>
+      <p class="empty-row">No applications yet.</p>
     <% } else { %>
       <ul class="rows">
         <% recentSubs.forEach(s => { %>
           <li>
-            <a href="/submissions/<%= s.id %>">
-              <span class="row-main"><strong><%= s.user_tag %></strong> · <%= s.role_name %></span>
-              <span class="row-meta"><%- include('partials/status', { status: s.status }) %> <time datetime="<%= new Date(s.created_at).toISOString() %>"></time></span>
+            <a class="row-link" href="/submissions/<%= s.id %>">
+              <span class="row-main"><span class="role-icon"><%= s.user_tag.slice(0, 1).toUpperCase() %></span><span><strong><%= s.user_tag %></strong><br><span class="muted small"><%= s.role_name %></span></span></span>
+              <span class="row-meta"><%- include('partials/status', { status: s.status }) %></span>
             </a>
           </li>
         <% }) %>
@@ -66,14 +75,14 @@
       <a href="/tickets" class="small">See all</a>
     </div>
     <% if (!recentTickets.length) { %>
-      <p class="muted">No tickets yet.</p>
+      <p class="empty-row">No tickets yet.</p>
     <% } else { %>
       <ul class="rows">
         <% recentTickets.forEach(t => { %>
           <li>
-            <a href="/tickets/<%= t.id %>">
-              <span class="row-main"><strong>#<%= String(t.number).padStart(4, '0') %></strong> · <%= t.opener_tag %></span>
-              <span class="row-meta"><%- include('partials/status', { status: t.status }) %> <time datetime="<%= new Date(t.created_at).toISOString() %>"></time></span>
+            <a class="row-link" href="/tickets/<%= t.id %>">
+              <span class="row-main"><span class="role-icon">#</span><span><strong>Ticket #<%= String(t.number).padStart(4, '0') %></strong><br><span class="muted small"><%= t.opener_tag %></span></span></span>
+              <span class="row-meta"><%- include('partials/status', { status: t.status }) %></span>
             </a>
           </li>
         <% }) %>

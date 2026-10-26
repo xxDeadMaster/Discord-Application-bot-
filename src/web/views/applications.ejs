@@ -1,83 +1,98 @@
 <%- include('partials/head') %>
 <div class="page-head">
-  <h1>Applications</h1>
-  <p class="muted">Applicants first pick a category, then a role inside it, and get that role's questions in their DMs. Changes here update the panel in Discord automatically.</p>
+  <div class="page-head-text">
+    <h1>Applications</h1>
+    <p>Applicants pick a category, then a role, and get that role's questions in their DMs. Changes here update the panel in Discord on their own.</p>
+  </div>
+  <a class="btn btn-primary" href="#new-category"><%- include('partials/icon', { name: 'plus', size: 16 }) %> New category</a>
 </div>
 
 <% if (!cats.length) { %>
-  <section class="card empty">
-    <h2>No categories yet</h2>
-    <p class="muted">Start with something like "Roblox Staff", then add roles such as Admin and Developer to it.</p>
+  <section class="card center">
+    <h2 style="margin: 0;">No categories yet</h2>
+    <p class="muted" style="margin: 0;">Start with something like "Roblox Staff", then add roles such as Admin and Developer to it.</p>
   </section>
 <% } %>
 
 <% cats.forEach(c => { %>
-<section class="card">
-  <details class="edit-cat">
-    <summary>
-      <span class="cat-title">
-        <strong><%= c.name %></strong>
-        <% if (!c.enabled) { %><span class="pill pill-off">off</span><% } %>
-      </span>
-      <span class="muted small"><%= c.description || 'No description' %> · Edit category</span>
-    </summary>
-    <form method="post" action="/applications/categories/<%= c.id %>" class="inline-form">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <div class="grid-3">
-        <div class="field">
-          <label for="cat-name-<%= c.id %>">Name</label>
-          <input id="cat-name-<%= c.id %>" name="name" maxlength="80" value="<%= c.name %>" required>
-        </div>
-        <div class="field">
-          <label for="cat-desc-<%= c.id %>">Short description</label>
-          <input id="cat-desc-<%= c.id %>" name="description" maxlength="100" value="<%= c.description %>">
-        </div>
-        <div class="field field-short">
-          <label for="cat-pos-<%= c.id %>">Order</label>
-          <input id="cat-pos-<%= c.id %>" name="position" type="number" value="<%= c.position %>">
-        </div>
-      </div>
-      <label class="toggle"><input type="checkbox" name="enabled" <%= c.enabled ? 'checked' : '' %>> Show this category on the panel</label>
-      <div class="actions">
-        <button class="btn btn-primary" type="submit">Save category</button>
-      </div>
-    </form>
-    <form method="post" action="/applications/categories/<%= c.id %>/delete" data-confirm="Delete &quot;<%= c.name %>&quot; and all its roles? Past submissions are kept.">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <button class="btn btn-danger-ghost btn-sm" type="submit">Delete category</button>
-    </form>
-  </details>
+<section class="card cat-card">
+  <div class="cat-head">
+    <div class="cat-title">
+      <h2><%= c.name %></h2>
+      <% if (!c.enabled) { %><span class="pill pill-off">Hidden</span><% } %>
+      <span class="muted small"><%= c.roles.length %> role<%= c.roles.length === 1 ? '' : 's' %><%= c.description ? ' · ' + c.description : '' %></span>
+    </div>
+    <div class="row-actions">
+      <button type="button" class="btn btn-ghost btn-sm" data-toggle="cat-edit-<%= c.id %>" aria-expanded="false" aria-controls="cat-edit-<%= c.id %>"><%- include('partials/icon', { name: 'edit', size: 15 }) %> Edit</button>
+      <form method="post" action="/applications/categories/<%= c.id %>/delete" data-confirm="Delete the &quot;<%= c.name %>&quot; category and all <%= c.roles.length %> of its roles? Past submissions are kept.">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="btn btn-danger-ghost btn-sm" type="submit"><%- include('partials/icon', { name: 'trash', size: 15 }) %> Delete</button>
+      </form>
+    </div>
+  </div>
 
-  <% if (!c.roles.length) { %>
-    <p class="muted">No roles in this category yet.</p>
-  <% } else { %>
-    <ul class="rows">
-      <% c.roles.forEach(r => { %>
-        <li>
-          <a href="/applications/roles/<%= r.id %>">
-            <span class="row-main"><strong><%= r.name %></strong> <span class="muted">· <%= r.question_count %> question<%= r.question_count === 1 ? '' : 's' %></span></span>
-            <span class="row-meta">
-              <% if (r.enabled && r.question_count > 0) { %><span class="pill pill-accepted">open</span><% } else { %><span class="pill pill-off">off</span><% } %>
-              <span class="muted small">Edit</span>
-            </span>
-          </a>
-        </li>
-      <% }) %>
-    </ul>
-  <% } %>
-
-  <form method="post" action="/applications/categories/<%= c.id %>/roles" class="add-row">
+  <form method="post" action="/applications/categories/<%= c.id %>" class="cat-edit inline-form" id="cat-edit-<%= c.id %>" hidden>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
-    <label class="sr" for="new-role-<%= c.id %>">New role name</label>
-    <input id="new-role-<%= c.id %>" name="name" maxlength="80" placeholder="New role, e.g. Developer" required>
-    <button class="btn" type="submit">Add role</button>
+    <div class="grid-3">
+      <div class="field">
+        <label for="cat-name-<%= c.id %>">Name</label>
+        <input id="cat-name-<%= c.id %>" name="name" maxlength="80" value="<%= c.name %>" required>
+      </div>
+      <div class="field">
+        <label for="cat-desc-<%= c.id %>">Short description</label>
+        <input id="cat-desc-<%= c.id %>" name="description" maxlength="100" value="<%= c.description %>">
+      </div>
+      <div class="field">
+        <label for="cat-pos-<%= c.id %>">Order on the panel</label>
+        <input id="cat-pos-<%= c.id %>" name="position" type="number" value="<%= c.position %>">
+      </div>
+    </div>
+    <div class="actions" style="justify-content: space-between;">
+      <label class="toggle"><input type="checkbox" name="enabled" <%= c.enabled ? 'checked' : '' %>> Show on the panel</label>
+      <button class="btn btn-primary btn-sm" type="submit">Save category</button>
+    </div>
   </form>
+
+  <div class="cat-body">
+    <% if (!c.roles.length) { %>
+      <p class="empty-row">No roles in this category yet.</p>
+    <% } else { %>
+      <ul class="rows">
+        <% c.roles.forEach(r => { const open = r.enabled && r.question_count > 0; %>
+          <li class="row">
+            <a class="row-main" href="/applications/roles/<%= r.id %>" style="color: inherit; flex: 1;">
+              <span class="role-icon"><%= r.name.slice(0, 1).toUpperCase() %></span>
+              <span>
+                <strong><%= r.name %></strong><br>
+                <span class="muted small"><%= r.question_count %> question<%= r.question_count === 1 ? '' : 's' %><%= r.description ? ' · ' + r.description : '' %></span>
+              </span>
+            </a>
+            <span class="row-actions">
+              <% if (open) { %><span class="pill pill-open">Open</span><% } else { %><span class="pill pill-off">Off</span><% } %>
+              <a class="icon-btn" href="/applications/roles/<%= r.id %>" aria-label="Edit <%= r.name %>" title="Edit"><%- include('partials/icon', { name: 'edit', size: 16 }) %></a>
+              <form method="post" action="/applications/roles/<%= r.id %>/delete" data-confirm="Delete the &quot;<%= r.name %>&quot; role and its questions? Past submissions are kept.">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button class="icon-btn danger" type="submit" aria-label="Delete <%= r.name %>" title="Delete"><%- include('partials/icon', { name: 'trash', size: 16 }) %></button>
+              </form>
+            </span>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+
+    <form method="post" action="/applications/categories/<%= c.id %>/roles" class="add-row">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label class="sr" for="new-role-<%= c.id %>">New role name</label>
+      <input id="new-role-<%= c.id %>" name="name" maxlength="80" placeholder="New role, e.g. Moderator" required>
+      <button class="btn" type="submit"><%- include('partials/icon', { name: 'plus', size: 16 }) %> Add role</button>
+    </form>
+  </div>
 </section>
 <% }) %>
 
-<section class="card">
-  <h2>Add a category</h2>
-  <form method="post" action="/applications/categories" class="stack">
+<section class="card" id="new-category">
+  <h2>New category</h2>
+  <form method="post" action="/applications/categories">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div class="grid-2">
       <div class="field">
@@ -89,7 +104,7 @@
         <input id="new-cat-desc" name="description" maxlength="100" placeholder="Admin, Developer, Builder">
       </div>
     </div>
-    <div class="actions"><button class="btn btn-primary" type="submit">Add category</button></div>
+    <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'plus', size: 16 }) %> Add category</button>
   </form>
 </section>
 <%- include('partials/foot') %>

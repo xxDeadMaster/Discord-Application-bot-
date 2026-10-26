@@ -13,6 +13,45 @@ document.querySelectorAll('form[data-confirm]').forEach((form) => {
   });
 });
 
+// Show/hide panels (e.g. "Edit category")
+document.querySelectorAll('[data-toggle]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const target = document.getElementById(btn.dataset.toggle);
+    if (!target) return;
+    target.hidden = !target.hidden;
+    btn.setAttribute('aria-expanded', String(!target.hidden));
+    if (!target.hidden) target.querySelector('input, textarea, select')?.focus();
+  });
+});
+
+// Bulk select + delete on tables
+document.querySelectorAll('form[data-bulk]').forEach((form) => {
+  const all = form.querySelector('[data-select-all]');
+  const boxes = () => [...form.querySelectorAll('[data-row-check]')];
+  const countEl = form.querySelector('[data-bulk-count]');
+  const submit = form.querySelector('[data-bulk-submit]');
+  const idle = countEl?.textContent;
+  const update = () => {
+    const checked = boxes().filter((b) => b.checked);
+    boxes().forEach((b) => b.closest('tr')?.classList.toggle('selected', b.checked));
+    if (countEl) countEl.textContent = checked.length ? `${checked.length} selected` : idle;
+    if (submit) submit.disabled = !checked.length;
+    if (all) {
+      all.checked = checked.length > 0 && checked.length === boxes().length;
+      all.indeterminate = checked.length > 0 && checked.length < boxes().length;
+      all.disabled = !boxes().length;
+    }
+  };
+  all?.addEventListener('change', () => { boxes().forEach((b) => { b.checked = all.checked; }); update(); });
+  form.addEventListener('change', (e) => { if (e.target.matches('[data-row-check]')) update(); });
+  form.addEventListener('submit', (e) => {
+    const n = boxes().filter((b) => b.checked).length;
+    const msg = (form.dataset.confirmBulk || 'Delete {n} item(s)?').replace('{n}', n);
+    if (!n || !window.confirm(msg)) e.preventDefault();
+  });
+  update();
+});
+
 // Question editor
 const list = document.querySelector('[data-questions]');
 if (list) {

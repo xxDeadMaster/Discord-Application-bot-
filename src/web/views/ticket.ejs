@@ -1,30 +1,36 @@
 <%- include('partials/head') %>
 <div class="page-head">
-  <p class="crumbs"><a href="/tickets">Tickets</a> / <%= title %></p>
-  <h1><%= title %></h1>
+  <div class="page-head-text">
+    <a class="crumbs" href="/tickets"><%- include('partials/icon', { name: 'arrowLeft', size: 14 }) %> Tickets</a>
+    <h1><%= title %></h1>
+  </div>
+  <%- include('partials/status', { status: ticket.status }) %>
 </div>
 
 <div class="detail">
   <section class="card">
     <div class="card-head">
       <h2>Transcript</h2>
-      <a class="btn btn-ghost btn-sm" href="/tickets/<%= ticket.id %>/transcript.txt">Download .txt</a>
+      <a class="btn btn-ghost btn-sm" href="/tickets/<%= ticket.id %>/transcript.txt"><%- include('partials/icon', { name: 'download', size: 16 }) %> Download .txt</a>
     </div>
     <% if (!messages.length) { %>
-      <p class="muted">No messages recorded.</p>
+      <p class="muted" style="margin: 0;">No messages recorded.</p>
     <% } else { %>
       <ol class="transcript">
         <% messages.forEach(m => { %>
           <li class="<%= m.is_bot ? 'bot' : '' %>">
-            <div class="t-head">
-              <strong><%= m.author_tag %></strong>
-              <% if (m.is_bot) { %><span class="pill pill-bot">bot</span><% } %>
-              <time datetime="<%= new Date(m.created_at).toISOString() %>"></time>
+            <span class="t-avatar" aria-hidden="true"><%= m.author_tag.slice(0, 1).toUpperCase() %></span>
+            <div class="t-content">
+              <div class="t-head">
+                <strong><%= m.author_tag %></strong>
+                <% if (m.is_bot) { %><span class="pill pill-bot">Bot</span><% } %>
+                <time datetime="<%= new Date(m.created_at).toISOString() %>"></time>
+              </div>
+              <% if (m.content) { %><p class="t-body"><%= m.content %></p><% } %>
+              <% (m.attachments || []).forEach(a => { %>
+                <a class="t-attach" href="<%= a.url %>" target="_blank" rel="noopener noreferrer"><%- include('partials/icon', { name: 'external', size: 14 }) %> <%= a.name %></a>
+              <% }) %>
             </div>
-            <% if (m.content) { %><p class="t-body"><%= m.content %></p><% } %>
-            <% (m.attachments || []).forEach(a => { %>
-              <p class="small"><a href="<%= a.url %>" target="_blank" rel="noopener noreferrer">Attachment: <%= a.name %></a></p>
-            <% }) %>
           </li>
         <% }) %>
       </ol>
@@ -35,7 +41,6 @@
   <aside class="stack">
     <section class="card">
       <dl class="meta meta-col">
-        <div><dt>Status</dt><dd><%- include('partials/status', { status: ticket.status }) %></dd></div>
         <div><dt>Opened by</dt><dd><strong><%= ticket.opener_tag %></strong><br><span class="muted small">ID <%= ticket.opener_id %></span></dd></div>
         <div><dt>Topic</dt><dd><%= ticket.topic %></dd></div>
         <div><dt>Opened</dt><dd><time datetime="<%= new Date(ticket.created_at).toISOString() %>"></time></dd></div>
@@ -44,12 +49,23 @@
         <% } %>
       </dl>
       <% if (ticket.status === 'open') { %>
-        <form method="post" action="/tickets/<%= ticket.id %>/close" data-confirm="Close this ticket? The channel will be deleted and the transcript saved.">
+        <form method="post" action="/tickets/<%= ticket.id %>/close" data-confirm="Close this ticket? The channel will be deleted and the transcript saved." style="margin-top: 18px;">
           <input type="hidden" name="_csrf" value="<%= csrf %>">
-          <button class="btn btn-danger" type="submit">Close ticket</button>
+          <button class="btn btn-danger" type="submit"><%- include('partials/icon', { name: 'x', size: 16 }) %> Close ticket</button>
         </form>
       <% } %>
     </section>
+
+    <% if (isAdmin && ticket.status === 'closed') { %>
+    <section class="card danger-zone">
+      <h2>Delete ticket</h2>
+      <p class="muted small">Removes the ticket and its transcript from the dashboard. The copy posted in your log channel stays. This can't be undone.</p>
+      <form method="post" action="/tickets/<%= ticket.id %>/delete" data-confirm="Delete this ticket and its transcript? This can't be undone.">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="btn btn-danger-ghost" type="submit"><%- include('partials/icon', { name: 'trash', size: 16 }) %> Delete ticket</button>
+      </form>
+    </section>
+    <% } %>
   </aside>
 </div>
 <%- include('partials/foot') %>

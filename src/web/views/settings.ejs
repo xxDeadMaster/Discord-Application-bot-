@@ -1,7 +1,9 @@
 <%- include('partials/head') %>
 <div class="page-head">
-  <h1>Settings</h1>
-  <p class="muted">Pick where everything goes. Channel lists come straight from your server.</p>
+  <div class="page-head-text">
+    <h1>Settings</h1>
+    <p>Pick where everything goes. Channel and role lists come straight from your server.</p>
+  </div>
 </div>
 
 <form method="post" action="/settings" class="stack">
@@ -57,21 +59,21 @@
   </section>
 
   <div class="actions sticky-actions">
-    <button class="btn btn-primary" type="submit">Save settings</button>
+    <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'check', size: 16 }) %> Save settings</button>
   </div>
 </form>
 
 <section class="card" id="panels">
   <h2>Panels</h2>
-  <p class="muted">Posts the panel in its channel, or updates the one already there. Application panels also update on their own when you change roles.</p>
+  <p class="muted small">Posts the panel in its channel, or updates the one already there. Application panels also update on their own when you change roles.</p>
   <div class="panel-actions">
     <form method="post" action="/settings/panel/apply">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <button class="btn" type="submit">Post or update application panel</button>
+      <button class="btn" type="submit"><%- include('partials/icon', { name: 'send', size: 16 }) %> Post or update application panel</button>
     </form>
     <form method="post" action="/settings/panel/ticket">
       <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <button class="btn" type="submit">Post or update ticket panel</button>
+      <button class="btn" type="submit"><%- include('partials/icon', { name: 'send', size: 16 }) %> Post or update ticket panel</button>
     </form>
   </div>
 </section>

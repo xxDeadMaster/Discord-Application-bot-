@@ -1,7 +1,10 @@
 <%- include('partials/head') %>
 <div class="page-head">
-  <p class="crumbs"><a href="/submissions">Submissions</a> / #<%= sub.id %></p>
-  <h1><%= sub.role_name %> application</h1>
+  <div class="page-head-text">
+    <a class="crumbs" href="/submissions"><%- include('partials/icon', { name: 'arrowLeft', size: 14 }) %> Submissions</a>
+    <h1><%= sub.role_name %> application <span class="muted" style="font-weight: 500;">#<%= sub.id %></span></h1>
+  </div>
+  <%- include('partials/status', { status: sub.status }) %>
 </div>
 
 <div class="detail">
@@ -10,7 +13,7 @@
       <div><dt>Applicant</dt><dd><strong><%= sub.user_tag %></strong><br><span class="muted small">ID <%= sub.user_id %></span></dd></div>
       <div><dt>Category</dt><dd><%= sub.category_name %></dd></div>
       <div><dt>Submitted</dt><dd><time datetime="<%= new Date(sub.created_at).toISOString() %>"></time></dd></div>
-      <div><dt>Status</dt><dd><%- include('partials/status', { status: sub.status }) %></dd></div>
+      <div><dt>Questions</dt><dd><%= sub.answers.length %></dd></div>
     </dl>
 
     <h2>Answers</h2>
@@ -28,21 +31,21 @@
     <section class="card">
       <h2>Decision</h2>
       <% if (sub.status === 'pending') { %>
-        <form method="post" action="/submissions/<%= sub.id %>/decide" class="stack">
+        <form method="post" action="/submissions/<%= sub.id %>/decide" class="stack" style="gap: 14px;">
           <input type="hidden" name="_csrf" value="<%= csrf %>">
-          <div class="field">
+          <div class="field" style="margin: 0;">
             <label for="reason">Note to the applicant (optional)</label>
             <textarea id="reason" name="reason" rows="3" maxlength="<%= limits.reason %>" placeholder="Sent in their DM with the result"></textarea>
           </div>
           <div class="actions">
-            <button class="btn btn-success" type="submit" name="decision" value="accepted">Accept</button>
-            <button class="btn btn-danger" type="submit" name="decision" value="denied">Deny</button>
+            <button class="btn btn-success" type="submit" name="decision" value="accepted"><%- include('partials/icon', { name: 'check', size: 16 }) %> Accept</button>
+            <button class="btn btn-danger" type="submit" name="decision" value="denied"><%- include('partials/icon', { name: 'x', size: 16 }) %> Deny</button>
           </div>
           <p class="help">Accepting gives the role set for <%= sub.role_name %> (if any) and DMs the applicant. The card in Discord updates too.</p>
         </form>
       <% } else { %>
-        <p><%= sub.status === 'accepted' ? 'Accepted' : 'Denied' %> by <strong><%= sub.reviewed_by_tag || 'unknown' %></strong>
-          <time datetime="<%= new Date(sub.reviewed_at).toISOString() %>"></time></p>
+        <p><%= sub.status === 'accepted' ? 'Accepted' : 'Denied' %> by <strong><%= sub.reviewed_by_tag || 'unknown' %></strong><br>
+          <span class="muted small"><time datetime="<%= new Date(sub.reviewed_at).toISOString() %>"></time></span></p>
         <% if (sub.reason) { %><p class="muted">Note: <%= sub.reason %></p><% } %>
       <% } %>
     </section>
@@ -50,11 +53,11 @@
     <section class="card">
       <h2>Their other applications</h2>
       <% if (!history.length) { %>
-        <p class="muted">None.</p>
+        <p class="muted" style="margin: 0;">None.</p>
       <% } else { %>
         <ul class="rows">
           <% history.forEach(h => { %>
-            <li><a href="/submissions/<%= h.id %>">
+            <li><a class="row-link" href="/submissions/<%= h.id %>">
               <span class="row-main">#<%= h.id %> · <%= h.role_name %></span>
               <span class="row-meta"><%- include('partials/status', { status: h.status }) %></span>
             </a></li>
@@ -62,6 +65,17 @@
         </ul>
       <% } %>
     </section>
+
+    <% if (isAdmin) { %>
+    <section class="card danger-zone">
+      <h2>Delete application</h2>
+      <p class="muted small">Removes it from the dashboard and deletes its card in the submissions channel. This can't be undone.</p>
+      <form method="post" action="/submissions/<%= sub.id %>/delete" data-confirm="Delete application #<%= sub.id %> from <%= sub.user_tag %>? This can't be undone.">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="btn btn-danger-ghost" type="submit"><%- include('partials/icon', { name: 'trash', size: 16 }) %> Delete application</button>
+      </form>
+    </section>
+    <% } %>
   </aside>
 </div>
 <%- include('partials/foot') %>
