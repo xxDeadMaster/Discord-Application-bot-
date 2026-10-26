@@ -24,6 +24,10 @@
         <input id="name" name="name" maxlength="<%= limits.name %>" value="<%= role.name %>" required>
       </div>
       <div class="field">
+        <label for="emoji">Emoji</label>
+        <input class="emoji-input" id="emoji" name="emoji" maxlength="64" value="<%= role.emoji || '' %>" placeholder="🛡️" title="One emoji, shown in Discord menus and cards. Leave empty for none.">
+      </div>
+      <div class="field">
         <label for="description">Short description</label>
         <input id="description" name="description" maxlength="<%= limits.description %>" value="<%= role.description %>" placeholder="Shown under the role in the dropdown">
       </div>

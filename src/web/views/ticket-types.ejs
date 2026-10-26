@@ -23,7 +23,7 @@
 <section class="card cat-card" id="type-<%= t.id %>">
   <div class="cat-head">
     <div class="cat-title">
-      <h2><%= t.name %></h2>
+      <h2><% if (t.emoji) { %><span class="emoji"><%= t.emoji %></span><% } %><%= t.name %></h2>
       <% if (t.enabled) { %><span class="pill pill-open">On</span><% } else { %><span class="pill pill-off">Off</span><% } %>
       <span class="muted small"><%= t.questions.length %> question<%= t.questions.length === 1 ? '' : 's' %> · <%= used[t.id] || 0 %> ticket<%= used[t.id] === 1 ? '' : 's' %></span>
     </div>
@@ -39,6 +39,7 @@
   <form method="post" action="/ticket-types/<%= t.id %>" class="cat-edit inline-form" id="type-edit-<%= t.id %>" hidden style="margin-bottom: 20px;">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div class="grid-3">
+      <div class="field"><label for="te-<%= t.id %>">Emoji</label><input class="emoji-input" id="te-<%= t.id %>" name="emoji" maxlength="64" value="<%= t.emoji || '' %>" placeholder="🎫" title="One emoji, shown in the ticket menu. Leave empty for none."></div>
       <div class="field"><label for="tn-<%= t.id %>">Name</label><input id="tn-<%= t.id %>" name="name" maxlength="80" value="<%= t.name %>" required></div>
       <div class="field"><label for="td-<%= t.id %>">Short description</label><input id="td-<%= t.id %>" name="description" maxlength="100" value="<%= t.description %>"></div>
       <div class="field"><label for="tp-<%= t.id %>">Order</label><input id="tp-<%= t.id %>" name="position" type="number" value="<%= t.position %>"></div>

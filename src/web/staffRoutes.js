@@ -1,5 +1,13 @@
 import express from 'express';
 import { refreshTicketPanelQuietly } from '../bot/panels.js';
+import { cleanEmoji } from '../bot/ui.js';
+
+/** Emoji from a form: '' when cleared, the old value when the input isn't an emoji. */
+const formEmoji = (value, old) => {
+  const v = String(value ?? '').trim();
+  if (!v) return '';
+  return cleanEmoji(v) ?? (old ?? '');
+};
 import { decideLoa, endLoa, isOnLoa, issueStrike, prettyDate, removeStrike, requestLoa, todayIn } from '../bot/staff.js';
 import { DEFAULT_QUESTION, toggleClaim } from '../bot/tickets.js';
 import { config } from '../config.js';
@@ -190,9 +198,10 @@ staffRoutes.post('/ticket-types/:id', requireManager, async (req, res) => {
   const questions = toArray(b.questions).map((q) => clean(q, 300)).filter(Boolean).slice(0, 5);
   const position = Number.parseInt(b.position, 10);
   await query(
-    `UPDATE ticket_types SET name = $2, description = $3, questions = $4, staff_role_id = $5, category_id = $6, enabled = $7, position = $8 WHERE id = $1`,
+    `UPDATE ticket_types SET name = $2, description = $3, questions = $4, staff_role_id = $5, category_id = $6, enabled = $7, position = $8, emoji = $9 WHERE id = $1`,
     [id, clean(b.name, 80) || type.name, clean(b.description, 100), questions.length ? questions : [DEFAULT_QUESTION],
-      pick(b.staff_role_id, opts.roles), pick(b.category_id, opts.categories), b.enabled === 'on', Number.isFinite(position) ? position : type.position],
+      pick(b.staff_role_id, opts.roles), pick(b.category_id, opts.categories), b.enabled === 'on', Number.isFinite(position) ? position : type.position,
+      formEmoji(b.emoji, type.emoji)],
   );
   await refreshTicketPanelQuietly();
   flash(req, 'success', `Saved "${clean(b.name, 80) || type.name}".`);

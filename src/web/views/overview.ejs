@@ -1,10 +1,16 @@
 <%- include('partials/head') %>
-<div class="page-head">
-  <div class="page-head-text">
-    <h1>Overview</h1>
-    <p>What's waiting for staff right now.</p>
+<section class="hero">
+  <img class="hero-logo" src="/static/orbit-logo.png" alt="" width="84" height="84">
+  <div class="hero-text">
+    <h1>Welcome back, <%= user.name %>!</h1>
+    <p>Overview · what's waiting for staff right now.</p>
+    <div class="hero-chips">
+      <a class="hero-chip" href="/submissions?status=pending">📨 <b><%= counts.pending %></b> to review</a>
+      <a class="hero-chip" href="/tickets?status=open">🎫 <b><%= counts.open_tickets %></b> open ticket<%= counts.open_tickets == 1 ? '' : 's' %></a>
+      <% if (typeof navCounts !== 'undefined' && navCounts && navCounts.pending_loa && isManager) { %><a class="hero-chip" href="/loa">🌴 <b><%= navCounts.pending_loa %></b> LOA request<%= navCounts.pending_loa == 1 ? '' : 's' %></a><% } %>
+    </div>
   </div>
-</div>
+</section>
 
 <section class="stats">
   <a class="stat" href="/submissions?status=pending">

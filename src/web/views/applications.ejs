@@ -18,7 +18,7 @@
 <section class="card cat-card">
   <div class="cat-head">
     <div class="cat-title">
-      <h2><%= c.name %></h2>
+      <h2><% if (c.emoji) { %><span class="emoji"><%= c.emoji %></span><% } %><%= c.name %></h2>
       <% if (!c.enabled) { %><span class="pill pill-off">Off</span><% } else if (c.openNow) { %><span class="pill pill-open">Open</span><% } else { %><span class="pill pill-pending">Closed</span><% } %>
       <span class="muted small"><%= c.roles.length %> role<%= c.roles.length === 1 ? '' : 's' %><%= c.description ? ' · ' + c.description : '' %></span>
     </div>
@@ -38,6 +38,10 @@
   <form method="post" action="/applications/categories/<%= c.id %>" class="cat-edit inline-form" id="cat-edit-<%= c.id %>" hidden>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div class="grid-3">
+      <div class="field">
+        <label for="cat-emoji-<%= c.id %>">Emoji</label>
+        <input class="emoji-input" id="cat-emoji-<%= c.id %>" name="emoji" maxlength="64" value="<%= c.emoji || '' %>" placeholder="🛡️" title="One emoji, shown in Discord menus and cards. Leave empty for none.">
+      </div>
       <div class="field">
         <label for="cat-name-<%= c.id %>">Name</label>
         <input id="cat-name-<%= c.id %>" name="name" maxlength="80" value="<%= c.name %>" required>
@@ -110,7 +114,7 @@
         <% c.roles.forEach(r => { const open = r.enabled && r.question_count > 0; %>
           <li class="row">
             <a class="row-main" href="/applications/roles/<%= r.id %>" style="color: inherit; flex: 1;">
-              <span class="role-icon"><%= r.name.slice(0, 1).toUpperCase() %></span>
+              <span class="role-icon"><%= r.emoji || r.name.slice(0, 1).toUpperCase() %></span>
               <span>
                 <strong><%= r.name %></strong><br>
                 <span class="muted small"><%= r.question_count %> question<%= r.question_count === 1 ? '' : 's' %><%= r.description ? ' · ' + r.description : '' %></span>

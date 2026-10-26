@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= title %> · App Bot</title>
+  <title><%= title %> · Orbit</title>
+  <link rel="icon" type="image/png" href="/static/orbit-logo.png">
+  <meta name="theme-color" content="#05070C">
   <link rel="stylesheet" href="/static/style.css?v=<%= assetVersion %>">
   <script src="/static/app.js?v=<%= assetVersion %>" defer></script>
 </head>
@@ -29,10 +31,10 @@
 %>
 <aside class="sidebar">
   <a class="brand" href="/">
-    <span class="brand-mark" aria-hidden="true">A</span>
+    <img class="brand-logo" src="/static/orbit-logo.png" alt="" width="40" height="40">
     <span class="brand-text">
-      <span class="brand-name">App Bot</span>
-      <span class="brand-sub"><%= typeof guild !== 'undefined' && guild ? guild.name : 'Dashboard' %></span>
+      <span class="brand-name">Orbit</span>
+      <span class="brand-sub">BloxVerse Staff Hub</span>
     </span>
   </a>
   <nav class="side-nav" aria-label="Main">

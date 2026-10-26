@@ -4,7 +4,7 @@ import { castVote, decideSubmission, removeReviewMessages } from '../bot/applica
 import { startInterview } from '../bot/interviews.js';
 import { invalidatePanelCache, publishPanel, refreshApplyPanelQuietly } from '../bot/panels.js';
 import { closeTicketFromDashboard, setTicketSettings, transcriptText } from '../bot/tickets.js';
-import { MAX_QUESTIONS, inviteUrl } from '../bot/ui.js';
+import { MAX_QUESTIONS, cleanEmoji, inviteUrl } from '../bot/ui.js';
 import { config } from '../config.js';
 import {
   DAYS, DAY_NAMES, WEEK_ORDER, allTimezones, weeklyHours, describeSchedule, isCategoryOpen, isValidTimezone, parseLocalInput, parseTime, toLocalInput,
@@ -17,6 +17,12 @@ import { requireAdmin } from './auth.js';
 
 export const routes = express.Router();
 
+/** Emoji from a form: '' when cleared (so defaults don't come back), the old value when the input isn't an emoji. */
+const formEmoji = (value, old) => {
+  const v = String(value ?? '').trim();
+  if (!v) return '';
+  return cleanEmoji(v) ?? (old ?? '');
+};
 const LIMITS = { name: 80, description: 100, question: 500, panelTitle: 200, panelDescription: 2000, reason: 500 };
 
 const flash = (req, type, text) => { req.session.flash = { type, text }; };
@@ -200,9 +206,9 @@ routes.post('/applications/categories/:id', requireAdmin, async (req, res) => {
 
   await query(
     `UPDATE app_categories SET name = $2, description = $3, enabled = $4, position = $5,
-       schedule_mode = $6, open_at = $7, close_at = $8, weekly_days = $9, weekly_start = $10, weekly_end = $11, weekly_hours = $12 WHERE id = $1`,
+       schedule_mode = $6, open_at = $7, close_at = $8, weekly_days = $9, weekly_start = $10, weekly_end = $11, weekly_hours = $12, emoji = $13 WHERE id = $1`,
     [id, name, clean(b.description, LIMITS.description), b.enabled === 'on', Number.isFinite(position) ? position : cat.position,
-      mode, openAt, closeAt, [...new Set(days)].sort(), start, end, JSON.stringify(hours)],
+      mode, openAt, closeAt, [...new Set(days)].sort(), start, end, JSON.stringify(hours), formEmoji(b.emoji, cat.emoji)],
   );
   const saved = await getCategory(id);
   flash(req, 'success', `Saved "${name}". ${isCategoryOpen(saved, tz) ? 'It is open now.' : `It is closed now: ${describeSchedule(saved, tz).text}.`}`);
@@ -271,8 +277,8 @@ routes.post('/applications/roles/:id', requireAdmin, async (req, res) => {
   if (enabled && !prompts.length) { enabled = false; note = ' It stays switched off until it has at least one question.'; }
 
   await query(
-    `UPDATE app_roles SET name = $2, description = $3, discord_role_id = $4, submissions_channel_id = $5, enabled = $6 WHERE id = $1`,
-    [id, clean(b.name, LIMITS.name) || role.name, clean(b.description, LIMITS.description), discordRoleId, channelId, enabled],
+    `UPDATE app_roles SET name = $2, description = $3, discord_role_id = $4, submissions_channel_id = $5, enabled = $6, emoji = $7 WHERE id = $1`,
+    [id, clean(b.name, LIMITS.name) || role.name, clean(b.description, LIMITS.description), discordRoleId, channelId, enabled, formEmoji(b.emoji, role.emoji)],
   );
   await replaceQuestions(id, prompts);
   await refreshApplyPanelQuietly();
