@@ -179,9 +179,9 @@ const tabsList = [
       <h2>Claude connector</h2>
       <% if (connector.enabled) { %><span class="pill pill-open">On</span><% } else { %><span class="pill pill-off">Off</span><% } %>
     </div>
-    <p class="muted small">Lets Claude read and handle applications and tickets for you: in Claude, go to <strong>Customize → Connectors → Add custom connector</strong>, paste the URL below, and add a request header <code>Authorization</code> with the value <code>Bearer</code> followed by your key. Anyone with the key has full access, so keep it private.</p>
+    <p class="muted small">Lets Claude read and handle applications and tickets for you. In Claude, go to <strong>Customize → Connectors → Add custom connector</strong>, paste your <strong>connector link</strong> (it has the key in it), and pick the <strong>no sign-in</strong> option. Anyone with the link has full access, so keep it private.</p>
     <div class="field">
-      <label for="connector-url">Connector URL</label>
+      <label for="connector-url">Connector URL (without the key)</label>
       <div class="input-pair">
         <input id="connector-url" value="<%= connector.url %>" readonly>
         <button type="button" class="btn" data-copy="connector-url">Copy</button>
@@ -189,13 +189,24 @@ const tabsList = [
     </div>
     <% if (connector.newKey) { %>
       <div class="field key-reveal">
-        <label for="connector-key">Your new key (shown only this once)</label>
+        <label for="connector-link">Your connector link (shown only this once)</label>
         <div class="input-pair">
-          <input id="connector-key" value="Bearer <%= connector.newKey %>" readonly>
-          <button type="button" class="btn btn-primary" data-copy="connector-key">Copy</button>
+          <input id="connector-link" value="<%= connector.keyUrl %>" readonly>
+          <button type="button" class="btn btn-primary" data-copy="connector-link">Copy</button>
         </div>
-        <p class="help">Paste this whole line (including "Bearer") as the Authorization header value.</p>
+        <p class="help">Paste this as the connector's URL in Claude and choose no sign-in.</p>
       </div>
+      <details class="small muted" style="margin-bottom: 12px;">
+        <summary>Using a request header instead?</summary>
+        <div class="field" style="margin-top: 8px;">
+          <label for="connector-key">Authorization header value</label>
+          <div class="input-pair">
+            <input id="connector-key" value="Bearer <%= connector.newKey %>" readonly>
+            <button type="button" class="btn" data-copy="connector-key">Copy</button>
+          </div>
+          <p class="help">Use the plain URL above, and add a header named <code>Authorization</code> with this value.</p>
+        </div>
+      </details>
     <% } %>
     <div class="tab-actions">
       <form method="post" action="/settings/connector/create" <%= connector.enabled ? 'data-confirm="Make a new key? The old key stops working right away, so you will need to update it in Claude."' : '' %>>

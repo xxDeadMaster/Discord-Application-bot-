@@ -72,7 +72,11 @@ async function checkKey(req, res, next) {
   const stored = await currentKeyHash();
   if (!stored) return res.status(403).json({ error: 'The Claude connector is turned off. Make a key in Orbit Settings -> General.' });
   const header = String(req.get('authorization') || '');
-  const sent = header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : String(req.get('x-orbit-key') || '').trim();
+  // Key can be sent as "Authorization: Bearer <key>", an X-Orbit-Key header, or ?key=<key> in the URL
+  // (the URL form works with Claude's "no sign-in" connector option, where no headers can be set)
+  const sent = header.toLowerCase().startsWith('bearer ')
+    ? header.slice(7).trim()
+    : String(req.get('x-orbit-key') || req.query?.key || '').trim();
   const a = Buffer.from(hash(sent || 'none'));
   const b = Buffer.from(stored);
   if (!sent || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
