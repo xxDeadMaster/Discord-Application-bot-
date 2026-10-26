@@ -24,6 +24,10 @@
     { href: '/loa', label: 'Leave (LOA)', icon: 'calendar', active: path.startsWith('/loa'), count: manager ? nc.pending_loa : 0, countLabel: 'pending' },
   ];
   if (manager) links.push({ href: '/strikes', label: 'Strikes', icon: 'alert', active: path.startsWith('/strikes') });
+  if (admin || manager) links.push({ section: 'Community' });
+  if (admin) links.push({ href: '/welcome', label: 'Welcome', icon: 'wave', active: path.startsWith('/welcome') });
+  if (manager) links.push({ href: '/giveaways', label: 'Giveaways', icon: 'gift', active: path.startsWith('/giveaways') });
+  if (manager) links.push({ href: '/polls', label: 'Polls', icon: 'poll', active: path.startsWith('/polls') });
   if (admin || manager) links.push({ section: 'Setup' });
   if (admin) links.push({ href: '/applications', label: 'Applications', icon: 'list', active: path.startsWith('/applications') });
   if (manager) links.push({ href: '/ticket-types', label: 'Ticket types', icon: 'ticket', active: path.startsWith('/ticket-types') });

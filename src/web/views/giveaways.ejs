@@ -1,0 +1,97 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Giveaways</h1>
+    <p>Members press 🎉 to enter. When the timer runs out, Orbit picks winners at random and pings them.</p>
+  </div>
+</div>
+
+<section class="card" id="new">
+  <h2>Start a giveaway</h2>
+  <form method="post" action="/giveaways" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid-2">
+      <div class="field">
+        <label for="prize">Prize</label>
+        <input id="prize" name="prize" maxlength="200" placeholder="1,000 Robux" required>
+      </div>
+      <%- include('partials/select', { name: 'channel_id', label: 'Channel', list: opts.textChannels, value: null, emptyLabel: 'Pick a channel', help: 'Where the giveaway is posted.' }) %>
+    </div>
+    <div class="field">
+      <label for="description">Details (optional)</label>
+      <textarea id="description" name="description" rows="2" maxlength="1000" placeholder="Thanks for 1k members! Must be in the group to claim."></textarea>
+    </div>
+    <div class="grid-3">
+      <div class="field">
+        <label for="duration_value">Runs for</label>
+        <div class="input-pair">
+          <input id="duration_value" name="duration_value" type="number" min="1" max="720" value="1" required>
+          <label class="sr" for="duration_unit">Unit</label>
+          <select id="duration_unit" name="duration_unit">
+            <option value="minutes">minutes</option>
+            <option value="hours">hours</option>
+            <option value="days" selected>days</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="winner_count">Winners</label>
+        <input id="winner_count" name="winner_count" type="number" min="1" max="20" value="1" required>
+      </div>
+      <%- include('partials/select', { name: 'required_role_id', label: 'Who can enter', list: opts.roles, value: null, emptyLabel: 'Everyone', help: 'Pick a role to make it members-only, like @Verified.' }) %>
+    </div>
+    <div>
+      <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'gift', size: 16 }) %> Start giveaway</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>All giveaways</h2>
+    <span class="muted small"><%= giveaways.filter(g => g.status === 'active').length %> running</span>
+  </div>
+  <% if (!giveaways.length) { %>
+    <p class="muted" style="margin: 0;">No giveaways yet. Start one above.</p>
+  <% } else { %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Prize</th><th>Status</th><th>Entries</th><th>Ends</th><th>Winners</th><th><span class="sr">Actions</span></th></tr></thead>
+      <tbody>
+      <% giveaways.forEach(g => { const ch = opts.textChannels.find(c => c.id === g.channel_id); %>
+        <tr>
+          <td><strong><%= g.prize %></strong><br><span class="muted small">#<%= g.id %> · <%= ch ? ch.name : 'deleted channel' %><%= g.required_role_id ? ' · role only' : '' %></span></td>
+          <td><span class="pill <%= g.status === 'active' ? 'pill-open' : g.status === 'ended' ? 'pill-accepted' : 'pill-off' %>"><%= g.status === 'active' ? 'Running' : g.status === 'ended' ? 'Ended' : 'Cancelled' %></span></td>
+          <td><%= g.entry_count %></td>
+          <td class="small"><time data-local="<%= new Date(g.ended_at || g.ends_at).toISOString() %>"><%= new Date(g.ended_at || g.ends_at).toUTCString().slice(5, 22) %> UTC</time></td>
+          <td class="small"><%= g.winner_ids.length ? g.winner_ids.map(id => { const m = guild && guild.members.cache.get(id); return m ? m.displayName : id; }).join(', ') : (g.status === 'ended' ? 'Nobody entered' : '—') %></td>
+          <td>
+            <div class="row-actions">
+              <% if (g.status === 'active') { %>
+                <form method="post" action="/giveaways/<%= g.id %>/end" data-confirm="End &quot;<%= g.prize %>&quot; now and pick winners?">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-sm" type="submit">End now</button>
+                </form>
+                <form method="post" action="/giveaways/<%= g.id %>/cancel" data-confirm="Cancel &quot;<%= g.prize %>&quot;? Nobody will win.">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-danger-ghost btn-sm" type="submit">Cancel</button>
+                </form>
+              <% } else { %>
+                <% if (g.status === 'ended' && g.entry_count > g.winner_ids.length) { %>
+                <form method="post" action="/giveaways/<%= g.id %>/reroll" data-confirm="Pick one new winner for &quot;<%= g.prize %>&quot;?">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-sm" type="submit">Reroll</button>
+                </form>
+                <% } %>
+                <form method="post" action="/giveaways/<%= g.id %>/delete" data-confirm="Delete &quot;<%= g.prize %>&quot; from this list? The Discord message stays.">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <button class="icon-btn danger" type="submit" aria-label="Delete" title="Delete"><%- include('partials/icon', { name: 'trash', size: 16 }) %></button>
+                </form>
+              <% } %>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</section>
+<%- include('partials/foot') %>

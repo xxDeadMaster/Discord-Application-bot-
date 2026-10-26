@@ -461,3 +461,145 @@ export async function listLoas({ status, limit = 200 } = {}) {
   const { rows } = await query(`SELECT * FROM loa_requests WHERE ${where} ORDER BY created_at DESC LIMIT $${params.length}`, params);
   return rows;
 }
+
+/* ---------- Welcome + verification config ---------- */
+
+const WELCOME_FIELDS = [
+  'join_enabled', 'join_channel_id', 'join_message', 'join_card', 'join_dm_enabled', 'join_dm_message', 'auto_role_ids',
+  'rules_channel_id', 'leave_enabled', 'leave_channel_id', 'leave_message', 'leave_card',
+  'boost_enabled', 'boost_channel_id', 'boost_message', 'boost_card',
+  'verify_channel_id', 'verify_role_id', 'verify_title', 'verify_message', 'verify_min_account_days',
+  'verify_log_channel_id', 'verify_panel_message_id',
+];
+
+export async function getWelcomeConfig(guildId = config.guildId) {
+  await query('INSERT INTO welcome_config (guild_id) VALUES ($1) ON CONFLICT DO NOTHING', [guildId]);
+  const { rows } = await query('SELECT * FROM welcome_config WHERE guild_id = $1', [guildId]);
+  return rows[0];
+}
+
+export async function updateWelcomeConfig(patch, guildId = config.guildId) {
+  const keys = Object.keys(patch).filter((k) => WELCOME_FIELDS.includes(k));
+  if (!keys.length) return getWelcomeConfig(guildId);
+  await getWelcomeConfig(guildId);
+  const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+  const { rows } = await query(
+    `UPDATE welcome_config SET ${sets}, updated_at = now() WHERE guild_id = $1 RETURNING *`,
+    [guildId, ...keys.map((k) => patch[k])],
+  );
+  return rows[0];
+}
+
+/* ---------- Giveaways ---------- */
+
+export async function createGiveaway(g) {
+  const { rows } = await query(
+    `INSERT INTO giveaways (guild_id, channel_id, prize, description, winner_count, required_role_id, ends_at, host_id, host_tag)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [config.guildId, g.channelId, g.prize, g.description || '', g.winnerCount, g.requiredRoleId || null, g.endsAt, g.hostId || null, g.hostTag || null],
+  );
+  return rows[0];
+}
+
+export async function getGiveaway(id) {
+  const { rows } = await query(
+    `SELECT g.*, (SELECT count(*)::int FROM giveaway_entries e WHERE e.giveaway_id = g.id) AS entry_count
+       FROM giveaways g WHERE g.id = $1 AND g.guild_id = $2`, [id, config.guildId]);
+  return rows[0] || null;
+}
+
+export async function listGiveaways({ status = null, limit = 100 } = {}) {
+  const params = [config.guildId];
+  let where = 'g.guild_id = $1';
+  if (status) { params.push(status); where += ` AND g.status = $${params.length}`; }
+  params.push(limit);
+  const { rows } = await query(
+    `SELECT g.*, (SELECT count(*)::int FROM giveaway_entries e WHERE e.giveaway_id = g.id) AS entry_count
+       FROM giveaways g WHERE ${where} ORDER BY (g.status = 'active') DESC, g.ends_at DESC LIMIT $${params.length}`, params);
+  return rows;
+}
+
+export async function updateGiveaway(id, fields) {
+  const allowed = ['message_id', 'status', 'winner_ids', 'ended_at', 'ends_at'];
+  const keys = Object.keys(fields).filter((k) => allowed.includes(k));
+  if (!keys.length) return getGiveaway(id);
+  const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+  await query(`UPDATE giveaways SET ${sets} WHERE id = $1`, [id, ...keys.map((k) => fields[k])]);
+  return getGiveaway(id);
+}
+
+export async function deleteGiveaway(id) {
+  await query('DELETE FROM giveaways WHERE id = $1 AND guild_id = $2', [id, config.guildId]);
+}
+
+/** Enter or leave. Returns { entered: boolean, count }. */
+export async function toggleGiveawayEntry(giveawayId, userId) {
+  const del = await query('DELETE FROM giveaway_entries WHERE giveaway_id = $1 AND user_id = $2', [giveawayId, userId]);
+  if (!del.rowCount) await query('INSERT INTO giveaway_entries (giveaway_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [giveawayId, userId]);
+  const { rows } = await query('SELECT count(*)::int AS n FROM giveaway_entries WHERE giveaway_id = $1', [giveawayId]);
+  return { entered: !del.rowCount, count: rows[0].n };
+}
+
+export async function giveawayEntrants(giveawayId) {
+  const { rows } = await query('SELECT user_id FROM giveaway_entries WHERE giveaway_id = $1', [giveawayId]);
+  return rows.map((r) => r.user_id);
+}
+
+/* ---------- Polls ---------- */
+
+export async function createPoll(p) {
+  const { rows } = await query(
+    `INSERT INTO polls (guild_id, channel_id, question, options, multi, ends_at, host_id, host_tag)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [config.guildId, p.channelId, p.question, p.options, Boolean(p.multi), p.endsAt || null, p.hostId || null, p.hostTag || null],
+  );
+  return rows[0];
+}
+
+export async function getPoll(id) {
+  const { rows } = await query('SELECT * FROM polls WHERE id = $1 AND guild_id = $2', [id, config.guildId]);
+  return rows[0] || null;
+}
+
+export async function listPolls({ limit = 100 } = {}) {
+  const { rows } = await query(
+    `SELECT p.*, (SELECT count(DISTINCT v.user_id)::int FROM poll_votes v WHERE v.poll_id = p.id) AS voter_count
+       FROM polls p WHERE p.guild_id = $1 ORDER BY (p.status = 'active') DESC, p.created_at DESC LIMIT $2`, [config.guildId, limit]);
+  return rows;
+}
+
+export async function updatePoll(id, fields) {
+  const allowed = ['message_id', 'status', 'ended_at'];
+  const keys = Object.keys(fields).filter((k) => allowed.includes(k));
+  if (!keys.length) return getPoll(id);
+  const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(', ');
+  await query(`UPDATE polls SET ${sets} WHERE id = $1`, [id, ...keys.map((k) => fields[k])]);
+  return getPoll(id);
+}
+
+export async function deletePoll(id) {
+  await query('DELETE FROM polls WHERE id = $1 AND guild_id = $2', [id, config.guildId]);
+}
+
+/**
+ * Records a vote. Single choice: picking another option moves the vote, picking the same one removes it.
+ * Multiple choice: each option toggles. Returns { voted: boolean }.
+ */
+export async function votePoll(poll, userId, optionIndex) {
+  const had = await query('SELECT 1 FROM poll_votes WHERE poll_id = $1 AND user_id = $2 AND option_index = $3', [poll.id, userId, optionIndex]);
+  if (had.rowCount) {
+    await query('DELETE FROM poll_votes WHERE poll_id = $1 AND user_id = $2 AND option_index = $3', [poll.id, userId, optionIndex]);
+    return { voted: false };
+  }
+  if (!poll.multi) await query('DELETE FROM poll_votes WHERE poll_id = $1 AND user_id = $2', [poll.id, userId]);
+  await query('INSERT INTO poll_votes (poll_id, user_id, option_index) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING', [poll.id, userId, optionIndex]);
+  return { voted: true };
+}
+
+/** Vote counts per option, plus distinct voters. */
+export async function pollResults(poll) {
+  const { rows } = await query('SELECT option_index, count(*)::int AS n FROM poll_votes WHERE poll_id = $1 GROUP BY option_index', [poll.id]);
+  const counts = poll.options.map((_, i) => rows.find((r) => r.option_index === i)?.n || 0);
+  const v = await query('SELECT count(DISTINCT user_id)::int AS n FROM poll_votes WHERE poll_id = $1', [poll.id]);
+  return { counts, voters: v.rows[0].n };
+}

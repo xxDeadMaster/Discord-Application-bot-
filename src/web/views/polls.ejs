@@ -1,0 +1,88 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Polls</h1>
+    <p>Members vote with numbered buttons, and the results bars update live in Discord.</p>
+  </div>
+</div>
+
+<section class="card" id="new">
+  <h2>Start a poll</h2>
+  <form method="post" action="/polls" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid-2">
+      <div class="field">
+        <label for="question">Question</label>
+        <input id="question" name="question" maxlength="250" placeholder="What should our next event be?" required>
+      </div>
+      <%- include('partials/select', { name: 'channel_id', label: 'Channel', list: opts.textChannels, value: null, emptyLabel: 'Pick a channel', help: 'Where the poll is posted.' }) %>
+    </div>
+    <fieldset class="field">
+      <legend>Options <span class="muted small">(2 to <%= maxOptions %>)</span></legend>
+      <div class="poll-options" data-poll-options data-max="<%= maxOptions %>">
+        <% for (let i = 0; i < 4; i++) { %>
+          <div class="poll-opt"><span class="poll-num" aria-hidden="true"><%= i + 1 %></span><label class="sr" for="opt-<%= i %>">Option <%= i + 1 %></label><input id="opt-<%= i %>" name="options" maxlength="80" placeholder="<%= ['Obby race', 'Hide and seek', 'Build battle', 'Trivia night'][i] %>" <%= i < 2 ? 'required' : '' %>></div>
+        <% } %>
+      </div>
+      <button class="btn btn-ghost btn-sm" type="button" data-add-option><%- include('partials/icon', { name: 'plus', size: 15 }) %> Add option</button>
+    </fieldset>
+    <div class="grid-2">
+      <div class="field">
+        <label for="duration_value">Closes after (optional)</label>
+        <div class="input-pair">
+          <input id="duration_value" name="duration_value" type="number" min="1" max="720" placeholder="Never">
+          <label class="sr" for="duration_unit">Unit</label>
+          <select id="duration_unit" name="duration_unit">
+            <option value="minutes">minutes</option>
+            <option value="hours" selected>hours</option>
+            <option value="days">days</option>
+          </select>
+        </div>
+        <p class="help">Leave empty to keep it open until you close it here.</p>
+      </div>
+      <div class="field">
+        <span class="label-like">Voting</span>
+        <label class="toggle"><input type="checkbox" name="multi"> Let people pick more than one option</label>
+      </div>
+    </div>
+    <div>
+      <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'poll', size: 16 }) %> Start poll</button>
+    </div>
+  </form>
+</section>
+
+<% if (!polls.length) { %>
+<section class="card"><h2>All polls</h2><p class="muted" style="margin: 0;">No polls yet. Start one above.</p></section>
+<% } %>
+
+<% polls.forEach(p => { const total = p.results.counts.reduce((a, b) => a + b, 0); const ch = opts.textChannels.find(c => c.id === p.channel_id); %>
+<section class="card poll-card">
+  <div class="card-head">
+    <div>
+      <h2 style="margin: 0;"><%= p.question %></h2>
+      <span class="muted small">#<%= p.id %> · <%= ch ? ch.name : 'deleted channel' %> · <%= p.results.voters %> voter<%= p.results.voters === 1 ? '' : 's' %><%= p.multi ? ' · multiple choice' : '' %></span>
+    </div>
+    <div class="row-actions">
+      <span class="pill <%= p.status === 'active' ? 'pill-open' : 'pill-off' %>"><%= p.status === 'active' ? 'Open' : 'Closed' %></span>
+      <% if (p.status === 'active') { %>
+        <form method="post" action="/polls/<%= p.id %>/end" data-confirm="Close this poll now?">
+          <input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-sm" type="submit">Close now</button>
+        </form>
+      <% } %>
+      <form method="post" action="/polls/<%= p.id %>/delete" data-confirm="Delete this poll from the list? The Discord message stays.">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="icon-btn danger" type="submit" aria-label="Delete" title="Delete"><%- include('partials/icon', { name: 'trash', size: 16 }) %></button>
+      </form>
+    </div>
+  </div>
+  <ul class="poll-results">
+    <% p.options.forEach((o, i) => { const n = p.results.counts[i]; const pct = total ? Math.round(n / total * 100) : 0; %>
+      <li>
+        <div class="poll-row"><span><span class="poll-num"><%= i + 1 %></span><%= o %></span><span class="muted small"><%= pct %>% · <%= n %></span></div>
+        <div class="poll-bar"><span style="width: <%= pct %>%"></span></div>
+      </li>
+    <% }) %>
+  </ul>
+</section>
+<% }) %>
+<%- include('partials/foot') %>

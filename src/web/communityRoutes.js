@@ -1,0 +1,200 @@
+// Dashboard pages: Welcome (join/leave/boost + verification), Giveaways and Polls.
+import express from 'express';
+import {
+  MAX_POLL_OPTIONS, cancelGiveaway, endGiveaway, endPoll, rerollGiveaway, startGiveaway, startPoll,
+} from '../bot/giveaways.js';
+import {
+  PLACEHOLDERS, publishVerifyPanel, sendTestMessage, setWelcomeConfig,
+} from '../bot/welcome.js';
+import {
+  deleteGiveaway, deletePoll, getGiveaway, getPoll, getWelcomeConfig, listGiveaways, listPolls, pollResults, updateWelcomeConfig,
+} from '../db.js';
+import { requireAdmin } from './auth.js';
+
+export const communityRoutes = express.Router();
+
+const flash = (req, type, text) => { req.session.flash = { type, text }; };
+const clean = (v, max) => String(v ?? '').trim().slice(0, max);
+const toArray = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
+const idParam = (req) => {
+  const n = Number.parseInt(req.params.id, 10);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+};
+/** An ID from a form, only if it exists in the list; '' clears it. */
+const pick = (v, list) => { const x = String(v ?? '').trim(); return x && list.some((i) => i.id === x) ? x : null; };
+
+function requireManager(req, res, next) {
+  if (res.locals.isManager) return next();
+  res.status(403).render('error', { title: 'Managers only', message: 'Only managers (Manage Server, or the manager role in Settings) can do this.', user: res.locals.user });
+}
+
+const UNITS = { minutes: 60_000, hours: 3_600_000, days: 86_400_000 };
+const MAX_MS = 30 * 86_400_000;
+/** Duration from the form ("2" + "hours"). Returns ms, or null when invalid. */
+function duration(value, unit) {
+  const n = Number(value);
+  const ms = n * (UNITS[unit] || 0);
+  return Number.isFinite(ms) && ms >= 60_000 && ms <= MAX_MS ? ms : null;
+}
+
+/* ---------- Welcome ---------- */
+
+communityRoutes.get('/welcome', requireAdmin, async (req, res) => {
+  res.render('welcome', { title: 'Welcome', cfg: await getWelcomeConfig(), opts: res.locals.guildOpts(), placeholders: PLACEHOLDERS });
+});
+
+communityRoutes.post('/welcome', requireAdmin, async (req, res) => {
+  const b = req.body;
+  const opts = res.locals.guildOpts();
+  const current = await getWelcomeConfig();
+  const msg = (v, fallback) => clean(v, 1800) || fallback;
+  const days = Number.parseInt(b.verify_min_account_days, 10);
+  const patch = {
+    join_enabled: b.join_enabled === 'on',
+    join_channel_id: pick(b.join_channel_id, opts.textChannels),
+    join_message: msg(b.join_message, current.join_message),
+    join_card: b.join_card === 'on',
+    join_dm_enabled: b.join_dm_enabled === 'on',
+    join_dm_message: msg(b.join_dm_message, current.join_dm_message),
+    auto_role_ids: toArray(b.auto_role_ids).filter((id) => opts.roles.some((r) => r.id === id)).slice(0, 5),
+    rules_channel_id: pick(b.rules_channel_id, opts.textChannels),
+    leave_enabled: b.leave_enabled === 'on',
+    leave_channel_id: pick(b.leave_channel_id, opts.textChannels),
+    leave_message: msg(b.leave_message, current.leave_message),
+    leave_card: b.leave_card === 'on',
+    boost_enabled: b.boost_enabled === 'on',
+    boost_channel_id: pick(b.boost_channel_id, opts.textChannels),
+    boost_message: msg(b.boost_message, current.boost_message),
+    boost_card: b.boost_card === 'on',
+    verify_channel_id: pick(b.verify_channel_id, opts.textChannels),
+    verify_role_id: pick(b.verify_role_id, opts.roles),
+    verify_title: clean(b.verify_title, 200) || 'Verify to join',
+    verify_message: msg(b.verify_message, current.verify_message),
+    verify_min_account_days: Number.isFinite(days) ? Math.min(Math.max(days, 0), 365) : 0,
+    verify_log_channel_id: pick(b.verify_log_channel_id, opts.textChannels),
+  };
+  const saved = await updateWelcomeConfig(patch);
+  setWelcomeConfig(saved);
+
+  const warn = [];
+  if (patch.join_enabled && !patch.join_channel_id) warn.push('pick a channel for welcome messages');
+  if (patch.leave_enabled && !patch.leave_channel_id) warn.push('pick a channel for leave messages');
+  if (patch.boost_enabled && !patch.boost_channel_id) warn.push('pick a channel for boost messages');
+  flash(req, warn.length ? 'error' : 'success', warn.length ? `Saved, but ${warn.join(', ')}.` : 'Welcome settings saved.');
+  res.redirect('/welcome');
+});
+
+communityRoutes.post('/welcome/test/:kind', requireAdmin, async (req, res) => {
+  const kind = req.params.kind;
+  if (!['join', 'leave', 'boost'].includes(kind)) return res.redirect('/welcome');
+  const r = await sendTestMessage(kind, res.locals.user.id);
+  const label = { join: 'welcome', leave: 'leave', boost: 'boost' }[kind];
+  flash(req, r.ok ? 'success' : 'error', r.ok ? `Sent a test ${label} message for you. Check the channel in Discord.` : `Test failed: ${r.error} Save the channel first.`);
+  res.redirect(`/welcome#${kind}`);
+});
+
+communityRoutes.post('/welcome/verify-panel', requireAdmin, async (req, res) => {
+  try {
+    const r = await publishVerifyPanel();
+    flash(req, 'success', r.updated ? 'Verify panel updated in Discord.' : 'Verify panel posted in Discord.');
+  } catch (err) {
+    flash(req, 'error', err.message);
+  }
+  res.redirect('/welcome#verify');
+});
+
+/* ---------- Giveaways ---------- */
+
+communityRoutes.get('/giveaways', requireManager, async (req, res) => {
+  res.render('giveaways', { title: 'Giveaways', giveaways: await listGiveaways(), opts: res.locals.guildOpts() });
+});
+
+communityRoutes.post('/giveaways', requireManager, async (req, res) => {
+  const b = req.body;
+  const opts = res.locals.guildOpts();
+  const prize = clean(b.prize, 200);
+  const channelId = pick(b.channel_id, opts.textChannels);
+  const ms = duration(b.duration_value, b.duration_unit);
+  const winners = Number.parseInt(b.winner_count, 10);
+  if (!prize) { flash(req, 'error', 'Type what the prize is.'); return res.redirect('/giveaways'); }
+  if (!channelId) { flash(req, 'error', 'Pick a channel to post the giveaway in.'); return res.redirect('/giveaways'); }
+  if (!ms) { flash(req, 'error', 'Pick how long it runs: at least 1 minute and at most 30 days.'); return res.redirect('/giveaways'); }
+  if (!(winners >= 1 && winners <= 20)) { flash(req, 'error', 'Winners must be between 1 and 20.'); return res.redirect('/giveaways'); }
+  try {
+    const g = await startGiveaway({
+      channelId, prize, description: clean(b.description, 1000), winnerCount: winners,
+      requiredRoleId: pick(b.required_role_id, opts.roles), endsAt: new Date(Date.now() + ms),
+      hostId: res.locals.user.id, hostTag: res.locals.user.name,
+    });
+    flash(req, 'success', `Giveaway #${g.id} for "${prize}" is live in Discord.`);
+  } catch (err) {
+    flash(req, 'error', err.message);
+  }
+  res.redirect('/giveaways');
+});
+
+communityRoutes.post('/giveaways/:id/:action', requireManager, async (req, res) => {
+  const id = idParam(req);
+  const g = id && await getGiveaway(id);
+  if (!g) return res.redirect('/giveaways');
+  const action = req.params.action;
+  let r;
+  if (action === 'end') r = await endGiveaway(id);
+  else if (action === 'reroll') r = await rerollGiveaway(id, 1);
+  else if (action === 'cancel') r = await cancelGiveaway(id);
+  else if (action === 'delete') {
+    if (g.status === 'active') await cancelGiveaway(id);
+    await deleteGiveaway(id);
+    r = { ok: true };
+  } else return res.redirect('/giveaways');
+  const done = { end: 'Giveaway ended and winners announced.', reroll: 'Picked a new winner and announced it.', cancel: 'Giveaway cancelled.', delete: 'Giveaway deleted from the dashboard.' }[action];
+  flash(req, r.ok ? 'success' : 'error', r.ok ? done : r.error);
+  res.redirect('/giveaways');
+});
+
+/* ---------- Polls ---------- */
+
+communityRoutes.get('/polls', requireManager, async (req, res) => {
+  const polls = await listPolls();
+  for (const p of polls) p.results = await pollResults(p);
+  res.render('polls', { title: 'Polls', polls, opts: res.locals.guildOpts(), maxOptions: MAX_POLL_OPTIONS });
+});
+
+communityRoutes.post('/polls', requireManager, async (req, res) => {
+  const b = req.body;
+  const opts = res.locals.guildOpts();
+  const question = clean(b.question, 250);
+  const options = toArray(b.options).map((o) => clean(o, 80)).filter(Boolean).slice(0, MAX_POLL_OPTIONS);
+  const channelId = pick(b.channel_id, opts.textChannels);
+  if (!question) { flash(req, 'error', 'Type the question.'); return res.redirect('/polls'); }
+  if (options.length < 2) { flash(req, 'error', 'Add at least 2 options.'); return res.redirect('/polls'); }
+  if (!channelId) { flash(req, 'error', 'Pick a channel to post the poll in.'); return res.redirect('/polls'); }
+  let endsAt = null;
+  if (b.duration_value) {
+    const ms = duration(b.duration_value, b.duration_unit);
+    if (!ms) { flash(req, 'error', 'Poll length must be at least 1 minute and at most 30 days, or leave it empty.'); return res.redirect('/polls'); }
+    endsAt = new Date(Date.now() + ms);
+  }
+  try {
+    const p = await startPoll({ channelId, question, options, multi: b.multi === 'on', endsAt, hostId: res.locals.user.id, hostTag: res.locals.user.name });
+    flash(req, 'success', `Poll #${p.id} is live in Discord.`);
+  } catch (err) {
+    flash(req, 'error', err.message);
+  }
+  res.redirect('/polls');
+});
+
+communityRoutes.post('/polls/:id/:action', requireManager, async (req, res) => {
+  const id = idParam(req);
+  const p = id && await getPoll(id);
+  if (!p) return res.redirect('/polls');
+  let r;
+  if (req.params.action === 'end') r = await endPoll(id);
+  else if (req.params.action === 'delete') {
+    if (p.status === 'active') await endPoll(id);
+    await deletePoll(id);
+    r = { ok: true };
+  } else return res.redirect('/polls');
+  flash(req, r.ok ? 'success' : 'error', r.ok ? (req.params.action === 'end' ? 'Poll closed. Final results are shown in Discord.' : 'Poll deleted from the dashboard.') : r.error);
+  res.redirect('/polls');
+});

@@ -2,12 +2,6 @@ import express from 'express';
 import { refreshTicketPanelQuietly } from '../bot/panels.js';
 import { cleanEmoji } from '../bot/ui.js';
 
-/** Emoji from a form: '' when cleared, the old value when the input isn't an emoji. */
-const formEmoji = (value, old) => {
-  const v = String(value ?? '').trim();
-  if (!v) return '';
-  return cleanEmoji(v) ?? (old ?? '');
-};
 import { decideLoa, endLoa, isOnLoa, issueStrike, prettyDate, removeStrike, requestLoa, todayIn } from '../bot/staff.js';
 import { DEFAULT_QUESTION, toggleClaim } from '../bot/tickets.js';
 import { config } from '../config.js';
@@ -15,6 +9,13 @@ import { getSettings, getTicketType, listLoas, listStrikes, listTicketTypes, que
 import { activityScore, staffActivity } from '../stats.js';
 
 export const staffRoutes = express.Router();
+
+/** Emoji from a form: '' when cleared, the old value when the input isn't an emoji. */
+const formEmoji = (value, old) => {
+  const v = String(value ?? '').trim();
+  if (!v) return '';
+  return cleanEmoji(v) ?? (old ?? '');
+};
 
 const flash = (req, type, text) => { req.session.flash = { type, text }; };
 const idParam = (req) => {

@@ -11,7 +11,7 @@ export const client = new Client({
     GatewayIntentBits.GuildVoiceStates, // interview voice channels: who joined and left
   ],
   // Channel partial is required to receive DMs
-  partials: [Partials.Channel, Partials.Message],
+  partials: [Partials.Channel, Partials.Message, Partials.GuildMember, Partials.User],
 });
 
 export async function getGuild() {

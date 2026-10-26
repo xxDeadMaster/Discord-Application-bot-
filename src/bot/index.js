@@ -13,6 +13,10 @@ import {
   handleOpenButton, handleOpenModal, handleRating, handleTypeSelect, loadOpenTickets, recordTicketMessage, startAutoClose,
 } from './tickets.js';
 import { ephemeral } from './ui.js';
+import {
+  handleMemberJoin, handleMemberLeave, handleMemberUpdate, handleVerifyButton, handleVerifyModal, loadWelcomeConfig,
+} from './welcome.js';
+import { handleGiveawayButton, handlePollButton, loadCommunity, startCommunityLoop } from './giveaways.js';
 
 function route(interaction) {
   if (interaction.isChatInputCommand()) return handleCommand(interaction);
@@ -33,11 +37,15 @@ function route(interaction) {
     if (id === 'ticket:keepopen') return handleKeepOpen(interaction);
     if (id.startsWith('trate:')) return handleRating(interaction);
     if (id.startsWith('loa:')) return handleLoaButton(interaction);
+    if (id === 'verify:start') return handleVerifyButton(interaction);
+    if (id.startsWith('gw:enter:')) return handleGiveawayButton(interaction);
+    if (id.startsWith('poll:vote:')) return handlePollButton(interaction);
   }
   if (interaction.isModalSubmit()) {
     if (id.startsWith('sub:denymodal:')) return handleDenyModal(interaction);
     if (id.startsWith('ticket:openmodal')) return handleOpenModal(interaction);
     if (id === 'loa:modal') return handleLoaModal(interaction);
+    if (id === 'verify:modal') return handleVerifyModal(interaction);
   }
   return null;
 }
@@ -73,6 +81,21 @@ client.on(Events.ChannelDelete, (channel) => {
   handleInterviewChannelDelete(channel).catch((err) => console.error('[channelDelete interview]', err));
 });
 
+client.on(Events.GuildMemberAdd, (member) => {
+  if (member.guild.id !== config.guildId) return;
+  handleMemberJoin(member).catch((err) => console.error('[memberAdd]', err));
+});
+
+client.on(Events.GuildMemberRemove, (member) => {
+  if (member.guild.id !== config.guildId) return;
+  handleMemberLeave(member).catch((err) => console.error('[memberRemove]', err));
+});
+
+client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
+  if (newMember.guild.id !== config.guildId) return;
+  handleMemberUpdate(oldMember, newMember).catch((err) => console.error('[memberUpdate]', err));
+});
+
 client.on(Events.VoiceStateUpdate, (oldState, newState) => {
   if ((newState.guild?.id || oldState.guild?.id) !== config.guildId) return;
   handleVoiceState(oldState, newState).catch((err) => console.error('[voiceState]', err));
@@ -92,6 +115,9 @@ client.once(Events.ClientReady, async (c) => {
   startPanelScheduler();
   startAutoClose();
   await loadLoaSchedule().catch((err) => console.error('[loa] load failed:', err));
+  await loadWelcomeConfig().catch((err) => console.error('[welcome] load failed:', err));
+  await loadCommunity().catch((err) => console.error('[community] load failed:', err));
+  startCommunityLoop();
 });
 
 client.on(Events.Error, (err) => console.error('[discord]', err));

@@ -145,3 +145,45 @@ document.querySelectorAll('[data-copy-monday]').forEach((btn) => {
     });
   });
 });
+
+/* ---------- Welcome page: click a fill-in to add it to the last message box used ---------- */
+(() => {
+  const targets = document.querySelectorAll('[data-ph-target]');
+  if (!targets.length) return;
+  let last = targets[0];
+  targets.forEach((t) => t.addEventListener('focus', () => { last = t; }));
+  document.querySelectorAll('[data-insert]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const code = btn.dataset.insert;
+      const start = last.selectionStart ?? last.value.length;
+      const end = last.selectionEnd ?? last.value.length;
+      last.value = last.value.slice(0, start) + code + last.value.slice(end);
+      last.focus();
+      last.selectionStart = last.selectionEnd = start + code.length;
+    });
+  });
+})();
+
+/* ---------- Polls page: add option rows ---------- */
+document.querySelectorAll('[data-add-option]').forEach((btn) => {
+  const list = btn.parentElement.querySelector('[data-poll-options]');
+  const max = Number(list.dataset.max || 10);
+  const sync = () => { btn.hidden = list.children.length >= max; };
+  btn.addEventListener('click', () => {
+    const n = list.children.length + 1;
+    if (n > max) return;
+    const row = document.createElement('div');
+    row.className = 'poll-opt';
+    row.innerHTML = `<span class="poll-num" aria-hidden="true">${n}</span><label class="sr" for="opt-${n - 1}">Option ${n}</label><input id="opt-${n - 1}" name="options" maxlength="80">`;
+    list.appendChild(row);
+    row.querySelector('input').focus();
+    sync();
+  });
+  sync();
+});
+
+/* ---------- Show times in the viewer's own timezone ---------- */
+document.querySelectorAll('time[data-local]').forEach((el) => {
+  const d = new Date(el.dataset.local);
+  if (!Number.isNaN(d.getTime())) el.textContent = d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+});

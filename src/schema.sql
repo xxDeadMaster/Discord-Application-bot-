@@ -235,3 +235,82 @@ UPDATE ticket_types SET emoji = CASE WHEN name ILIKE '%report%' THEN '🚨' WHEN
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS role_emoji TEXT;
 ALTER TABLE submissions ADD COLUMN IF NOT EXISTS user_avatar TEXT;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS type_emoji TEXT;
+
+/* ---------- Welcome, leave, boost + verification ---------- */
+CREATE TABLE IF NOT EXISTS welcome_config (
+  guild_id                TEXT PRIMARY KEY,
+  join_enabled            BOOLEAN NOT NULL DEFAULT false,
+  join_channel_id         TEXT,
+  join_message            TEXT NOT NULL DEFAULT 'Hey {mention}, welcome to **{server}**! You are member **#{count}**.
+Read the rules in {rules}, then press **Verify** to see the rest of the server.',
+  join_card               BOOLEAN NOT NULL DEFAULT true,
+  join_dm_enabled         BOOLEAN NOT NULL DEFAULT false,
+  join_dm_message         TEXT NOT NULL DEFAULT 'Welcome to **{server}**, {name}! Read the rules and press Verify to get in. Have fun!',
+  auto_role_ids           TEXT[] NOT NULL DEFAULT '{}',
+  rules_channel_id        TEXT,
+  leave_enabled           BOOLEAN NOT NULL DEFAULT false,
+  leave_channel_id        TEXT,
+  leave_message           TEXT NOT NULL DEFAULT '**{name}** left the server. We now have **{count}** members.',
+  leave_card              BOOLEAN NOT NULL DEFAULT true,
+  boost_enabled           BOOLEAN NOT NULL DEFAULT false,
+  boost_channel_id        TEXT,
+  boost_message           TEXT NOT NULL DEFAULT '{mention} just boosted **{server}**! 💎 Thank you! We now have **{boosts}** boosts.',
+  boost_card              BOOLEAN NOT NULL DEFAULT true,
+  verify_channel_id       TEXT,
+  verify_role_id          TEXT,
+  verify_title            TEXT NOT NULL DEFAULT 'Verify to join',
+  verify_message          TEXT NOT NULL DEFAULT 'Welcome to **{server}**! Read the rules, then press **Verify** below and type the short code to unlock the server.',
+  verify_min_account_days INTEGER NOT NULL DEFAULT 0,
+  verify_log_channel_id   TEXT,
+  verify_panel_message_id TEXT,
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+/* ---------- Giveaways ---------- */
+CREATE TABLE IF NOT EXISTS giveaways (
+  id               SERIAL PRIMARY KEY,
+  guild_id         TEXT NOT NULL,
+  channel_id       TEXT NOT NULL,
+  message_id       TEXT,
+  prize            TEXT NOT NULL,
+  description      TEXT NOT NULL DEFAULT '',
+  winner_count     INTEGER NOT NULL DEFAULT 1,
+  required_role_id TEXT,
+  ends_at          TIMESTAMPTZ NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'active', -- active | ended | cancelled
+  winner_ids       TEXT[] NOT NULL DEFAULT '{}',
+  host_id          TEXT,
+  host_tag         TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ended_at         TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS giveaway_entries (
+  giveaway_id INTEGER NOT NULL REFERENCES giveaways(id) ON DELETE CASCADE,
+  user_id     TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (giveaway_id, user_id)
+);
+
+/* ---------- Polls ---------- */
+CREATE TABLE IF NOT EXISTS polls (
+  id          SERIAL PRIMARY KEY,
+  guild_id    TEXT NOT NULL,
+  channel_id  TEXT NOT NULL,
+  message_id  TEXT,
+  question    TEXT NOT NULL,
+  options     TEXT[] NOT NULL,
+  multi       BOOLEAN NOT NULL DEFAULT false,
+  ends_at     TIMESTAMPTZ,
+  status      TEXT NOT NULL DEFAULT 'active', -- active | ended
+  host_id     TEXT,
+  host_tag    TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ended_at    TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS poll_votes (
+  poll_id      INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+  user_id      TEXT NOT NULL,
+  option_index INTEGER NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (poll_id, user_id, option_index)
+);

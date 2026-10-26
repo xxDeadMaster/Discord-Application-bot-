@@ -106,3 +106,75 @@ export function bannerAttachment(title, subtitle = '', name = 'banner.png') {
     return null;
   }
 }
+
+/* ---------- Member cards (welcome / goodbye / boost) ---------- */
+
+const CW = 1100;
+const CH = 360;
+const CARD_THEMES = {
+  join: { ring: '#58A6FF', glow: '#3D8BFF', sub: '#9FCBFF', fill: '#1F6FEB', bg: ['#04060C', '#0A1B44', '#1450C8'] },
+  leave: { ring: '#8592A8', glow: '#4A5670', sub: '#B8C2D3', fill: '#2C3547', bg: ['#04060C', '#10141E', '#273148'] },
+  boost: { ring: '#F47FFF', glow: '#C86BFF', sub: '#F2C9FF', fill: '#7B3FE4', bg: ['#04060C', '#1E0F44', '#6B2FD6'] },
+};
+
+function cardSvg({ kind = 'join', heading, name, subtitle, avatarPng }) {
+  const t = CARD_THEMES[kind] || CARD_THEMES.join;
+  const head = textPath(titleFont, clean(heading).toUpperCase() || 'WELCOME', 40, 640, 380, 118, { letterSpacing: 8 });
+  const who = textPath(titleFont, clean(name) || 'New member', 92, 660, 380, 214, { letterSpacing: 1 });
+  const sub = subtitle ? textPath(subFont, clean(subtitle).toUpperCase(), 26, 640, 383, 270, { letterSpacing: 6 }) : null;
+  const initial = textPath(titleFont, (clean(name) || '?').slice(0, 1).toUpperCase(), 110, 200, 190, 218, { align: 'center' });
+  const avatar = avatarPng
+    ? `<image href="data:image/png;base64,${avatarPng.toString('base64')}" x="80" y="70" width="220" height="220" clip-path="url(#av)" preserveAspectRatio="xMidYMid slice"/>`
+    : `<circle cx="190" cy="180" r="110" fill="${t.fill}"/><path d="${initial.d}" fill="#FFFFFF"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${CW}" height="${CH}" viewBox="0 0 ${CW} ${CH}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${t.bg[0]}"/><stop offset="0.55" stop-color="${t.bg[1]}"/><stop offset="1" stop-color="${t.bg[2]}"/></linearGradient>
+    <radialGradient id="gl" cx="0.17" cy="0.5" r="0.4"><stop offset="0" stop-color="${t.glow}" stop-opacity="0.55"/><stop offset="1" stop-color="${t.glow}" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0 L0 0 0 40" fill="none" stroke="#58A6FF" stroke-width="1" opacity="0.06"/></pattern>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${t.ring}" stop-opacity="0"/><stop offset="0.5" stop-color="${t.ring}"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0.8"/></linearGradient>
+    <clipPath id="av"><circle cx="190" cy="180" r="110"/></clipPath>
+    <filter id="blur" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="9"/></filter>
+  </defs>
+  <rect width="${CW}" height="${CH}" fill="url(#bg)"/>
+  <rect width="${CW}" height="${CH}" fill="url(#grid)"/>
+  <rect width="${CW}" height="${CH}" fill="url(#gl)"/>
+  <g fill="#FFFFFF"><circle cx="980" cy="60" r="2.5" opacity="0.6"/><circle cx="720" cy="40" r="2" opacity="0.45"/><circle cx="1040" cy="300" r="2" opacity="0.5"/>
+  <path d="M1010 200 l4 11 l11 4 l-11 4 l-4 11 l-4 -11 l-11 -4 l11 -4 z" opacity="0.75"/></g>
+  <ellipse cx="190" cy="180" rx="168" ry="44" transform="rotate(-14 190 180)" fill="none" stroke="url(#ring)" stroke-width="6" opacity="0.9"/>
+  <circle cx="190" cy="180" r="118" fill="${t.bg[0]}" stroke="${t.ring}" stroke-width="6"/>
+  ${avatar}
+  <path d="${head.d}" fill="${t.sub}"/>
+  <path d="${who.d}" fill="${t.glow}" opacity="0.85" filter="url(#blur)"/>
+  <path d="${who.d}" fill="#FFFFFF"/>
+  ${sub ? `<path d="${sub.d}" fill="${t.sub}"/>` : ''}
+  <rect x="383" y="${sub ? 292 : 240}" width="64" height="6" rx="3" fill="${t.ring}"/>
+</svg>`;
+}
+
+/** Fetches an avatar PNG (small, with a timeout). Returns null when it can't. */
+export async function fetchAvatar(url) {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    return buf.length < 2_000_000 ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
+/** PNG of a member card. kind: join | leave | boost. */
+export function renderCard(opts) {
+  return new Resvg(cardSvg(opts), { fitTo: { mode: 'width', value: CW } }).render().asPng();
+}
+
+/** A Discord attachment for a member card, plus its attachment:// url. Null on error. */
+export function cardAttachment(opts, name = 'card.png') {
+  try {
+    return { file: new AttachmentBuilder(renderCard(opts), { name }), url: `attachment://${name}` };
+  } catch (err) {
+    console.warn('[card] could not render:', err.message);
+    return null;
+  }
+}
