@@ -49,7 +49,7 @@
       <% questions.forEach((q, i) => { %>
         <li class="question">
           <label class="sr" for="q-<%= i %>">Question <%= i + 1 %></label>
-          <textarea id="q-<%= i %>" name="questions" rows="2" maxlength="<%= limits.question %>"><%= q.prompt %></textarea>
+          <textarea id="q-<%= i %>" name="questions" rows="1" maxlength="<%= limits.question %>"><%= q.prompt %></textarea>
           <%- qTools %>
         </li>
       <% }) %>
@@ -57,7 +57,7 @@
     <template data-question-template>
       <li class="question">
         <label class="sr">New question</label>
-        <textarea name="questions" rows="2" maxlength="<%= limits.question %>" placeholder="Type the question"></textarea>
+        <textarea name="questions" rows="1" maxlength="<%= limits.question %>" placeholder="Type the question"></textarea>
         <%- qTools %>
       </li>
     </template>

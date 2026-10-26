@@ -2,6 +2,7 @@ import { ChannelType } from 'discord.js';
 import express from 'express';
 import { castVote, decideSubmission, removeReviewMessages } from '../bot/applications.js';
 import { startInterview } from '../bot/interviews.js';
+import { prettyDate, todayIn } from '../bot/staff.js';
 import { invalidatePanelCache, publishPanel, refreshApplyPanelQuietly } from '../bot/panels.js';
 import { closeTicketFromDashboard, setTicketSettings, transcriptText } from '../bot/tickets.js';
 import { MAX_QUESTIONS, cleanEmoji, inviteUrl } from '../bot/ui.js';
@@ -10,7 +11,7 @@ import {
   DAYS, DAY_NAMES, WEEK_ORDER, allTimezones, weeklyHours, describeSchedule, isCategoryOpen, isValidTimezone, parseLocalInput, parseTime, toLocalInput,
 } from '../schedule.js';
 import {
-  dashboardCounts, deleteClosedTickets, listVotes, voteTally, deleteSubmissions, getCategory, getRole, getSettings, getSubmission, getTicket, listCategories, listQuestions,
+  dashboardCounts, deleteClosedTickets, findOpenLoa, listVotes, voteTally, deleteSubmissions, getCategory, getRole, getSettings, getSubmission, getTicket, listCategories, listQuestions,
   listRoles, listSubmissions, listTicketMessages, listTickets, query, replaceQuestions, updateSettings,
 } from '../db.js';
 import { requireAdmin } from './auth.js';
@@ -71,11 +72,24 @@ routes.get('/', async (req, res) => {
     { done: Boolean(settings.staff_role_id), text: 'Pick a staff role', href: '/settings' },
     { done: Boolean(settings.apply_channel_id && settings.submissions_channel_id), text: 'Pick application + submissions channels', href: '/settings' },
     { done: cats.length > 0, text: 'Add an application category, roles and questions', href: '/applications' },
-    { done: Boolean(settings.apply_panel_message_id), text: 'Post the application panel', href: '/settings#panels' },
-    { done: Boolean(settings.ticket_channel_id && settings.ticket_panel_message_id), text: 'Pick a ticket channel and post the ticket panel', href: '/settings#panels' },
+    { done: Boolean(settings.apply_panel_message_id), text: 'Post the application panel', href: '/settings#applications' },
+    { done: Boolean(settings.ticket_channel_id && settings.ticket_panel_message_id), text: 'Pick a ticket channel and post the ticket panel', href: '/settings#tickets' },
   ];
+  // "Your to-do" for whoever is signed in
+  const me = res.locals.user.id;
+  const { rows: [todo] } = await query(
+    `SELECT
+       (SELECT id FROM submissions WHERE guild_id = $1 AND status = 'pending' ORDER BY created_at ASC LIMIT 1) AS oldest_pending,
+       (SELECT count(*)::int FROM submissions s WHERE s.guild_id = $1 AND s.status = 'pending'
+          AND NOT EXISTS (SELECT 1 FROM submission_votes v WHERE v.submission_id = s.id AND v.user_id = $2)) AS need_my_vote,
+       (SELECT count(*)::int FROM tickets WHERE guild_id = $1 AND status = 'open' AND claimed_by IS NULL) AS unclaimed,
+       (SELECT count(*)::int FROM tickets WHERE guild_id = $1 AND status = 'open' AND claimed_by = $2) AS my_tickets`,
+    [config.guildId, me],
+  );
+  const myLoa = await findOpenLoa(me);
   res.render('overview', {
-    title: 'Overview', counts, recentSubs, recentTickets, checklist, inviteUrl: inviteUrl(),
+    title: 'Overview', counts, recentSubs, recentTickets, checklist, inviteUrl: inviteUrl(), todo,
+    myLoa: myLoa ? { ...myLoa, from: prettyDate(myLoa.start_date), until: prettyDate(myLoa.end_date), started: myLoa.start_date <= todayIn(settings.timezone) } : null,
     applyChannel: nameOf(opts.textChannels, settings.apply_channel_id),
   });
 });
@@ -126,8 +140,21 @@ routes.post('/settings', requireAdmin, async (req, res) => {
   patch.apply_cooldown_days = Number.isFinite(cooldown) ? Math.min(Math.max(cooldown, 0), 365) : 7;
 
   setTicketSettings(await updateSettings(patch));
-  flash(req, 'success', 'Settings saved. If you changed panel text, press "Post or update" below to refresh the panels.');
-  res.redirect('/settings');
+
+  // "Save and post panel" buttons: save first, then post or update that panel with the new text
+  const post = b.then_post === 'apply' || b.then_post === 'ticket' ? b.then_post : null;
+  const tab = ['general', 'applications', 'tickets', 'staff'].includes(b.tab) ? b.tab : '';
+  if (post) {
+    try {
+      const r = await publishPanel(post);
+      flash(req, 'success', `Settings saved, and the ${post === 'apply' ? 'application' : 'ticket'} panel was ${r.updated ? 'updated' : 'posted'} in Discord.`);
+    } catch (err) {
+      flash(req, 'error', `Settings saved, but the panel could not be posted: ${err.message}`);
+    }
+  } else {
+    flash(req, 'success', 'Settings saved.');
+  }
+  res.redirect(`/settings${tab ? `#${tab}` : ''}`);
 });
 
 routes.post('/settings/panel/:kind', requireAdmin, async (req, res) => {
@@ -358,7 +385,16 @@ routes.get('/submissions/:id', async (req, res) => {
   );
   const votes = await listVotes(sub.id);
   const myVote = votes.find((v) => v.user_id === res.locals.user.id)?.vote || null;
-  res.render('submission', { title: `Application #${sub.id}`, sub, history, limits: LIMITS, votes, myVote });
+  // The oldest other application still waiting, for the "Next pending" button
+  const { rows: queue } = await query(
+    `SELECT id, (SELECT count(*)::int FROM submissions WHERE guild_id = $1 AND status = 'pending' AND id <> $2) AS left
+       FROM submissions WHERE guild_id = $1 AND status = 'pending' AND id <> $2 ORDER BY created_at ASC LIMIT 1`,
+    [config.guildId, sub.id],
+  );
+  res.render('submission', {
+    title: `Application #${sub.id}`, sub, history, limits: LIMITS, votes, myVote,
+    nextPending: queue[0]?.id || null, pendingLeft: queue[0]?.left || 0,
+  });
 });
 
 routes.post('/submissions/:id/vote', async (req, res) => {

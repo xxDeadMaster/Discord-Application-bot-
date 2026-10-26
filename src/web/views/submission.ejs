@@ -4,96 +4,39 @@
     <a class="crumbs" href="/submissions"><%- include('partials/icon', { name: 'arrowLeft', size: 14 }) %> Submissions</a>
     <h1><%= sub.role_name %> application <span class="muted" style="font-weight: 500;">#<%= sub.id %></span></h1>
   </div>
-  <%- include('partials/status', { status: sub.status }) %>
+  <div class="row-actions">
+    <%- include('partials/status', { status: sub.status }) %>
+    <% if (nextPending) { %>
+      <a class="btn <%= sub.status === 'pending' ? 'btn-ghost' : 'btn-primary' %>" href="/submissions/<%= nextPending %>">Next pending (<%= pendingLeft %>) →</a>
+    <% } %>
+  </div>
 </div>
 
-<div class="detail">
-  <section class="card">
-    <dl class="meta">
-      <div><dt>Applicant</dt><dd><strong><%= sub.user_tag %></strong><br><span class="muted small">ID <%= sub.user_id %></span></dd></div>
-      <div><dt>Category</dt><dd><%= sub.category_name %></dd></div>
-      <div><dt>Submitted</dt><dd><time datetime="<%= new Date(sub.created_at).toISOString() %>"></time></dd></div>
-      <div><dt>Questions</dt><dd><%= sub.answers.length %></dd></div>
-    </dl>
-
-    <h2>Answers</h2>
-    <ol class="answers">
-      <% sub.answers.forEach(item => { %>
-        <li>
-          <p class="q"><%= item.q %></p>
-          <p class="a"><%= item.a %></p>
-        </li>
-      <% }) %>
-    </ol>
-  </section>
-
-  <aside class="stack">
+<% const yes = votes.filter(v => v.vote === 'yes').length, no = votes.length - yes; %>
+<div class="detail review-layout">
+  <div class="stack review-main">
     <section class="card">
-      <h2>Decision</h2>
-      <% if (sub.status === 'pending') { %>
-        <form method="post" action="/submissions/<%= sub.id %>/decide" class="stack" style="gap: 14px;">
-          <input type="hidden" name="_csrf" value="<%= csrf %>">
-          <div class="field" style="margin: 0;">
-            <label for="reason">Note to the applicant (optional)</label>
-            <textarea id="reason" name="reason" rows="3" maxlength="<%= limits.reason %>" placeholder="Sent in their DM with the result"></textarea>
-          </div>
-          <div class="actions">
-            <button class="btn btn-success" type="submit" name="decision" value="accepted"><%- include('partials/icon', { name: 'check', size: 16 }) %> Accept</button>
-            <button class="btn btn-danger" type="submit" name="decision" value="denied"><%- include('partials/icon', { name: 'x', size: 16 }) %> Deny</button>
-          </div>
-          <p class="help">Accepting gives the role set for <%= sub.role_name %> (if any) and DMs the applicant. The card in Discord updates too.</p>
-        </form>
-      <% } else { %>
-        <p><%= sub.status === 'accepted' ? 'Accepted' : 'Denied' %> by <strong><%= sub.reviewed_by_tag || 'unknown' %></strong><br>
-          <span class="muted small"><time datetime="<%= new Date(sub.reviewed_at).toISOString() %>"></time></span></p>
-        <% if (sub.reason) { %><p class="muted">Note: <%= sub.reason %></p><% } %>
-      <% } %>
-    </section>
+      <dl class="meta">
+        <div><dt>Applicant</dt><dd><strong><%= sub.user_tag %></strong><br><span class="muted small">ID <%= sub.user_id %></span></dd></div>
+        <div><dt>Category</dt><dd><%= sub.category_name %></dd></div>
+        <div><dt>Submitted</dt><dd><time datetime="<%= new Date(sub.created_at).toISOString() %>"></time></dd></div>
+        <div><dt>Questions</dt><dd><%= sub.answers.length %></dd></div>
+      </dl>
 
-    <section class="card">
       <div class="card-head">
-        <h2>Staff votes</h2>
-        <span class="muted small"><%= votes.filter(v => v.vote === 'yes').length %> yes · <%= votes.filter(v => v.vote === 'no').length %> no</span>
+        <h2 style="margin: 0;">Answers</h2>
+        <% if (sub.answers.length > 6) { %>
+          <button type="button" class="btn btn-ghost btn-sm" data-collapse-all="answers" aria-pressed="false">Show questions only</button>
+        <% } %>
       </div>
-      <% const yes = votes.filter(v => v.vote === 'yes').length, total = votes.length; %>
-      <div class="vote-bar" aria-hidden="true"><span style="width: <%= total ? Math.round(yes / total * 100) : 0 %>%"></span></div>
-      <% if (votes.length) { %>
-        <ul class="voters">
-          <% votes.forEach(v => { %>
-            <li><span class="pill <%= v.vote === 'yes' ? 'pill-accepted' : 'pill-denied' %>"><%= v.vote === 'yes' ? 'Yes' : 'No' %></span> <%= v.user_tag %></li>
-          <% }) %>
-        </ul>
-      <% } else { %>
-        <p class="muted small">No votes yet.</p>
-      <% } %>
-      <% if (sub.status === 'pending') { %>
-        <form method="post" action="/submissions/<%= sub.id %>/vote" class="actions" style="margin-top: 12px;">
-          <input type="hidden" name="_csrf" value="<%= csrf %>">
-          <button class="btn btn-sm <%= myVote === 'yes' ? 'btn-success' : 'btn-ghost' %>" type="submit" name="vote" value="yes" aria-pressed="<%= myVote === 'yes' %>"><%- include('partials/icon', { name: 'check', size: 15 }) %> Vote yes</button>
-          <button class="btn btn-sm <%= myVote === 'no' ? 'btn-danger' : 'btn-ghost' %>" type="submit" name="vote" value="no" aria-pressed="<%= myVote === 'no' %>"><%- include('partials/icon', { name: 'x', size: 15 }) %> Vote no</button>
-        </form>
-        <p class="help" style="margin-top: 8px;">Click your vote again to take it back. Votes close once the application is accepted or denied.</p>
-      <% } %>
-    </section>
-
-    <section class="card">
-      <h2>Interview</h2>
-      <% if (sub.interview_status === 'active') { %>
-        <p>Running now in Discord<% if (sub.interview_by_tag) { %>, started by <strong><%= sub.interview_by_tag %></strong><% } %>.</p>
-        <p class="muted small">The voice channel deletes itself when everyone leaves, or after 30 minutes if nobody joins.</p>
-      <% } else if (sub.interview_status === 'done') { %>
-        <p>Held<% if (sub.interview_by_tag) { %> (started by <strong><%= sub.interview_by_tag %></strong>)<% } %>.</p>
-      <% } else if (sub.interview_status === 'expired') { %>
-        <p class="muted">The last interview channel was removed because nobody joined.</p>
-      <% } else { %>
-        <p class="muted small">Opens a private temporary voice channel for the applicant and staff. The applicant gets a DM to join, and their answers are posted in the channel chat.</p>
-      <% } %>
-      <% if (sub.status === 'pending' && sub.interview_status !== 'active') { %>
-        <form method="post" action="/submissions/<%= sub.id %>/interview">
-          <input type="hidden" name="_csrf" value="<%= csrf %>">
-          <button class="btn btn-primary btn-sm" type="submit"><%- include('partials/icon', { name: 'user', size: 15 }) %> <%= sub.interview_status ? 'Start a new interview' : 'Start interview' %></button>
-        </form>
-      <% } %>
+      <ol class="answers" id="answers">
+        <% sub.answers.forEach(item => { %>
+          <li>
+            <p class="q"><%= item.q %></p>
+            <p class="a"><%= item.a %></p>
+          </li>
+        <% }) %>
+      </ol>
     </section>
 
     <section class="card">
@@ -122,6 +65,75 @@
       </form>
     </section>
     <% } %>
+  </div>
+
+  <aside class="review-side">
+    <section class="card review-box">
+      <!-- Decision -->
+      <h2>Decision</h2>
+      <% if (sub.status === 'pending') { %>
+        <form method="post" action="/submissions/<%= sub.id %>/decide" class="stack" style="gap: 12px;">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <div class="field" style="margin: 0;">
+            <label for="reason">Note to the applicant (optional)</label>
+            <textarea id="reason" name="reason" rows="2" maxlength="<%= limits.reason %>" placeholder="Sent in their DM with the result"></textarea>
+          </div>
+          <div class="actions review-decide">
+            <button class="btn btn-success" type="submit" name="decision" value="accepted"><%- include('partials/icon', { name: 'check', size: 16 }) %> Accept</button>
+            <button class="btn btn-danger" type="submit" name="decision" value="denied"><%- include('partials/icon', { name: 'x', size: 16 }) %> Deny</button>
+          </div>
+          <p class="help" style="margin: 0;">Accepting gives the <%= sub.role_name %> role (if one is set) and DMs them. The Discord card updates too.</p>
+        </form>
+      <% } else { %>
+        <p style="margin: 0;"><%= sub.status === 'accepted' ? 'Accepted' : 'Denied' %> by <strong><%= sub.reviewed_by_tag || 'unknown' %></strong><br>
+          <span class="muted small"><time datetime="<%= new Date(sub.reviewed_at).toISOString() %>"></time></span></p>
+        <% if (sub.reason) { %><p class="muted" style="margin: 8px 0 0;">Note: <%= sub.reason %></p><% } %>
+      <% } %>
+
+      <!-- Votes -->
+      <div class="review-part">
+        <div class="card-head" style="margin-bottom: 8px;">
+          <h3 style="margin: 0;">Staff votes</h3>
+          <span class="muted small"><%= yes %> yes · <%= no %> no</span>
+        </div>
+        <div class="vote-bar" aria-hidden="true"><span style="width: <%= votes.length ? Math.round(yes / votes.length * 100) : 0 %>%"></span></div>
+        <% if (votes.length) { %>
+          <ul class="voters">
+            <% votes.forEach(v => { %>
+              <li><span class="pill <%= v.vote === 'yes' ? 'pill-accepted' : 'pill-denied' %>"><%= v.vote === 'yes' ? 'Yes' : 'No' %></span> <%= v.user_tag %></li>
+            <% }) %>
+          </ul>
+        <% } %>
+        <% if (sub.status === 'pending') { %>
+          <form method="post" action="/submissions/<%= sub.id %>/vote" class="actions" style="margin-top: 10px;">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <button class="btn btn-sm <%= myVote === 'yes' ? 'btn-success' : 'btn-ghost' %>" type="submit" name="vote" value="yes" aria-pressed="<%= myVote === 'yes' %>"><%- include('partials/icon', { name: 'check', size: 15 }) %> Vote yes</button>
+            <button class="btn btn-sm <%= myVote === 'no' ? 'btn-danger' : 'btn-ghost' %>" type="submit" name="vote" value="no" aria-pressed="<%= myVote === 'no' %>"><%- include('partials/icon', { name: 'x', size: 15 }) %> Vote no</button>
+          </form>
+          <p class="help" style="margin: 6px 0 0;">Click your vote again to take it back.</p>
+        <% } %>
+      </div>
+
+      <!-- Interview -->
+      <div class="review-part">
+        <h3>Interview</h3>
+        <% if (sub.interview_status === 'active') { %>
+          <p class="small" style="margin: 0;">Running now in Discord<% if (sub.interview_by_tag) { %>, started by <strong><%= sub.interview_by_tag %></strong><% } %>.</p>
+        <% } else if (sub.interview_status === 'done') { %>
+          <p class="small" style="margin: 0 0 8px;">Held<% if (sub.interview_by_tag) { %> (started by <strong><%= sub.interview_by_tag %></strong>)<% } %>.</p>
+        <% } else if (sub.interview_status === 'expired') { %>
+          <p class="muted small" style="margin: 0 0 8px;">The last interview channel was removed because nobody joined.</p>
+        <% } else { %>
+          <p class="muted small" style="margin: 0 0 8px;">Opens a private voice channel. They get a DM to join, and their answers are posted in its chat.</p>
+        <% } %>
+        <% if (sub.status === 'pending' && sub.interview_status !== 'active') { %>
+          <form method="post" action="/submissions/<%= sub.id %>/interview">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <button class="btn btn-primary btn-sm" type="submit"><%- include('partials/icon', { name: 'user', size: 15 }) %> <%= sub.interview_status ? 'Start a new interview' : 'Start interview' %></button>
+          </form>
+        <% } %>
+      </div>
+    </section>
   </aside>
 </div>
 <%- include('partials/foot') %>

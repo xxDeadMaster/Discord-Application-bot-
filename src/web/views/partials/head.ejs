@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#05070C">
   <link rel="stylesheet" href="/static/style.css?v=<%= assetVersion %>">
   <script src="/static/app.js?v=<%= assetVersion %>" defer></script>
+  <script>document.documentElement.classList.add('js')</script>
 </head>
 <body class="<%= user ? 'has-sidebar' : 'no-sidebar' %>">
 <% if (user) {

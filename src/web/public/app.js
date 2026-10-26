@@ -187,3 +187,69 @@ document.querySelectorAll('time[data-local]').forEach((el) => {
   const d = new Date(el.dataset.local);
   if (!Number.isNaN(d.getTime())) el.textContent = d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 });
+
+/* ---------- Page tabs: [data-tabs] bar with [data-tab] buttons, panels [data-tab-panel] ---------- */
+document.querySelectorAll('[data-tabs]').forEach((bar) => {
+  const key = `orbit-tab:${bar.dataset.tabs}`;
+  const tabs = [...bar.querySelectorAll('[data-tab]')];
+  const panelOf = (t) => document.getElementById(t.getAttribute('aria-controls'));
+  const input = document.querySelector(`input[data-tab-input="${bar.dataset.tabs}"]`);
+  const show = (tab, { focus = false, remember = true } = {}) => {
+    tabs.forEach((t) => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      panelOf(t)?.classList.toggle('active', on);
+    });
+    if (input) input.value = tab.dataset.tab;
+    // Keep the chosen tab visible when the bar scrolls sideways (phones)
+    bar.scrollLeft = Math.max(0, tab.offsetLeft - (bar.clientWidth - tab.offsetWidth) / 2);
+    if (remember) { try { localStorage.setItem(key, tab.dataset.tab); } catch { /* private mode */ } }
+    if (focus) tab.focus();
+  };
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => {
+      show(t);
+      history.replaceState(null, '', `#${t.dataset.tab}`);
+    });
+    t.addEventListener('keydown', (e) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (step) { e.preventDefault(); show(tabs[(i + step + tabs.length) % tabs.length], { focus: true }); }
+    });
+  });
+  // Pick the first tab to show: from the link (#tickets or an element inside a tab), else the last one used
+  const hash = decodeURIComponent(location.hash.slice(1));
+  let start = tabs.find((t) => t.dataset.tab === hash);
+  if (!start && hash) {
+    const el = document.getElementById(hash);
+    const panel = el?.closest('[data-tab-panel]');
+    start = tabs.find((t) => panelOf(t) === panel);
+  }
+  if (!start) {
+    let saved = null;
+    try { saved = localStorage.getItem(key); } catch { /* private mode */ }
+    start = tabs.find((t) => t.dataset.tab === saved) || tabs[0];
+  }
+  if (start) show(start, { remember: false });
+});
+
+/* ---------- Review page: "Show questions only" toggle for long applications ---------- */
+document.querySelectorAll('[data-collapse-all]').forEach((btn) => {
+  const list = document.getElementById(btn.dataset.collapseAll);
+  btn.addEventListener('click', () => {
+    const on = list.classList.toggle('qs-only');
+    btn.setAttribute('aria-pressed', String(on));
+    btn.textContent = on ? 'Show answers' : 'Show questions only';
+  });
+});
+
+/* ---------- Question boxes: one line, grow to fit the text ---------- */
+(() => {
+  const list = document.querySelector('[data-questions]');
+  if (!list) return;
+  const fit = (ta) => { ta.style.height = 'auto'; ta.style.height = `${ta.scrollHeight + 2}px`; };
+  list.querySelectorAll('textarea').forEach(fit);
+  list.addEventListener('input', (e) => { if (e.target.matches('textarea')) fit(e.target); });
+  new MutationObserver(() => list.querySelectorAll('textarea').forEach(fit)).observe(list, { childList: true });
+  window.addEventListener('resize', () => list.querySelectorAll('textarea').forEach(fit));
+})();

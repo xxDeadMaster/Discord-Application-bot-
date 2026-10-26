@@ -8,139 +8,159 @@
 
 <%
 const sel = (name, label, list, value, help, empty) => include('partials/select', { name, label, list, value, help, emptyLabel: empty });
+const tabsList = [
+  { id: 'join', label: '👋 Join', on: cfg.join_enabled && cfg.join_channel_id },
+  { id: 'leave', label: '🚪 Leave', on: cfg.leave_enabled && cfg.leave_channel_id },
+  { id: 'boost', label: '💎 Boost', on: cfg.boost_enabled && cfg.boost_channel_id },
+  { id: 'verify', label: '✅ Verify', on: Boolean(cfg.verify_panel_message_id) },
+];
 %>
+<div class="ptabs" role="tablist" aria-label="Welcome sections" data-tabs="welcome">
+  <% tabsList.forEach(t => { %>
+    <button type="button" class="ptab" role="tab" id="tabbtn-<%= t.id %>" data-tab="<%= t.id %>" aria-controls="tab-<%= t.id %>" aria-selected="false">
+      <%= t.label %><span class="ptab-state <%= t.on ? 'on' : '' %>"><%= t.on ? 'On' : 'Off' %></span>
+    </button>
+  <% }) %>
+</div>
 
-<section class="card placeholders">
-  <h2>Fill-ins you can use in any message</h2>
-  <div class="ph-list">
-    <% placeholders.forEach(([code, desc]) => { %>
-      <button type="button" class="ph" data-insert="<%= code %>" title="Click to add to the last message box you used"><code><%= code %></code><span><%= desc %></span></button>
-    <% }) %>
-  </div>
-  <p class="muted small" style="margin: 10px 0 0;">Use <code>**bold**</code> for bold text. Click a fill-in to add it to the message box you last clicked.</p>
-</section>
+<div class="ph-strip">
+  <span class="muted small">Fill-ins (click to add):</span>
+  <% placeholders.forEach(([code, desc]) => { %>
+    <button type="button" class="ph" data-insert="<%= code %>" title="<%= desc %>"><code><%= code %></code></button>
+  <% }) %>
+</div>
 
 <form method="post" action="/welcome" class="stack">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <input type="hidden" name="tab" value="join" data-tab-input="welcome">
 
-  <section class="card" id="join">
-    <div class="card-head">
-      <h2><span class="emoji">👋</span>When someone joins</h2>
-      <label class="toggle"><input type="checkbox" name="join_enabled" <%= cfg.join_enabled ? 'checked' : '' %>> On</label>
-    </div>
-    <div class="grid-2">
-      <%- sel('join_channel_id', 'Welcome channel', opts.textChannels, cfg.join_channel_id, 'Where the welcome message is posted.') %>
-      <%- sel('rules_channel_id', 'Rules channel', opts.textChannels, cfg.rules_channel_id, 'Used by {rules} in your messages.') %>
-    </div>
-    <div class="field">
-      <label for="join_message">Welcome message</label>
-      <textarea id="join_message" name="join_message" rows="3" maxlength="1800" data-ph-target><%= cfg.join_message %></textarea>
-    </div>
-    <label class="toggle"><input type="checkbox" name="join_card" <%= cfg.join_card ? 'checked' : '' %>> Add the image card with their avatar and name</label>
-
-    <div class="sub-section">
-      <h3>Auto role</h3>
-      <p class="muted small">Given to everyone the moment they join (for example <strong>Community Member</strong>). Up to 5. The bot's own role must be <strong>above</strong> these in Server Settings → Roles.</p>
-      <div class="search" style="max-width: none; margin-bottom: 10px;">
-        <%- include('partials/icon', { name: 'search', size: 16 }) %>
-        <label class="sr" for="auto-role-filter">Filter roles</label>
-        <input id="auto-role-filter" placeholder="Filter roles" data-filter-target="auto-roles">
+  <!-- ===== Join ===== -->
+  <div id="tab-join" role="tabpanel" aria-labelledby="tabbtn-join" data-tab-panel class="stack">
+    <section class="card">
+      <div class="card-head">
+        <h2>When someone joins</h2>
+        <label class="toggle"><input type="checkbox" name="join_enabled" <%= cfg.join_enabled ? 'checked' : '' %>> Post a welcome message</label>
       </div>
-      <div class="check-list check-list-ok" id="auto-roles">
-        <% const auto = cfg.auto_role_ids || []; opts.roles.slice().sort((a, b) => auto.includes(b.id) - auto.includes(a.id)).forEach(r => { %>
-          <label class="check-item" data-filter-text="<%= r.name.toLowerCase() %>">
-            <input type="checkbox" name="auto_role_ids" value="<%= r.id %>" <%= auto.includes(r.id) ? 'checked' : '' %>>
-            <span><%= r.name %></span>
-          </label>
-        <% }) %>
-      </div>
-    </div>
-
-    <div class="sub-section">
-      <div class="card-head" style="margin: 0;">
-        <h3>Welcome DM</h3>
-        <label class="toggle"><input type="checkbox" name="join_dm_enabled" <%= cfg.join_dm_enabled ? 'checked' : '' %>> On</label>
+      <div class="grid-2">
+        <%- sel('join_channel_id', 'Welcome channel', opts.textChannels, cfg.join_channel_id, 'Where the welcome message is posted.') %>
+        <%- sel('rules_channel_id', 'Rules channel', opts.textChannels, cfg.rules_channel_id, 'Used by {rules} in your messages.') %>
       </div>
       <div class="field">
-        <label for="join_dm_message">Private message sent to them</label>
-        <textarea id="join_dm_message" name="join_dm_message" rows="2" maxlength="1800" data-ph-target><%= cfg.join_dm_message %></textarea>
-        <p class="help">Skipped quietly for people who have DMs turned off.</p>
+        <label for="join_message">Welcome message</label>
+        <textarea id="join_message" name="join_message" rows="3" maxlength="1800" data-ph-target><%= cfg.join_message %></textarea>
       </div>
+      <div class="tab-actions">
+        <label class="toggle"><input type="checkbox" name="join_card" <%= cfg.join_card ? 'checked' : '' %>> Image card with their avatar</label>
+        <button class="btn btn-sm" type="submit" name="then_test" value="join" style="margin-left: auto;"><%- include('partials/icon', { name: 'send', size: 15 }) %> Save and send test</button>
+      </div>
+    </section>
+    <div class="grid-2 align-start">
+      <section class="card">
+        <h2>Auto role</h2>
+        <p class="muted small">Given the moment they join (like <strong>Community Member</strong>). Up to 5. The bot's role must be above these.</p>
+        <div class="search" style="max-width: none; margin-bottom: 10px;">
+          <%- include('partials/icon', { name: 'search', size: 16 }) %>
+          <label class="sr" for="auto-role-filter">Filter roles</label>
+          <input id="auto-role-filter" placeholder="Filter roles" data-filter-target="auto-roles">
+        </div>
+        <div class="check-list check-list-ok check-list-short" id="auto-roles">
+          <% const auto = cfg.auto_role_ids || []; opts.roles.slice().sort((a, b) => auto.includes(b.id) - auto.includes(a.id)).forEach(r => { %>
+            <label class="check-item" data-filter-text="<%= r.name.toLowerCase() %>">
+              <input type="checkbox" name="auto_role_ids" value="<%= r.id %>" <%= auto.includes(r.id) ? 'checked' : '' %>>
+              <span><%= r.name %></span>
+            </label>
+          <% }) %>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-head">
+          <h2>Welcome DM</h2>
+          <label class="toggle"><input type="checkbox" name="join_dm_enabled" <%= cfg.join_dm_enabled ? 'checked' : '' %>> On</label>
+        </div>
+        <div class="field">
+          <label for="join_dm_message">Private message sent to them</label>
+          <textarea id="join_dm_message" name="join_dm_message" rows="3" maxlength="1800" data-ph-target><%= cfg.join_dm_message %></textarea>
+          <p class="help">Skipped quietly for people with DMs turned off.</p>
+        </div>
+      </section>
     </div>
-  </section>
+  </div>
 
-  <section class="card" id="leave">
-    <div class="card-head">
-      <h2><span class="emoji">🚪</span>When someone leaves</h2>
-      <label class="toggle"><input type="checkbox" name="leave_enabled" <%= cfg.leave_enabled ? 'checked' : '' %>> On</label>
-    </div>
-    <%- sel('leave_channel_id', 'Leave channel', opts.textChannels, cfg.leave_channel_id, 'Often the same as the welcome channel, or a staff log.') %>
-    <div class="field">
-      <label for="leave_message">Leave message</label>
-      <textarea id="leave_message" name="leave_message" rows="2" maxlength="1800" data-ph-target><%= cfg.leave_message %></textarea>
-      <p class="help">{mention} won't ping here, since they already left.</p>
-    </div>
-    <label class="toggle"><input type="checkbox" name="leave_card" <%= cfg.leave_card ? 'checked' : '' %>> Add the image card</label>
-  </section>
-
-  <section class="card" id="boost">
-    <div class="card-head">
-      <h2><span class="emoji">💎</span>When someone boosts</h2>
-      <label class="toggle"><input type="checkbox" name="boost_enabled" <%= cfg.boost_enabled ? 'checked' : '' %>> On</label>
-    </div>
-    <%- sel('boost_channel_id', 'Boost channel', opts.textChannels, cfg.boost_channel_id, 'Where the thank-you message is posted.') %>
-    <div class="field">
-      <label for="boost_message">Boost message</label>
-      <textarea id="boost_message" name="boost_message" rows="2" maxlength="1800" data-ph-target><%= cfg.boost_message %></textarea>
-    </div>
-    <label class="toggle"><input type="checkbox" name="boost_card" <%= cfg.boost_card ? 'checked' : '' %>> Add the image card</label>
-  </section>
-
-  <section class="card" id="verify">
-    <div class="card-head">
-      <h2><span class="emoji">✅</span>Verification</h2>
-      <% if (cfg.verify_panel_message_id) { %><span class="pill pill-open">Panel posted</span><% } else { %><span class="pill pill-off">Not posted</span><% } %>
-    </div>
-    <p class="muted small">Members press <strong>Verify</strong> on the panel, type a 5-character code from a pop-up, and get the verified role. Their other roles (like Community Member) stay.</p>
-    <div class="grid-2">
-      <%- sel('verify_channel_id', 'Verify channel', opts.textChannels, cfg.verify_channel_id, 'Where the Verify panel goes. Usually your rules or welcome channel.') %>
-      <%- sel('verify_role_id', 'Role to give', opts.roles, cfg.verify_role_id, 'For example @Verified. Must be below the bot\'s role.') %>
-      <%- sel('verify_log_channel_id', 'Log channel (optional)', opts.textChannels, cfg.verify_log_channel_id, 'Staff see who verified and how old their account is.', 'No log') %>
+  <!-- ===== Leave ===== -->
+  <div id="tab-leave" role="tabpanel" aria-labelledby="tabbtn-leave" data-tab-panel class="stack">
+    <section class="card">
+      <div class="card-head">
+        <h2>When someone leaves</h2>
+        <label class="toggle"><input type="checkbox" name="leave_enabled" <%= cfg.leave_enabled ? 'checked' : '' %>> Post a leave message</label>
+      </div>
+      <%- sel('leave_channel_id', 'Leave channel', opts.textChannels, cfg.leave_channel_id, 'Often the welcome channel, or a staff log.') %>
       <div class="field">
-        <label for="verify_min_account_days">Minimum account age (days)</label>
-        <input id="verify_min_account_days" name="verify_min_account_days" type="number" min="0" max="365" value="<%= cfg.verify_min_account_days %>">
-        <p class="help">Blocks brand-new alt accounts. 0 lets everyone verify.</p>
+        <label for="leave_message">Leave message</label>
+        <textarea id="leave_message" name="leave_message" rows="2" maxlength="1800" data-ph-target><%= cfg.leave_message %></textarea>
+        <p class="help">{mention} won't ping here, since they already left.</p>
       </div>
-    </div>
-    <div class="field">
-      <label for="verify_title">Panel title</label>
-      <input id="verify_title" name="verify_title" maxlength="200" value="<%= cfg.verify_title %>">
-    </div>
-    <div class="field">
-      <label for="verify_message">Panel message</label>
-      <textarea id="verify_message" name="verify_message" rows="2" maxlength="1800" data-ph-target><%= cfg.verify_message %></textarea>
-    </div>
-  </section>
+      <div class="tab-actions">
+        <label class="toggle"><input type="checkbox" name="leave_card" <%= cfg.leave_card ? 'checked' : '' %>> Image card</label>
+        <button class="btn btn-sm" type="submit" name="then_test" value="leave" style="margin-left: auto;"><%- include('partials/icon', { name: 'send', size: 15 }) %> Save and send test</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== Boost ===== -->
+  <div id="tab-boost" role="tabpanel" aria-labelledby="tabbtn-boost" data-tab-panel class="stack">
+    <section class="card">
+      <div class="card-head">
+        <h2>When someone boosts</h2>
+        <label class="toggle"><input type="checkbox" name="boost_enabled" <%= cfg.boost_enabled ? 'checked' : '' %>> Post a thank-you message</label>
+      </div>
+      <%- sel('boost_channel_id', 'Boost channel', opts.textChannels, cfg.boost_channel_id, 'Where the thank-you message is posted.') %>
+      <div class="field">
+        <label for="boost_message">Boost message</label>
+        <textarea id="boost_message" name="boost_message" rows="2" maxlength="1800" data-ph-target><%= cfg.boost_message %></textarea>
+      </div>
+      <div class="tab-actions">
+        <label class="toggle"><input type="checkbox" name="boost_card" <%= cfg.boost_card ? 'checked' : '' %>> Image card</label>
+        <button class="btn btn-sm" type="submit" name="then_test" value="boost" style="margin-left: auto;"><%- include('partials/icon', { name: 'send', size: 15 }) %> Save and send test</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== Verify ===== -->
+  <div id="tab-verify" role="tabpanel" aria-labelledby="tabbtn-verify" data-tab-panel class="stack">
+    <section class="card" id="verify">
+      <div class="card-head">
+        <h2>Verification</h2>
+        <% if (cfg.verify_panel_message_id) { %><span class="pill pill-open">Panel posted</span><% } else { %><span class="pill pill-off">Not posted</span><% } %>
+      </div>
+      <p class="muted small">Members press <strong>Verify</strong>, type a 5-character code from a pop-up, and get the role. Their other roles (like Community Member) stay.</p>
+      <div class="grid-2">
+        <%- sel('verify_channel_id', 'Verify channel', opts.textChannels, cfg.verify_channel_id, 'Usually your rules or welcome channel.') %>
+        <%- sel('verify_role_id', 'Role to give', opts.roles, cfg.verify_role_id, 'For example @Verified. Must be below the bot\'s role.') %>
+        <%- sel('verify_log_channel_id', 'Log channel (optional)', opts.textChannels, cfg.verify_log_channel_id, 'Staff see who verified and their account age.', 'No log') %>
+        <div class="field">
+          <label for="verify_min_account_days">Minimum account age (days)</label>
+          <input id="verify_min_account_days" name="verify_min_account_days" type="number" min="0" max="365" value="<%= cfg.verify_min_account_days %>">
+          <p class="help">Blocks brand-new alts. 0 lets everyone verify.</p>
+        </div>
+      </div>
+      <div class="field">
+        <label for="verify_title">Panel title</label>
+        <input id="verify_title" name="verify_title" maxlength="200" value="<%= cfg.verify_title %>">
+      </div>
+      <div class="field">
+        <label for="verify_message">Panel message</label>
+        <textarea id="verify_message" name="verify_message" rows="2" maxlength="1800" data-ph-target><%= cfg.verify_message %></textarea>
+      </div>
+      <div class="tab-actions">
+        <button class="btn" type="submit" name="then_post" value="verify"><%- include('partials/icon', { name: 'send', size: 16 }) %> Save and post Verify panel</button>
+        <span class="muted small"><%= cfg.verify_panel_message_id ? 'Updates the panel already in Discord.' : 'Not posted yet.' %></span>
+      </div>
+    </section>
+  </div>
 
   <div class="actions sticky-actions">
     <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'check', size: 16 }) %> Save welcome settings</button>
+    <span class="muted small">Saves every tab.</span>
   </div>
 </form>
-
-<section class="card">
-  <h2>Try it out</h2>
-  <p class="muted small">Save first. Tests post a real message in that channel, made for you, so you can see exactly how it looks.</p>
-  <div class="panel-actions">
-    <% [['join', 'welcome'], ['leave', 'leave'], ['boost', 'boost']].forEach(([k, label]) => { %>
-      <form method="post" action="/welcome/test/<%= k %>">
-        <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <button class="btn" type="submit" <%= cfg[k + '_channel_id'] ? '' : 'disabled title="Pick and save a channel first"' %>><%- include('partials/icon', { name: 'send', size: 16 }) %> Send test <%= label %> message</button>
-      </form>
-    <% }) %>
-    <form method="post" action="/welcome/verify-panel">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'send', size: 16 }) %> Post or update Verify panel</button>
-    </form>
-  </div>
-</section>
 <%- include('partials/foot') %>

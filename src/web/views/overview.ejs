@@ -3,11 +3,19 @@
   <img class="hero-logo" src="/static/orbit-logo.png" alt="" width="84" height="84">
   <div class="hero-text">
     <h1>Welcome back, <%= user.name %>!</h1>
-    <p>Overview · what's waiting for staff right now.</p>
-    <div class="hero-chips">
-      <a class="hero-chip" href="/submissions?status=pending">📨 <b><%= counts.pending %></b> to review</a>
-      <a class="hero-chip" href="/tickets?status=open">🎫 <b><%= counts.open_tickets %></b> open ticket<%= counts.open_tickets == 1 ? '' : 's' %></a>
-      <% if (typeof navCounts !== 'undefined' && navCounts && navCounts.pending_loa && isManager) { %><a class="hero-chip" href="/loa">🌴 <b><%= navCounts.pending_loa %></b> LOA request<%= navCounts.pending_loa == 1 ? '' : 's' %></a><% } %>
+    <p>Overview · your to-do right now.</p>
+    <div class="hero-chips" aria-label="Your to-do">
+      <% const nothing = !counts.pending && !todo.unclaimed && !todo.my_tickets; %>
+      <% if (counts.pending) { %><a class="hero-chip hero-chip-main" href="/submissions/<%= todo.oldest_pending %>">📨 Review <b><%= counts.pending %></b> application<%= counts.pending == 1 ? '' : 's' %> →</a><% } %>
+      <% if (todo.need_my_vote) { %><a class="hero-chip" href="/submissions?status=pending">🗳️ <b><%= todo.need_my_vote %></b> need your vote</a><% } %>
+      <% if (todo.unclaimed) { %><a class="hero-chip" href="/tickets?status=open">🎫 <b><%= todo.unclaimed %></b> unclaimed ticket<%= todo.unclaimed == 1 ? '' : 's' %></a><% } %>
+      <% if (todo.my_tickets) { %><a class="hero-chip" href="/tickets?status=open">✋ <b><%= todo.my_tickets %></b> ticket<%= todo.my_tickets == 1 ? '' : 's' %> you claimed</a><% } %>
+      <% if (nothing) { %><span class="hero-chip">✅ All caught up!</span><% } %>
+      <% if (myLoa) { %>
+        <a class="hero-chip" href="/loa"><%= myLoa.started ? `🌴 On LOA until ${myLoa.until}` : `📅 LOA starts ${myLoa.from}` %></a>
+      <% } else { %>
+        <a class="hero-chip hero-chip-quiet" href="/loa">🌴 Going away? Set LOA</a>
+      <% } %>
     </div>
   </div>
 </section>

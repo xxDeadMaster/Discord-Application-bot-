@@ -80,8 +80,27 @@ communityRoutes.post('/welcome', requireAdmin, async (req, res) => {
   if (patch.join_enabled && !patch.join_channel_id) warn.push('pick a channel for welcome messages');
   if (patch.leave_enabled && !patch.leave_channel_id) warn.push('pick a channel for leave messages');
   if (patch.boost_enabled && !patch.boost_channel_id) warn.push('pick a channel for boost messages');
+  const tab = ['join', 'leave', 'boost', 'verify'].includes(b.tab) ? b.tab : '';
+  const back = `/welcome${tab ? `#${tab}` : ''}`;
+
+  // "Save and send test" / "Save and post Verify panel" buttons
+  const label = { join: 'welcome', leave: 'leave', boost: 'boost' };
+  if (label[b.then_test]) {
+    const r = await sendTestMessage(b.then_test, res.locals.user.id);
+    flash(req, r.ok ? 'success' : 'error', r.ok ? `Saved, and a test ${label[b.then_test]} message for you was posted. Check the channel in Discord.` : `Saved, but the test failed: ${r.error}`);
+    return res.redirect(back);
+  }
+  if (b.then_post === 'verify') {
+    try {
+      const r = await publishVerifyPanel();
+      flash(req, 'success', `Saved, and the Verify panel was ${r.updated ? 'updated' : 'posted'} in Discord.`);
+    } catch (err) {
+      flash(req, 'error', `Saved, but the Verify panel could not be posted: ${err.message}`);
+    }
+    return res.redirect(back);
+  }
   flash(req, warn.length ? 'error' : 'success', warn.length ? `Saved, but ${warn.join(', ')}.` : 'Welcome settings saved.');
-  res.redirect('/welcome');
+  res.redirect(back);
 });
 
 communityRoutes.post('/welcome/test/:kind', requireAdmin, async (req, res) => {

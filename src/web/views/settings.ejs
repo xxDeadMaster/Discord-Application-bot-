@@ -6,141 +6,171 @@
   </div>
 </div>
 
+<%
+const sel = (o) => include('partials/select', o);
+const tabsList = [
+  { id: 'general', label: 'General', todo: !settings.staff_role_id },
+  { id: 'applications', label: 'Applications', todo: !settings.apply_channel_id || !settings.submissions_channel_id },
+  { id: 'tickets', label: 'Tickets', todo: !settings.ticket_channel_id },
+  { id: 'staff', label: 'Staff tools', todo: false },
+];
+%>
+<div class="ptabs" role="tablist" aria-label="Settings sections" data-tabs="settings">
+  <% tabsList.forEach(t => { %>
+    <button type="button" class="ptab" role="tab" id="tabbtn-<%= t.id %>" data-tab="<%= t.id %>" aria-controls="tab-<%= t.id %>" aria-selected="false">
+      <%= t.label %><% if (t.todo) { %><span class="ptab-dot" title="Something here still needs to be set"></span><span class="sr"> (needs setup)</span><% } %>
+    </button>
+  <% }) %>
+</div>
+
 <form method="post" action="/settings" class="stack">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <input type="hidden" name="tab" value="general" data-tab-input="settings">
 
-  <section class="card">
-    <h2>Staff</h2>
-    <%- include('partials/select', { name: 'staff_role_id', label: 'Staff role', list: opts.roles, value: settings.staff_role_id,
-        help: 'People with this role can sign in here, review applications and see tickets. Server admins always can.' }) %>
-  </section>
+  <!-- ===== General ===== -->
+  <div id="tab-general" role="tabpanel" aria-labelledby="tabbtn-general" data-tab-panel class="stack">
+    <p class="tab-intro">Who can use this dashboard, and the timezone used for schedules.</p>
+    <section class="card">
+      <h2>People</h2>
+      <div class="grid-2">
+        <%- sel({ name: 'staff_role_id', label: 'Staff role', list: opts.roles, value: settings.staff_role_id,
+            help: 'Can sign in here, review applications and handle tickets. Server admins always can.' }) %>
+        <%- sel({ name: 'manager_role_id', label: 'Manager role', list: opts.roles, value: settings.manager_role_id,
+            emptyLabel: 'Only Manage Server', help: 'Can give strikes, run giveaways and polls, and end anyone\'s LOA. Pinged at 3 strikes.' }) %>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Timezone</h2>
+      <div class="field" style="max-width: 420px;">
+        <label for="timezone">Timezone for application schedules</label>
+        <select id="timezone" name="timezone">
+          <% timezones.forEach(z => { %><option value="<%= z %>" <%= z === settings.timezone ? 'selected' : '' %>><%= z.replace(/_/g, ' ') %></option><% }) %>
+        </select>
+        <p class="help">Open and close times on the Applications page, and LOA dates, use this timezone.</p>
+      </div>
+    </section>
+  </div>
 
-  <section class="card">
-    <h2>Applications</h2>
-    <div class="grid-2">
-      <%- include('partials/select', { name: 'apply_channel_id', label: 'Applications channel', list: opts.textChannels, value: settings.apply_channel_id,
-          help: 'Where the application panel (the dropdown) is posted.' }) %>
-      <%- include('partials/select', { name: 'submissions_channel_id', label: 'Submissions channel', list: opts.textChannels, value: settings.submissions_channel_id,
-          help: 'Where finished applications go for staff. Each role can override this.' }) %>
-    </div>
-    <div class="field">
-      <label for="apply_panel_title">Panel title</label>
-      <input id="apply_panel_title" name="apply_panel_title" maxlength="200" value="<%= settings.apply_panel_title %>">
-    </div>
-    <div class="field">
-      <label for="apply_panel_description">Panel message</label>
-      <textarea id="apply_panel_description" name="apply_panel_description" rows="3" maxlength="2000"><%= settings.apply_panel_description %></textarea>
-    </div>
-    <div class="field field-short">
-      <label for="apply_cooldown_days">Days before someone can reapply after a denial</label>
-      <input id="apply_cooldown_days" name="apply_cooldown_days" type="number" min="0" max="365" value="<%= settings.apply_cooldown_days %>">
-      <p class="help">Set to 0 for no wait.</p>
-    </div>
-  </section>
+  <!-- ===== Applications ===== -->
+  <div id="tab-applications" role="tabpanel" aria-labelledby="tabbtn-applications" data-tab-panel class="stack">
+    <p class="tab-intro">Where the apply panel goes, where finished applications are sent, and who can't apply.</p>
+    <section class="card" id="panels">
+      <h2>Channels and panel</h2>
+      <div class="grid-2">
+        <%- sel({ name: 'apply_channel_id', label: 'Applications channel', list: opts.textChannels, value: settings.apply_channel_id,
+            help: 'Where the application panel (the dropdown) is posted.' }) %>
+        <%- sel({ name: 'submissions_channel_id', label: 'Submissions channel', list: opts.textChannels, value: settings.submissions_channel_id,
+            help: 'Where finished applications go for staff. Each role can override this.' }) %>
+      </div>
+      <div class="field">
+        <label for="apply_panel_title">Panel title</label>
+        <input id="apply_panel_title" name="apply_panel_title" maxlength="200" value="<%= settings.apply_panel_title %>">
+      </div>
+      <div class="field">
+        <label for="apply_panel_description">Panel message</label>
+        <textarea id="apply_panel_description" name="apply_panel_description" rows="2" maxlength="2000"><%= settings.apply_panel_description %></textarea>
+      </div>
+      <div class="tab-actions">
+        <button class="btn" type="submit" name="then_post" value="apply"><%- include('partials/icon', { name: 'send', size: 16 }) %> Save and post application panel</button>
+        <span class="muted small"><%= settings.apply_panel_message_id ? 'Updates the panel already in Discord.' : 'Not posted yet.' %></span>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Rules</h2>
+      <div class="grid-2">
+        <div class="field">
+          <label for="apply_cooldown_days">Days before someone can reapply after a denial</label>
+          <input id="apply_cooldown_days" name="apply_cooldown_days" type="number" min="0" max="365" value="<%= settings.apply_cooldown_days %>">
+          <p class="help">Set to 0 for no wait.</p>
+        </div>
+        <%- sel({ name: 'interview_category_id', label: 'Category for interview voice channels', list: opts.categories, value: settings.interview_category_id,
+            emptyLabel: 'Same as tickets', help: 'Voice channels made by the Interview button. They delete themselves when everyone leaves.' }) %>
+      </div>
+      <div class="card-head" style="margin: 6px 0 8px;">
+        <h3 style="margin: 0;">Who can't apply</h3>
+        <span class="muted small"><span data-blocked-count><%= (settings.blocked_role_ids || []).length %></span> blocked</span>
+      </div>
+      <p class="muted small">Members with any of these roles are turned away when they try to apply.</p>
+      <div class="search" style="max-width: none; margin-bottom: 10px;">
+        <%- include('partials/icon', { name: 'search', size: 16 }) %>
+        <label class="sr" for="role-filter">Filter roles</label>
+        <input id="role-filter" placeholder="Filter roles" data-filter-target="blocked-roles">
+      </div>
+      <div class="check-list" id="blocked-roles">
+        <% const blocked = settings.blocked_role_ids || []; opts.roles.slice().sort((a, b) => blocked.includes(b.id) - blocked.includes(a.id)).forEach(r => { %>
+          <label class="check-item" data-filter-text="<%= r.name.toLowerCase() %>">
+            <input type="checkbox" name="blocked_role_ids" value="<%= r.id %>" <%= blocked.includes(r.id) ? 'checked' : '' %>>
+            <span><%= r.name %></span>
+          </label>
+        <% }) %>
+      </div>
+    </section>
+  </div>
 
-  <section class="card">
-    <div class="card-head">
-      <h2>Who can't apply</h2>
-      <span class="muted small"><span data-blocked-count><%= (settings.blocked_role_ids || []).length %></span> blocked</span>
-    </div>
-    <p class="muted small">Members with any of these roles are turned away when they try to apply. Already-submitted applications are not affected.</p>
-    <div class="search" style="max-width: none; margin-bottom: 10px;">
-      <%- include('partials/icon', { name: 'search', size: 16 }) %>
-      <label class="sr" for="role-filter">Filter roles</label>
-      <input id="role-filter" placeholder="Filter roles" data-filter-target="blocked-roles">
-    </div>
-    <div class="check-list" id="blocked-roles">
-      <% const blocked = settings.blocked_role_ids || []; opts.roles.slice().sort((a, b) => blocked.includes(b.id) - blocked.includes(a.id)).forEach(r => { %>
-        <label class="check-item" data-filter-text="<%= r.name.toLowerCase() %>">
-          <input type="checkbox" name="blocked_role_ids" value="<%= r.id %>" <%= blocked.includes(r.id) ? 'checked' : '' %>>
-          <span><%= r.name %></span>
-        </label>
-      <% }) %>
-    </div>
-  </section>
+  <!-- ===== Tickets ===== -->
+  <div id="tab-tickets" role="tabpanel" aria-labelledby="tabbtn-tickets" data-tab-panel class="stack">
+    <p class="tab-intro">Where the open-a-ticket panel goes, where ticket channels are made, and when quiet tickets close. Ticket topics are on the Ticket types page.</p>
+    <section class="card">
+      <h2>Channels</h2>
+      <div class="grid-3">
+        <%- sel({ name: 'ticket_channel_id', label: 'Open-a-ticket channel', list: opts.textChannels, value: settings.ticket_channel_id,
+            help: 'Where the ticket panel is posted.' }) %>
+        <%- sel({ name: 'ticket_category_id', label: 'Category for ticket channels', list: opts.categories, value: settings.ticket_category_id,
+            emptyLabel: 'No category (top of the list)', help: 'New ticket channels are made in here.' }) %>
+        <%- sel({ name: 'ticket_log_channel_id', label: 'Ticket log channel', list: opts.textChannels, value: settings.ticket_log_channel_id,
+            help: 'Closed tickets and transcripts go here. Keep it staff-only.' }) %>
+      </div>
+      <div class="field" style="max-width: 420px;">
+        <label for="auto_close_hours">Close tickets after this many quiet hours</label>
+        <input id="auto_close_hours" name="auto_close_hours" type="number" min="0" max="720" value="<%= settings.auto_close_hours %>">
+        <p class="help">The bot warns first, then closes 1 hour later if nobody replies. 0 turns this off.</p>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Panel</h2>
+      <div class="field">
+        <label for="ticket_panel_title">Panel title</label>
+        <input id="ticket_panel_title" name="ticket_panel_title" maxlength="200" value="<%= settings.ticket_panel_title %>">
+      </div>
+      <div class="field">
+        <label for="ticket_panel_description">Panel message</label>
+        <textarea id="ticket_panel_description" name="ticket_panel_description" rows="2" maxlength="2000"><%= settings.ticket_panel_description %></textarea>
+      </div>
+      <div class="tab-actions">
+        <button class="btn" type="submit" name="then_post" value="ticket"><%- include('partials/icon', { name: 'send', size: 16 }) %> Save and post ticket panel</button>
+        <span class="muted small"><%= settings.ticket_panel_message_id ? 'Updates the panel already in Discord.' : 'Not posted yet.' %></span>
+      </div>
+    </section>
+  </div>
 
-  <section class="card">
-    <h2>Staff management</h2>
-    <p class="muted small">Managers can give strikes and approve leave. People with Manage Server always can.</p>
-    <div class="grid-2">
-      <%- include('partials/select', { name: 'manager_role_id', label: 'Manager role', list: opts.roles, value: settings.manager_role_id,
-          emptyLabel: 'Only Manage Server', help: 'Gets pinged for LOA requests and when someone reaches 3 strikes.' }) %>
-      <%- include('partials/select', { name: 'strike_log_channel_id', label: 'Strike log channel', list: opts.textChannels, value: settings.strike_log_channel_id,
+  <!-- ===== Staff tools ===== -->
+  <div id="tab-staff" role="tabpanel" aria-labelledby="tabbtn-staff" data-tab-panel class="stack">
+    <p class="tab-intro">Roles and channels for strikes and leave of absence.</p>
+    <section class="card">
+      <h2>Strikes</h2>
+      <%- sel({ name: 'strike_log_channel_id', label: 'Strike log channel', list: opts.textChannels, value: settings.strike_log_channel_id,
           help: 'Every strike given or removed is posted here. Keep it staff-only.' }) %>
-    </div>
-    <div class="grid-3">
-      <% [0, 1, 2].forEach(i => { %>
-        <%- include('partials/select', { name: 'strike_role_' + (i + 1), label: 'Role for strike ' + (i + 1), list: opts.roles, value: (settings.strike_role_ids || [])[i] || null,
-            emptyLabel: 'None', help: i === 0 ? 'The bot swaps these as strikes are added or removed.' : '' }) %>
-      <% }) %>
-    </div>
-    <div class="grid-2">
-      <%- include('partials/select', { name: 'loa_role_id', label: 'LOA role', list: opts.roles, value: settings.loa_role_id,
-          emptyLabel: 'None', help: 'Given on the first day of approved leave, removed after the last day.' }) %>
-      <%- include('partials/select', { name: 'loa_channel_id', label: 'LOA requests channel', list: opts.textChannels, value: settings.loa_channel_id,
-          help: 'New requests are posted here with Approve and Deny buttons.' }) %>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>Interviews</h2>
-    <%- include('partials/select', { name: 'interview_category_id', label: 'Category for interview voice channels', list: opts.categories, value: settings.interview_category_id,
-        emptyLabel: 'Same as tickets', help: 'Temporary voice channels made by the Interview button go here and delete themselves when everyone leaves.' }) %>
-  </section>
-
-  <section class="card">
-    <h2>Timezone</h2>
-    <div class="field field-short" style="max-width: 420px;">
-      <label for="timezone">Timezone for application schedules</label>
-      <select id="timezone" name="timezone">
-        <% timezones.forEach(z => { %><option value="<%= z %>" <%= z === settings.timezone ? 'selected' : '' %>><%= z.replace(/_/g, ' ') %></option><% }) %>
-      </select>
-      <p class="help">Open and close times you set on the Applications page use this timezone.</p>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>Tickets</h2>
-    <div class="grid-2">
-      <%- include('partials/select', { name: 'ticket_channel_id', label: 'Open-a-ticket channel', list: opts.textChannels, value: settings.ticket_channel_id,
-          help: 'Where the "Open a ticket" button is posted.' }) %>
-      <%- include('partials/select', { name: 'ticket_category_id', label: 'Category for ticket channels', list: opts.categories, value: settings.ticket_category_id,
-          emptyLabel: 'No category (top of the list)', help: 'New ticket channels are created inside this category.' }) %>
-      <%- include('partials/select', { name: 'ticket_log_channel_id', label: 'Ticket log channel', list: opts.textChannels, value: settings.ticket_log_channel_id,
-          help: 'Closed tickets are posted here with a transcript file. Keep it staff-only.' }) %>
-    </div>
-    <div class="field field-short">
-      <label for="auto_close_hours">Close tickets after this many hours with no messages</label>
-      <input id="auto_close_hours" name="auto_close_hours" type="number" min="0" max="720" value="<%= settings.auto_close_hours %>">
-      <p class="help">The bot warns first, then closes 1 hour later if nobody replies. Set to 0 to turn this off.</p>
-    </div>
-    <div class="field">
-      <label for="ticket_panel_title">Panel title</label>
-      <input id="ticket_panel_title" name="ticket_panel_title" maxlength="200" value="<%= settings.ticket_panel_title %>">
-    </div>
-    <div class="field">
-      <label for="ticket_panel_description">Panel message</label>
-      <textarea id="ticket_panel_description" name="ticket_panel_description" rows="3" maxlength="2000"><%= settings.ticket_panel_description %></textarea>
-    </div>
-  </section>
+      <div class="grid-3">
+        <% [0, 1, 2].forEach(i => { %>
+          <%- sel({ name: 'strike_role_' + (i + 1), label: 'Role for strike ' + (i + 1), list: opts.roles, value: (settings.strike_role_ids || [])[i] || null,
+              emptyLabel: 'None', help: i === 0 ? 'The bot swaps these as strikes are added or removed.' : '' }) %>
+        <% }) %>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Leave of absence</h2>
+      <div class="grid-2">
+        <%- sel({ name: 'loa_role_id', label: 'LOA role', list: opts.roles, value: settings.loa_role_id,
+            emptyLabel: 'None', help: 'Given on the first day of leave and removed after the last day or when they come back early.' }) %>
+        <%- sel({ name: 'loa_channel_id', label: 'LOA channel', list: opts.textChannels, value: settings.loa_channel_id,
+            help: 'Each LOA is posted here with an I\'m back early button. Announcement channels work.' }) %>
+      </div>
+    </section>
+  </div>
 
   <div class="actions sticky-actions">
     <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'check', size: 16 }) %> Save settings</button>
+    <span class="muted small">Saves every tab.</span>
   </div>
 </form>
-
-<section class="card" id="panels">
-  <h2>Panels</h2>
-  <p class="muted small">Posts the panel in its channel, or updates the one already there. Application panels also update on their own when you change roles.</p>
-  <div class="panel-actions">
-    <form method="post" action="/settings/panel/apply">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <button class="btn" type="submit"><%- include('partials/icon', { name: 'send', size: 16 }) %> Post or update application panel</button>
-    </form>
-    <form method="post" action="/settings/panel/ticket">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <button class="btn" type="submit"><%- include('partials/icon', { name: 'send', size: 16 }) %> Post or update ticket panel</button>
-    </form>
-  </div>
-</section>
 <%- include('partials/foot') %>

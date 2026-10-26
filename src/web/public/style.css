@@ -481,3 +481,71 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .poll-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; font-weight: 600; }
 .poll-bar { height: 10px; border-radius: 999px; background: var(--field); border: 1px solid var(--border); overflow: hidden; }
 .poll-bar span { display: block; height: 100%; background: linear-gradient(90deg, #1F6FEB, #58A6FF); border-radius: 999px; }
+
+/* ---------- Page tabs (Settings, Welcome) ---------- */
+.ptabs {
+  display: flex; gap: 4px; padding: 4px; margin: 0 0 16px; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--border); overflow-x: auto; scrollbar-width: none;
+  position: sticky; top: 8px; z-index: 5;
+}
+.ptabs::-webkit-scrollbar { display: none; }
+.ptab {
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 40px; padding: 0 16px; border-radius: 9px; border: 0; background: transparent;
+  color: var(--text-2); font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; white-space: nowrap;
+}
+.ptab:hover { color: var(--text); background: var(--raised); }
+.ptab[aria-selected="true"] { background: var(--accent); color: #fff; box-shadow: 0 2px 0 #1450C8; }
+.ptab .ptab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+.ptab[aria-selected="true"] .ptab-dot { background: #fff; }
+.js [data-tab-panel]:not(.active) { display: none; }
+.tab-intro { margin: -6px 0 -6px; color: var(--muted); font-size: 14px; }
+.tab-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+@media (max-width: 700px) {
+  .ptabs { top: 0; border-radius: 0 0 12px 12px; margin-left: -16px; margin-right: -16px; }
+  .ptab { padding: 0 12px; }
+}
+.ptab-state { font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: var(--field); color: var(--muted); }
+.ptab-state.on { background: rgba(47, 178, 122, 0.18); color: #6fdc9b; }
+.ptab[aria-selected="true"] .ptab-state { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.ph-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -6px 0 14px; }
+.ph-strip .ph { padding: 3px 9px; }
+.align-start { align-items: start; }
+.check-list-short { max-height: 190px; }
+
+/* ---------- Review page: decision box stays in view ---------- */
+.review-layout { align-items: stretch; }
+.review-layout > .review-main { flex: 999 1 520px; min-width: 0; }
+.review-layout > .review-side { flex: 1 1 320px; min-width: 0; }
+.review-box { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.review-part { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.review-decide .btn { flex: 1; justify-content: center; }
+.answers.qs-only .a { display: none; }
+.answers.qs-only li { padding: 9px 14px; }
+@media (max-width: 860px) {
+  .review-layout { flex-direction: column; }
+  .review-box { position: static; max-height: none; }
+}
+
+/* ---------- Compact question editor ---------- */
+.questions { gap: 6px; }
+.question textarea { min-height: 42px; resize: none; overflow: hidden; line-height: 1.45; padding-top: 10px; padding-bottom: 10px; }
+.question::before { height: 42px; }
+.q-tools { padding-top: 4px; }
+.hero-chip-main { background: #fff; color: #0A1B44; border-color: #fff; }
+.hero-chip-main:hover { background: #E6F0FF; }
+.hero-chip-quiet { background: transparent; border-style: dashed; font-weight: 600; }
+
+/* ---------- Tighter sidebar so every link fits on laptop screens ---------- */
+.sidebar { padding-top: 10px; padding-bottom: 10px; }
+.brand { padding-bottom: 10px; }
+.side-section { padding: 10px 10px 4px; }
+.side-link { min-height: 34px; }
+.side-user { margin-top: 6px; }
+@media (min-height: 900px) {
+  .side-link { min-height: 38px; }
+  .side-section { padding-top: 14px; }
+}
+.hero-chip { background: rgba(8, 18, 46, 0.72); backdrop-filter: blur(4px); }
+.hero-chip-main { background: #fff; }
+.ptabs { position: sticky; }
