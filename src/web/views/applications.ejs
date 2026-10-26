@@ -75,22 +75,25 @@
         </div>
       </div>
       <div data-mode-panel="weekly">
-        <div class="day-pick" role="group" aria-label="Days">
-          <% days.forEach((d, i) => { %>
-            <label class="day-opt"><input type="checkbox" name="weekly_days" value="<%= i %>" <%= (c.weekly_days || []).includes(i) ? 'checked' : '' %>><span><%= d %></span></label>
+        <div class="week-grid" role="group" aria-label="Weekly hours">
+          <div class="week-head" aria-hidden="true"><span>Day</span><span>Opens</span><span>Closes</span></div>
+          <% c.inputs.days.forEach(day => { %>
+            <div class="week-row <%= day.on ? 'on' : '' %>" data-day-row>
+              <label class="week-day">
+                <input type="checkbox" name="day_<%= day.d %>_on" <%= day.on ? 'checked' : '' %> data-day-toggle>
+                <span><%= day.name %></span>
+              </label>
+              <label class="sr" for="d<%= day.d %>s-<%= c.id %>"><%= day.name %> opens</label>
+              <input type="time" id="d<%= day.d %>s-<%= c.id %>" name="day_<%= day.d %>_start" value="<%= day.start %>" <%= day.on ? '' : 'disabled' %>>
+              <label class="sr" for="d<%= day.d %>e-<%= c.id %>"><%= day.name %> closes</label>
+              <input type="time" id="d<%= day.d %>e-<%= c.id %>" name="day_<%= day.d %>_end" value="<%= day.end %>" <%= day.on ? '' : 'disabled' %>>
+            </div>
           <% }) %>
         </div>
-        <div class="grid-2">
-          <div class="field">
-            <label for="w-start-<%= c.id %>">From</label>
-            <input type="time" id="w-start-<%= c.id %>" name="weekly_start" value="<%= c.inputs.weekly_start %>">
-          </div>
-          <div class="field">
-            <label for="w-end-<%= c.id %>">Until</label>
-            <input type="time" id="w-end-<%= c.id %>" name="weekly_end" value="<%= c.inputs.weekly_end %>">
-            <p class="help">An earlier time than "From" means it runs past midnight.</p>
-          </div>
+        <div class="actions" style="margin: 10px 0 12px;">
+          <button type="button" class="btn btn-ghost btn-sm" data-copy-monday>Copy Monday's hours to every day that's on</button>
         </div>
+        <p class="help" style="margin-bottom: 12px;">A close time earlier than the open time means it runs past midnight (for example Friday 8 PM – 2 AM).</p>
       </div>
     </fieldset>
     <div class="actions" style="justify-content: space-between;">

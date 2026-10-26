@@ -1,0 +1,59 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Staff activity</h1>
+    <p>Who's reviewing applications and handling tickets. Ratings come from members rating tickets the staff member claimed.</p>
+  </div>
+  <div class="tabs" role="group" aria-label="Time period">
+    <% [['7', 'Last 7 days'], ['30', 'Last 30 days'], ['all', 'All time']].forEach(([v, l]) => { %>
+      <a class="tab <%= period === v ? 'active' : '' %>" href="/staff?period=<%= v %>"><%= l %></a>
+    <% }) %>
+  </div>
+</div>
+
+<% if (noStaffRole) { %>
+  <div class="flash flash-error"><%- include('partials/icon', { name: 'alert' }) %><span>No staff role is set, so only people with recorded activity are listed. Pick one in Settings.</span></div>
+<% } else if (!membersLoaded) { %>
+  <div class="flash flash-error"><%- include('partials/icon', { name: 'alert' }) %><span>The bot can't see the member list yet. Turn on Server Members Intent in the Discord Developer Portal.</span></div>
+<% } %>
+
+<section class="stats">
+  <div class="stat"><span class="stat-icon"><%- include('partials/icon', { name: 'inbox', size: 20 }) %></span><span class="stat-text"><span class="stat-num"><%= totals.reviews %></span><span class="stat-label">Applications reviewed</span></span></div>
+  <div class="stat"><span class="stat-icon green"><%- include('partials/icon', { name: 'ticket', size: 20 }) %></span><span class="stat-text"><span class="stat-num"><%= totals.claimed %></span><span class="stat-label">Tickets claimed</span></span></div>
+  <div class="stat"><span class="stat-icon"><%- include('partials/icon', { name: 'user', size: 20 }) %></span><span class="stat-text"><span class="stat-num"><%= totals.interviews %></span><span class="stat-label">Interviews</span></span></div>
+  <div class="stat"><span class="stat-icon warn"><%- include('partials/icon', { name: 'check', size: 20 }) %></span><span class="stat-text"><span class="stat-num"><%= totals.votes %></span><span class="stat-label">Votes cast</span></span></div>
+</section>
+
+<section class="card flush">
+  <% if (!table.length) { %>
+    <p class="muted pad">No staff activity yet.</p>
+  <% } else { %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Staff member</th><th class="num">Reviewed</th><th class="num">Votes</th><th class="num">Interviews</th>
+        <th class="num">Claimed</th><th class="num">Closed</th><th class="num">Rating</th><th class="num">Strikes</th><th>Status</th>
+      </tr></thead>
+      <tbody>
+        <% table.forEach(r => { %>
+          <tr>
+            <td>
+              <span class="row-main"><span class="role-icon"><%= (r.name || '?').slice(0, 1).toUpperCase() %></span>
+                <span><strong><%= r.name %></strong><% if (!r.isStaffMember) { %><br><span class="muted small">No longer staff</span><% } %></span></span>
+            </td>
+            <td class="num"><%= r.reviews %><% if (r.reviews) { %> <span class="muted small">(<%= r.accepted %>✓ <%= r.denied %>✗)</span><% } %></td>
+            <td class="num"><%= r.votes %></td>
+            <td class="num"><%= r.interviews %></td>
+            <td class="num"><%= r.claimed %></td>
+            <td class="num"><%= r.closed %></td>
+            <td class="num"><% if (r.avgRating) { %><span class="rating"><%- include('partials/icon', { name: 'star', size: 14 }) %> <%= r.avgRating %></span> <span class="muted small">(<%= r.ratings %>)</span><% } else { %><span class="muted">—</span><% } %></td>
+            <td class="num"><% if (r.strikes) { %><span class="pill pill-denied"><%= r.strikes %></span><% } else { %><span class="muted">0</span><% } %></td>
+            <td><% if (r.loa) { %><span class="pill pill-pending"><%= r.loa %></span><% } else if (r.score === 0) { %><span class="pill pill-off">No activity</span><% } else { %><span class="pill pill-open">Active</span><% } %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</section>
+<%- include('partials/foot') %>

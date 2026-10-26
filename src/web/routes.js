@@ -3,11 +3,11 @@ import express from 'express';
 import { castVote, decideSubmission, removeReviewMessages } from '../bot/applications.js';
 import { startInterview } from '../bot/interviews.js';
 import { invalidatePanelCache, publishPanel, refreshApplyPanelQuietly } from '../bot/panels.js';
-import { closeTicketFromDashboard, transcriptText } from '../bot/tickets.js';
+import { closeTicketFromDashboard, setTicketSettings, transcriptText } from '../bot/tickets.js';
 import { MAX_QUESTIONS, inviteUrl } from '../bot/ui.js';
 import { config } from '../config.js';
 import {
-  DAYS, allTimezones, describeSchedule, isCategoryOpen, isValidTimezone, parseLocalInput, parseTime, toLocalInput,
+  DAYS, DAY_NAMES, WEEK_ORDER, allTimezones, weeklyHours, describeSchedule, isCategoryOpen, isValidTimezone, parseLocalInput, parseTime, toLocalInput,
 } from '../schedule.js';
 import {
   dashboardCounts, deleteClosedTickets, listVotes, voteTally, deleteSubmissions, getCategory, getRole, getSettings, getSubmission, getTicket, listCategories, listQuestions,
@@ -27,7 +27,7 @@ const idParam = (req) => {
 const clean = (v, max) => String(v ?? '').trim().slice(0, max);
 const toArray = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
-function guildOptions(guild) {
+export function guildOptions(guild) {
   const textChannels = guild.channels.cache
     .filter((c) => c.type === ChannelType.GuildText)
     .sort((a, b) => a.rawPosition - b.rawPosition)
@@ -91,6 +91,10 @@ routes.post('/settings', requireAdmin, async (req, res) => {
     ticket_category_id: pickId(b.ticket_category_id, opts.categories),
     ticket_log_channel_id: pickId(b.ticket_log_channel_id, opts.textChannels),
     interview_category_id: pickId(b.interview_category_id, opts.categories),
+    manager_role_id: pickId(b.manager_role_id, opts.roles),
+    strike_log_channel_id: pickId(b.strike_log_channel_id, opts.textChannels),
+    loa_role_id: pickId(b.loa_role_id, opts.roles),
+    loa_channel_id: pickId(b.loa_channel_id, opts.textChannels),
   };
   if (Object.values(patch).includes(undefined)) {
     flash(req, 'error', 'One of the channels or roles no longer exists. Refresh and try again.');
@@ -103,6 +107,9 @@ routes.post('/settings', requireAdmin, async (req, res) => {
   patch.blocked_role_ids = toArray(b.blocked_role_ids).map(String).filter((id) => opts.roles.some((r) => r.id === id));
   const tz = String(b.timezone || '').trim();
   patch.timezone = isValidTimezone(tz) ? tz : before.timezone;
+  patch.strike_role_ids = [b.strike_role_1, b.strike_role_2, b.strike_role_3].map((v) => pickId(v, opts.roles)).filter(Boolean);
+  const hours = Number.parseInt(b.auto_close_hours, 10);
+  patch.auto_close_hours = Number.isFinite(hours) ? Math.min(Math.max(hours, 0), 720) : 48;
   invalidatePanelCache();
 
   patch.apply_panel_title = clean(b.apply_panel_title, LIMITS.panelTitle) || 'Staff Applications';
@@ -112,7 +119,7 @@ routes.post('/settings', requireAdmin, async (req, res) => {
   const cooldown = Number.parseInt(b.apply_cooldown_days, 10);
   patch.apply_cooldown_days = Number.isFinite(cooldown) ? Math.min(Math.max(cooldown, 0), 365) : 7;
 
-  await updateSettings(patch);
+  setTicketSettings(await updateSettings(patch));
   flash(req, 'success', 'Settings saved. If you changed panel text, press "Post or update" below to refresh the panels.');
   res.redirect('/settings');
 });
@@ -137,9 +144,10 @@ routes.get('/applications', requireAdmin, async (req, res) => {
     c.roles = await listRoles(c.id);
     c.schedule = describeSchedule(c, tz);
     c.openNow = isCategoryOpen(c, tz);
+    const wh = weeklyHours(c);
     c.inputs = {
       open_at: toLocalInput(c.open_at, tz), close_at: toLocalInput(c.close_at, tz),
-      weekly_start: c.weekly_start || '', weekly_end: c.weekly_end || '',
+      days: WEEK_ORDER.map((d) => ({ d, name: DAY_NAMES[d], on: Boolean(wh[d]), start: wh[d]?.start.text || '', end: wh[d]?.end.text || '' })),
     };
   }
   res.render('applications', { title: 'Applications', cats, days: DAYS, tz });
@@ -174,18 +182,27 @@ routes.post('/applications/categories/:id', requireAdmin, async (req, res) => {
     if (!openAt && !closeAt) { flash(req, 'error', 'Pick an open date, a close date, or both.'); return res.redirect('/applications'); }
     if (openAt && closeAt && closeAt <= openAt) { flash(req, 'error', 'The close date must be after the open date.'); return res.redirect('/applications'); }
   }
+  const hours = {};
   if (mode === 'weekly') {
-    days = toArray(b.weekly_days).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
-    start = parseTime(b.weekly_start)?.text || null;
-    end = parseTime(b.weekly_end)?.text || null;
-    if (!days.length || !start || !end || start === end) { flash(req, 'error', 'For a weekly schedule, pick at least one day and different start and end times.'); return res.redirect('/applications'); }
+    for (let d = 0; d <= 6; d++) {
+      if (b[`day_${d}_on`] !== 'on') continue;
+      const st = parseTime(b[`day_${d}_start`]);
+      const en = parseTime(b[`day_${d}_end`]);
+      if (!st || !en || st.text === en.text) {
+        flash(req, 'error', `${DAY_NAMES[d]}: pick an open time and a different close time.`);
+        return res.redirect('/applications');
+      }
+      hours[d] = { start: st.text, end: en.text };
+    }
+    if (!Object.keys(hours).length) { flash(req, 'error', 'For a weekly schedule, turn on at least one day.'); return res.redirect('/applications'); }
+    days = Object.keys(hours).map(Number);
   }
 
   await query(
     `UPDATE app_categories SET name = $2, description = $3, enabled = $4, position = $5,
-       schedule_mode = $6, open_at = $7, close_at = $8, weekly_days = $9, weekly_start = $10, weekly_end = $11 WHERE id = $1`,
+       schedule_mode = $6, open_at = $7, close_at = $8, weekly_days = $9, weekly_start = $10, weekly_end = $11, weekly_hours = $12 WHERE id = $1`,
     [id, name, clean(b.description, LIMITS.description), b.enabled === 'on', Number.isFinite(position) ? position : cat.position,
-      mode, openAt, closeAt, [...new Set(days)].sort(), start, end],
+      mode, openAt, closeAt, [...new Set(days)].sort(), start, end, JSON.stringify(hours)],
   );
   const saved = await getCategory(id);
   flash(req, 'success', `Saved "${name}". ${isCategoryOpen(saved, tz) ? 'It is open now.' : `It is closed now: ${describeSchedule(saved, tz).text}.`}`);

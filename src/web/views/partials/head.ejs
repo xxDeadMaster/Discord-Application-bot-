@@ -11,17 +11,21 @@
 <% if (user) {
   const nc = typeof navCounts !== 'undefined' && navCounts ? navCounts : {};
   const admin = typeof isAdmin !== 'undefined' && isAdmin;
+  const manager = typeof isManager !== 'undefined' && isManager;
   const links = [
     { href: '/', label: 'Overview', icon: 'home', active: path === '/' },
     { section: 'Review' },
     { href: '/submissions', label: 'Submissions', icon: 'inbox', active: path.startsWith('/submissions'), count: nc.pending, countLabel: 'pending' },
-    { href: '/tickets', label: 'Tickets', icon: 'ticket', active: path.startsWith('/tickets'), count: nc.open_tickets, countLabel: 'open' },
+    { href: '/tickets', label: 'Tickets', icon: 'ticket', active: path.startsWith('/tickets') && !path.startsWith('/ticket-types'), count: nc.open_tickets, countLabel: 'open' },
+    { section: 'Staff' },
+    { href: '/staff', label: 'Activity', icon: 'chart', active: path.startsWith('/staff') },
+    { href: '/loa', label: 'Leave (LOA)', icon: 'calendar', active: path.startsWith('/loa'), count: manager ? nc.pending_loa : 0, countLabel: 'pending' },
   ];
-  if (admin) links.push(
-    { section: 'Setup' },
-    { href: '/applications', label: 'Applications', icon: 'list', active: path.startsWith('/applications') },
-    { href: '/settings', label: 'Settings', icon: 'settings', active: path.startsWith('/settings') },
-  );
+  if (manager) links.push({ href: '/strikes', label: 'Strikes', icon: 'alert', active: path.startsWith('/strikes') });
+  if (admin || manager) links.push({ section: 'Setup' });
+  if (admin) links.push({ href: '/applications', label: 'Applications', icon: 'list', active: path.startsWith('/applications') });
+  if (manager) links.push({ href: '/ticket-types', label: 'Ticket types', icon: 'ticket', active: path.startsWith('/ticket-types') });
+  if (admin) links.push({ href: '/settings', label: 'Settings', icon: 'settings', active: path.startsWith('/settings') });
 %>
 <aside class="sidebar">
   <a class="brand" href="/">
@@ -46,7 +50,7 @@
     <% if (user.avatar) { %><img src="<%= user.avatar %>" alt="" width="32" height="32"><% } else { %><span class="avatar-fallback" aria-hidden="true"><%= (user.name || '?').slice(0, 1).toUpperCase() %></span><% } %>
     <span class="side-user-text">
       <span class="side-user-name"><%= user.name %></span>
-      <span class="side-user-role"><%= admin ? 'Admin' : 'Staff' %></span>
+      <span class="side-user-role"><%= admin ? 'Admin' : manager ? 'Manager' : 'Staff' %></span>
     </span>
     <form method="post" action="/logout">
       <input type="hidden" name="_csrf" value="<%= csrf %>">

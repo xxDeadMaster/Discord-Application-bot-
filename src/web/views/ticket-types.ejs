@@ -1,0 +1,81 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Ticket types</h1>
+    <p>Members pick one of these from the dropdown in your open-a-ticket channel, then answer its questions (up to 5). With no types, the panel shows a single "Open a ticket" button.</p>
+  </div>
+  <% if (!types.length) { %>
+  <form method="post" action="/ticket-types/defaults">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'plus', size: 16 }) %> Add the 4 starter types</button>
+  </form>
+  <% } %>
+</div>
+
+<% if (!types.length) { %>
+  <section class="card center">
+    <h2 style="margin: 0;">No ticket types yet</h2>
+    <p class="muted" style="margin: 0;">Add the starter set (Support, Report a Player, Partnership, Punishment Appeal) and edit them, or make your own below.</p>
+  </section>
+<% } %>
+
+<% types.forEach(t => { %>
+<section class="card cat-card" id="type-<%= t.id %>">
+  <div class="cat-head">
+    <div class="cat-title">
+      <h2><%= t.name %></h2>
+      <% if (t.enabled) { %><span class="pill pill-open">On</span><% } else { %><span class="pill pill-off">Off</span><% } %>
+      <span class="muted small"><%= t.questions.length %> question<%= t.questions.length === 1 ? '' : 's' %> · <%= used[t.id] || 0 %> ticket<%= used[t.id] === 1 ? '' : 's' %></span>
+    </div>
+    <div class="row-actions">
+      <button type="button" class="btn btn-ghost btn-sm" data-toggle="type-edit-<%= t.id %>" aria-expanded="false" aria-controls="type-edit-<%= t.id %>"><%- include('partials/icon', { name: 'edit', size: 15 }) %> Edit</button>
+      <form method="post" action="/ticket-types/<%= t.id %>/delete" data-confirm="Delete the &quot;<%= t.name %>&quot; ticket type? Past tickets are kept.">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="btn btn-danger-ghost btn-sm" type="submit"><%- include('partials/icon', { name: 'trash', size: 15 }) %> Delete</button>
+      </form>
+    </div>
+    <div class="schedule-line"><span><%= t.description || 'No description' %></span></div>
+  </div>
+  <form method="post" action="/ticket-types/<%= t.id %>" class="cat-edit inline-form" id="type-edit-<%= t.id %>" hidden style="margin-bottom: 20px;">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid-3">
+      <div class="field"><label for="tn-<%= t.id %>">Name</label><input id="tn-<%= t.id %>" name="name" maxlength="80" value="<%= t.name %>" required></div>
+      <div class="field"><label for="td-<%= t.id %>">Short description</label><input id="td-<%= t.id %>" name="description" maxlength="100" value="<%= t.description %>"></div>
+      <div class="field"><label for="tp-<%= t.id %>">Order</label><input id="tp-<%= t.id %>" name="position" type="number" value="<%= t.position %>"></div>
+      <%- include('partials/select', { name: 'staff_role_id', label: 'Extra staff role that can see these', list: opts.roles, value: t.staff_role_id,
+          emptyLabel: 'Only the main staff role', help: 'For example a Partnership team. The main staff role can always see tickets.' }) %>
+      <%- include('partials/select', { name: 'category_id', label: 'Discord category for these tickets', list: opts.categories, value: t.category_id,
+          emptyLabel: 'Default ticket category', help: '' }) %>
+    </div>
+    <div class="field">
+      <label>Questions (first one is required, up to 5)</label>
+      <% for (let i = 0; i < 5; i++) { %>
+        <input name="questions" maxlength="300" value="<%= t.questions[i] || '' %>" placeholder="<%= i === 0 ? 'What do you need help with?' : 'Optional question ' + (i + 1) %>" style="margin-bottom: 6px;" aria-label="Question <%= i + 1 %>">
+      <% } %>
+      <p class="help">Discord shows the first 45 characters as the label; longer questions appear in full inside the box.</p>
+    </div>
+    <div class="actions" style="justify-content: space-between;">
+      <label class="toggle"><input type="checkbox" name="enabled" <%= t.enabled ? 'checked' : '' %>> Show in the ticket dropdown</label>
+      <button class="btn btn-primary btn-sm" type="submit">Save</button>
+    </div>
+  </form>
+  <div class="cat-body">
+    <ol class="answers" style="padding: 0 10px;">
+      <% t.questions.forEach(q => { %><li style="padding: 10px 14px;"><p class="q" style="margin: 0;"><%= q %></p></li><% }) %>
+    </ol>
+  </div>
+</section>
+<% }) %>
+
+<section class="card">
+  <h2>New ticket type</h2>
+  <form method="post" action="/ticket-types">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid-2">
+      <div class="field"><label for="nt-name">Name</label><input id="nt-name" name="name" maxlength="80" placeholder="Bug Report" required></div>
+      <div class="field"><label for="nt-desc">Short description</label><input id="nt-desc" name="description" maxlength="100" placeholder="Shown under it in the dropdown"></div>
+    </div>
+    <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'plus', size: 16 }) %> Add ticket type</button>
+  </form>
+</section>
+<%- include('partials/foot') %>

@@ -42,14 +42,23 @@
     <section class="card">
       <dl class="meta meta-col">
         <div><dt>Opened by</dt><dd><strong><%= ticket.opener_tag %></strong><br><span class="muted small">ID <%= ticket.opener_id %></span></dd></div>
-        <div><dt>Topic</dt><dd><%= ticket.topic %></dd></div>
+        <% if (ticket.type_name) { %><div><dt>Type</dt><dd><%= ticket.type_name %></dd></div><% } %>
+        <% const ans = Array.isArray(ticket.answers) && ticket.answers.length ? ticket.answers : [{ q: 'Topic', a: ticket.topic }]; ans.forEach(x => { %>
+          <div><dt><%= x.q %></dt><dd style="white-space: pre-wrap;"><%= x.a || '—' %></dd></div>
+        <% }) %>
+        <div><dt>Claimed by</dt><dd><%= ticket.claimed_by_tag || 'Nobody' %></dd></div>
+        <div><dt>Rating</dt><dd><% if (ticket.rating) { %><span class="rating"><%- include('partials/icon', { name: 'star', size: 15 }) %> <%= ticket.rating %>/5</span><% } else { %><span class="muted"><%= ticket.status === 'open' ? 'Asked when it closes' : 'Not rated' %></span><% } %></dd></div>
         <div><dt>Opened</dt><dd><time datetime="<%= new Date(ticket.created_at).toISOString() %>"></time></dd></div>
         <% if (ticket.closed_at) { %>
           <div><dt>Closed</dt><dd><time datetime="<%= new Date(ticket.closed_at).toISOString() %>"></time><br><span class="muted small">by <%= ticket.closed_by_tag || 'unknown' %></span></dd></div>
         <% } %>
       </dl>
       <% if (ticket.status === 'open') { %>
-        <form method="post" action="/tickets/<%= ticket.id %>/close" data-confirm="Close this ticket? The channel will be deleted and the transcript saved." style="margin-top: 18px;">
+        <form method="post" action="/tickets/<%= ticket.id %>/claim" style="margin-top: 18px;">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="btn <%= ticket.claimed_by === user.id ? 'btn-ghost' : 'btn-primary' %>" type="submit"><%- include('partials/icon', { name: 'hand', size: 16 }) %> <%= ticket.claimed_by === user.id ? 'Unclaim' : ticket.claimed_by ? 'Take over' : 'Claim' %></button>
+        </form>
+        <form method="post" action="/tickets/<%= ticket.id %>/close" data-confirm="Close this ticket? The channel will be deleted and the transcript saved." style="margin-top: 10px;">
           <input type="hidden" name="_csrf" value="<%= csrf %>">
           <button class="btn btn-danger" type="submit"><%- include('partials/icon', { name: 'x', size: 16 }) %> Close ticket</button>
         </form>

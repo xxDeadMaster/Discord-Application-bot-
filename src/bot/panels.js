@@ -4,6 +4,7 @@ import {
 import { getSettings, listCategories, listRoles, updateSettings } from '../db.js';
 import { client } from './client.js';
 import { isCategoryOpen } from '../schedule.js';
+import { ticketPanelComponents } from './tickets.js';
 import { COLORS, truncate } from './ui.js';
 
 /** Applications (categories) open right now that have at least one role with questions. */
@@ -42,13 +43,22 @@ export async function buildApplyPanel(settings) {
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select)] };
 }
 
-export function buildTicketPanel(settings) {
+export async function buildTicketPanel(settings) {
   const embed = new EmbedBuilder()
     .setColor(COLORS.brand)
     .setTitle(truncate(settings.ticket_panel_title, 256))
     .setDescription(truncate(settings.ticket_panel_description, 4000));
-  const button = new ButtonBuilder().setCustomId('ticket:open').setLabel('Open a ticket').setStyle(ButtonStyle.Primary);
-  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(button)] };
+  return { embeds: [embed], components: await ticketPanelComponents() };
+}
+
+/** Refreshes the ticket panel if one is already posted (after ticket types change). */
+export async function refreshTicketPanelQuietly() {
+  try {
+    const settings = await getSettings();
+    if (settings.ticket_channel_id && settings.ticket_panel_message_id) await publishPanel('ticket');
+  } catch (err) {
+    console.warn('[panels] could not refresh ticket panel:', err.message);
+  }
 }
 
 /**
@@ -65,7 +75,7 @@ export async function publishPanel(kind) {
   const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!channel || channel.type !== ChannelType.GuildText) throw new Error('The bot cannot find that channel. Check it still exists and the bot can see it.');
 
-  const payload = kind === 'apply' ? await buildApplyPanel(settings) : buildTicketPanel(settings);
+  const payload = kind === 'apply' ? await buildApplyPanel(settings) : await buildTicketPanel(settings);
 
   if (settings[messageKey]) {
     const existing = await channel.messages.fetch(settings[messageKey]).catch(() => null);

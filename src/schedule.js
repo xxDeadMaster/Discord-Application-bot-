@@ -64,6 +64,10 @@ export function formatWhen(date, tz) {
   }).format(new Date(date));
 }
 
+/** Monday-first order for showing days. */
+export const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+export const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 export function time12(t) {
   const h = t.hh % 12 || 12;
   return `${h}${t.mm ? `:${String(t.mm).padStart(2, '0')}` : ''} ${t.hh < 12 ? 'AM' : 'PM'}`;
@@ -74,55 +78,70 @@ function addDays(y, m, d, n) {
   return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate(), weekday: t.getUTCDay() };
 }
 
-function weeklyWindow(role) {
-  const start = parseTime(role.weekly_start);
-  const end = parseTime(role.weekly_end);
-  const days = (role.weekly_days || []).map(Number).filter((n) => n >= 0 && n <= 6);
-  if (!start || !end || !days.length) return null;
-  const startMin = start.hh * 60 + start.mm;
-  const endMin = end.hh * 60 + end.mm;
-  return { start, end, days, startMin, endMin, overnight: endMin <= startMin };
+/**
+ * Per-day weekly hours: { "0": { start: "12:00", end: "20:00" }, ... } (0 = Sunday).
+ * Falls back to the older single-window fields (weekly_days + weekly_start/end).
+ */
+export function weeklyHours(item) {
+  const out = {};
+  const src = item.weekly_hours && Object.keys(item.weekly_hours).length ? item.weekly_hours : null;
+  if (src) {
+    for (const [k, v] of Object.entries(src)) {
+      const d = Number(k);
+      const st = parseTime(v?.start);
+      const en = parseTime(v?.end);
+      if (d >= 0 && d <= 6 && st && en && st.text !== en.text) out[d] = { start: st, end: en };
+    }
+    return out;
+  }
+  const st = parseTime(item.weekly_start);
+  const en = parseTime(item.weekly_end);
+  if (st && en && st.text !== en.text) for (const d of item.weekly_days || []) if (d >= 0 && d <= 6) out[d] = { start: st, end: en };
+  return out;
 }
 
+const mins = (t) => t.hh * 60 + t.mm;
+const overnight = (w) => mins(w.end) <= mins(w.start);
+
 /**
- * Whether a role is taking applications right now (ignores the on/off switch),
+ * Whether an application is taking applications right now (ignores the on/off switch),
  * plus when that changes. Returns { open, changesAt: Date|null }.
  */
-export function scheduleState(role, tz, now = new Date()) {
-  const mode = role.schedule_mode || 'always';
+export function scheduleState(item, tz, now = new Date()) {
+  const mode = item.schedule_mode || 'always';
 
   if (mode === 'dates') {
-    const openAt = role.open_at ? new Date(role.open_at) : null;
-    const closeAt = role.close_at ? new Date(role.close_at) : null;
+    const openAt = item.open_at ? new Date(item.open_at) : null;
+    const closeAt = item.close_at ? new Date(item.close_at) : null;
     if (openAt && now < openAt) return { open: false, changesAt: openAt };
     if (closeAt && now >= closeAt) return { open: false, changesAt: null };
     return { open: true, changesAt: closeAt };
   }
 
   if (mode === 'weekly') {
-    const w = weeklyWindow(role);
-    if (!w) return { open: false, changesAt: null };
+    const hours = weeklyHours(item);
+    if (!Object.keys(hours).length) return { open: false, changesAt: null };
     const p = tzParts(now, tz);
     const nowMin = p.hh * 60 + p.mm;
-    const yesterday = (p.weekday + 6) % 7;
+    const today = hours[p.weekday];
+    const yest = hours[(p.weekday + 6) % 7];
 
-    let openNow = false;
-    let endDay = null; // offset in days from today when the current window ends
-    if (!w.overnight) {
-      if (w.days.includes(p.weekday) && nowMin >= w.startMin && nowMin < w.endMin) { openNow = true; endDay = 0; }
-    } else if (w.days.includes(p.weekday) && nowMin >= w.startMin) {
-      openNow = true; endDay = 1;
-    } else if (w.days.includes(yesterday) && nowMin < w.endMin) {
-      openNow = true; endDay = 0;
+    let endAt = null;
+    if (today && !overnight(today) && nowMin >= mins(today.start) && nowMin < mins(today.end)) {
+      endAt = { offset: 0, t: today.end };
+    } else if (today && overnight(today) && nowMin >= mins(today.start)) {
+      endAt = { offset: 1, t: today.end };
+    } else if (yest && overnight(yest) && nowMin < mins(yest.end)) {
+      endAt = { offset: 0, t: yest.end };
     }
-
-    if (openNow) {
-      const e = addDays(p.y, p.m, p.d, endDay);
-      return { open: true, changesAt: zonedToUtc(e.y, e.m, e.d, w.end.hh, w.end.mm, tz) };
+    if (endAt) {
+      const e = addDays(p.y, p.m, p.d, endAt.offset);
+      return { open: true, changesAt: zonedToUtc(e.y, e.m, e.d, endAt.t.hh, endAt.t.mm, tz) };
     }
     for (let i = 0; i <= 7; i++) {
       const day = addDays(p.y, p.m, p.d, i);
-      if (!w.days.includes(day.weekday)) continue;
+      const w = hours[day.weekday];
+      if (!w) continue;
       const start = zonedToUtc(day.y, day.m, day.d, w.start.hh, w.start.mm, tz);
       if (start > now) return { open: false, changesAt: start };
     }
@@ -143,12 +162,12 @@ export function describeSchedule(role, tz, now = new Date()) {
   const state = scheduleState(role, tz, now);
   if (mode === 'always') return { open: state.open, text: 'Always open while switched on' };
   if (mode === 'weekly') {
-    const w = weeklyWindow(role);
-    if (!w) return { open: false, text: 'Weekly schedule not finished' };
-    const days = w.days.slice().sort().map((d) => DAYS[d]).join(', ');
-    const window = `${days}, ${time12(w.start)}–${time12(w.end)}`;
-    if (state.open) return { open: true, text: `Open now · ${window}`, changesAt: state.changesAt };
-    return { open: false, text: state.changesAt ? `Opens ${formatWhen(state.changesAt, tz)} · ${window}` : window, changesAt: state.changesAt };
+    const hours = weeklyHours(role);
+    const n = Object.keys(hours).length;
+    if (!n) return { open: false, text: 'Weekly schedule not finished' };
+    const summary = `${n} day${n === 1 ? '' : 's'} a week`;
+    if (state.open) return { open: true, text: `Open now until ${formatWhen(state.changesAt, tz)} · ${summary}`, changesAt: state.changesAt };
+    return { open: false, text: state.changesAt ? `Opens ${formatWhen(state.changesAt, tz)} · ${summary}` : summary, changesAt: state.changesAt };
   }
   if (state.open) return { open: true, text: state.changesAt ? `Open until ${formatWhen(state.changesAt, tz)}` : 'Open', changesAt: state.changesAt };
   if (state.changesAt) return { open: false, text: `Opens ${formatWhen(state.changesAt, tz)}`, changesAt: state.changesAt };

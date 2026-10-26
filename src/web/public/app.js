@@ -120,3 +120,28 @@ document.querySelectorAll('[data-filter-target]').forEach((input) => {
   const count = document.querySelector('[data-blocked-count]');
   list.addEventListener('change', () => { if (count) count.textContent = list.querySelectorAll('input:checked').length; });
 });
+
+// Weekly hours: enable a day's times only when the day is on; copy Monday's hours
+document.querySelectorAll('[data-day-row]').forEach((row) => {
+  const toggle = row.querySelector('[data-day-toggle]');
+  const times = row.querySelectorAll('input[type=time]');
+  const sync = () => {
+    row.classList.toggle('on', toggle.checked);
+    times.forEach((t) => { t.disabled = !toggle.checked; });
+    if (toggle.checked && !times[0].value) times[0].value = '12:00';
+    if (toggle.checked && !times[1].value) times[1].value = '20:00';
+  };
+  toggle.addEventListener('change', sync);
+});
+document.querySelectorAll('[data-copy-monday]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const grid = btn.closest('[data-mode-panel]').querySelector('.week-grid');
+    const rows = [...grid.querySelectorAll('[data-day-row]')];
+    const [ms, me] = rows[0].querySelectorAll('input[type=time]');
+    rows.slice(1).forEach((r) => {
+      if (!r.querySelector('[data-day-toggle]').checked) return;
+      const [s, e] = r.querySelectorAll('input[type=time]');
+      s.value = ms.value; e.value = me.value;
+    });
+  });
+});

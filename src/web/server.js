@@ -7,7 +7,8 @@ import session from 'express-session';
 import { config } from '../config.js';
 import { pool } from '../db.js';
 import { authRouter, requireLogin } from './auth.js';
-import { routes } from './routes.js';
+import { guildOptions, routes } from './routes.js';
+import { staffRoutes } from './staffRoutes.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -60,7 +61,9 @@ export function startWeb() {
   });
 
   app.use(authRouter);
-  app.use(requireLogin, routes);
+  app.use(requireLogin, (req, res, next) => { res.locals.guildOpts = () => guildOptions(res.locals.guild); next(); });
+  app.use(staffRoutes);
+  app.use(routes);
 
   app.use((req, res) => res.status(404).render('error', { title: 'Not found', message: 'That page does not exist.', user: res.locals.user || null }));
   app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars

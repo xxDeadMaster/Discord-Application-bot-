@@ -76,7 +76,7 @@ export async function startInterview({ submissionId, staffId, staffTag }) {
   }
 
   await setInterview(sub.id, {
-    interview_status: 'active', interview_channel_id: channel.id, interview_by_tag: staffTag,
+    interview_status: 'active', interview_channel_id: channel.id, interview_by: staffId || null, interview_by_tag: staffTag,
     interview_at: new Date(), interview_joined: false,
   });
   active.set(channel.id, { submissionId: sub.id, joined: false, timer: null });

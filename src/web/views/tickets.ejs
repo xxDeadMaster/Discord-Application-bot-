@@ -39,7 +39,7 @@
       <table>
         <thead><tr>
           <% if (isAdmin) { %><th class="check-col"><label class="sr" for="select-all">Select all closed tickets</label><input type="checkbox" id="select-all" data-select-all></th><% } %>
-          <th>Ticket</th><th>Opened by</th><th>Topic</th><th>Status</th><th>Messages</th><th>Opened</th>
+          <th>Ticket</th><th>Type</th><th>Opened by</th><th>Topic</th><th>Claimed by</th><th>Status</th><th>Rating</th><th>Opened</th>
         </tr></thead>
         <tbody>
           <% tickets.forEach(t => { const num = String(t.number).padStart(4, '0'); %>
@@ -48,10 +48,12 @@
                 <% if (t.status === 'closed') { %><label class="sr" for="sel-<%= t.id %>">Select ticket <%= num %></label><input type="checkbox" id="sel-<%= t.id %>" name="ids" value="<%= t.id %>" data-row-check><% } %>
               </td><% } %>
               <td><a class="cell-link" href="/tickets/<%= t.id %>">#<%= num %></a></td>
+              <td class="muted"><%= t.type_name || '—' %></td>
               <td><%= t.opener_tag %></td>
               <td class="clip muted"><%= t.topic %></td>
+              <td class="muted"><%= t.claimed_by_tag || '—' %></td>
               <td><%- include('partials/status', { status: t.status }) %></td>
-              <td class="muted"><%= t.message_count %></td>
+              <td class="muted"><%= t.rating ? t.rating + '/5' : '—' %></td>
               <td class="muted"><time datetime="<%= new Date(t.created_at).toISOString() %>"></time></td>
             </tr>
           <% }) %>

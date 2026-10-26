@@ -60,6 +60,29 @@
   </section>
 
   <section class="card">
+    <h2>Staff management</h2>
+    <p class="muted small">Managers can give strikes and approve leave. People with Manage Server always can.</p>
+    <div class="grid-2">
+      <%- include('partials/select', { name: 'manager_role_id', label: 'Manager role', list: opts.roles, value: settings.manager_role_id,
+          emptyLabel: 'Only Manage Server', help: 'Gets pinged for LOA requests and when someone reaches 3 strikes.' }) %>
+      <%- include('partials/select', { name: 'strike_log_channel_id', label: 'Strike log channel', list: opts.textChannels, value: settings.strike_log_channel_id,
+          help: 'Every strike given or removed is posted here. Keep it staff-only.' }) %>
+    </div>
+    <div class="grid-3">
+      <% [0, 1, 2].forEach(i => { %>
+        <%- include('partials/select', { name: 'strike_role_' + (i + 1), label: 'Role for strike ' + (i + 1), list: opts.roles, value: (settings.strike_role_ids || [])[i] || null,
+            emptyLabel: 'None', help: i === 0 ? 'The bot swaps these as strikes are added or removed.' : '' }) %>
+      <% }) %>
+    </div>
+    <div class="grid-2">
+      <%- include('partials/select', { name: 'loa_role_id', label: 'LOA role', list: opts.roles, value: settings.loa_role_id,
+          emptyLabel: 'None', help: 'Given on the first day of approved leave, removed after the last day.' }) %>
+      <%- include('partials/select', { name: 'loa_channel_id', label: 'LOA requests channel', list: opts.textChannels, value: settings.loa_channel_id,
+          help: 'New requests are posted here with Approve and Deny buttons.' }) %>
+    </div>
+  </section>
+
+  <section class="card">
     <h2>Interviews</h2>
     <%- include('partials/select', { name: 'interview_category_id', label: 'Category for interview voice channels', list: opts.categories, value: settings.interview_category_id,
         emptyLabel: 'Same as tickets', help: 'Temporary voice channels made by the Interview button go here and delete themselves when everyone leaves.' }) %>
@@ -85,6 +108,11 @@
           emptyLabel: 'No category (top of the list)', help: 'New ticket channels are created inside this category.' }) %>
       <%- include('partials/select', { name: 'ticket_log_channel_id', label: 'Ticket log channel', list: opts.textChannels, value: settings.ticket_log_channel_id,
           help: 'Closed tickets are posted here with a transcript file. Keep it staff-only.' }) %>
+    </div>
+    <div class="field field-short">
+      <label for="auto_close_hours">Close tickets after this many hours with no messages</label>
+      <input id="auto_close_hours" name="auto_close_hours" type="number" min="0" max="720" value="<%= settings.auto_close_hours %>">
+      <p class="help">The bot warns first, then closes 1 hour later if nobody replies. Set to 0 to turn this off.</p>
     </div>
     <div class="field">
       <label for="ticket_panel_title">Panel title</label>

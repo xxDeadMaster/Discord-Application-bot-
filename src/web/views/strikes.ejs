@@ -1,0 +1,67 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Strikes</h1>
+    <p>Give or remove staff strikes. The bot gives the matching strike role (1, 2 or 3), DMs the person and posts in your strike log. Staff can also use <code>/strike</code> in Discord.</p>
+  </div>
+</div>
+
+<% if (!rolesSet) { %>
+  <div class="flash flash-error"><%- include('partials/icon', { name: 'alert' }) %><span>No strike roles are set yet, so strikes are recorded but no role changes. Pick them in Settings → Staff management.</span></div>
+<% } %>
+
+<section class="card">
+  <h2>Give a strike</h2>
+  <form method="post" action="/strikes" data-confirm="Give this staff member a strike? They'll get a DM.">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid-2">
+      <div class="field">
+        <label for="user_id">Staff member</label>
+        <select id="user_id" name="user_id" required>
+          <option value="">Choose…</option>
+          <% members.forEach(m => { %><option value="<%= m.id %>"><%= m.name %><%= activeByUser.get(m.id) ? ` (${activeByUser.get(m.id)} active)` : '' %></option><% }) %>
+        </select>
+        <% if (!members.length) { %><p class="help">No staff found. Set a staff role in Settings, and turn on Server Members Intent.</p><% } %>
+      </div>
+      <div class="field">
+        <label for="reason">Reason</label>
+        <input id="reason" name="reason" maxlength="500" required placeholder="What happened">
+      </div>
+    </div>
+    <button class="btn btn-danger" type="submit"><%- include('partials/icon', { name: 'alert', size: 16 }) %> Give strike</button>
+  </form>
+</section>
+
+<section class="card flush">
+  <div class="bulk-bar"><span class="muted">Strike history</span></div>
+  <% if (!strikes.length) { %>
+    <p class="muted pad">No strikes yet.</p>
+  <% } else { %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Staff member</th><th>Reason</th><th>Given by</th><th>When</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <% strikes.forEach(s => { %>
+          <tr>
+            <td class="muted"><%= s.id %></td>
+            <td><strong><%= s.user_tag %></strong><br><span class="muted small"><%= activeByUser.get(s.user_id) || 0 %> active</span></td>
+            <td class="clip" title="<%= s.reason %>"><%= s.reason %></td>
+            <td class="muted"><%= s.issued_by_tag %></td>
+            <td class="muted"><time datetime="<%= new Date(s.created_at).toISOString() %>"></time></td>
+            <td><% if (s.revoked_at) { %><span class="pill pill-off">Removed</span><br><span class="muted small">by <%= s.revoked_by_tag %></span><% } else { %><span class="pill pill-denied">Active</span><% } %></td>
+            <td>
+              <% if (!s.revoked_at) { %>
+              <form method="post" action="/strikes/<%= s.id %>/remove" data-confirm="Remove strike #<%= s.id %> from <%= s.user_tag %>?">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button class="btn btn-ghost btn-sm" type="submit">Remove</button>
+              </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</section>
+<%- include('partials/foot') %>

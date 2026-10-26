@@ -141,3 +141,77 @@ CREATE TABLE IF NOT EXISTS submission_votes (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (submission_id, user_id)
 );
+
+-- Per-day weekly hours for applications: { "0": { "start": "12:00", "end": "20:00" }, ... } (0 = Sunday)
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS weekly_hours JSONB NOT NULL DEFAULT '{}';
+UPDATE app_categories
+   SET weekly_hours = (SELECT jsonb_object_agg(d::text, jsonb_build_object('start', weekly_start, 'end', weekly_end)) FROM unnest(weekly_days) AS d)
+ WHERE weekly_hours = '{}'::jsonb AND cardinality(weekly_days) > 0 AND weekly_start IS NOT NULL AND weekly_end IS NOT NULL;
+
+-- Ticket types (Support, Report a Player, ...), each with up to 5 questions
+CREATE TABLE IF NOT EXISTS ticket_types (
+  id            SERIAL PRIMARY KEY,
+  guild_id      TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  description   TEXT NOT NULL DEFAULT '',
+  questions     TEXT[] NOT NULL DEFAULT '{}',
+  staff_role_id TEXT,
+  category_id   TEXT,
+  position      INTEGER NOT NULL DEFAULT 0,
+  enabled       BOOLEAN NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS type_id INTEGER REFERENCES ticket_types(id) ON DELETE SET NULL;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS type_name TEXT;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS answers JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS claimed_by TEXT;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS claimed_by_tag TEXT;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS welcome_message_id TEXT;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS rating INTEGER;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS rated_at TIMESTAMPTZ;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS auto_close_hours INTEGER NOT NULL DEFAULT 48;
+
+-- Who started an interview (for staff stats)
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS interview_by TEXT;
+
+-- Staff management: who can issue strikes / approve LOA, strike roles (1..3), LOA role and channels
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS manager_role_id TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS strike_role_ids TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS strike_log_channel_id TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS loa_role_id TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS loa_channel_id TEXT;
+
+CREATE TABLE IF NOT EXISTS strikes (
+  id             SERIAL PRIMARY KEY,
+  guild_id       TEXT NOT NULL,
+  user_id        TEXT NOT NULL,
+  user_tag       TEXT NOT NULL,
+  reason         TEXT NOT NULL,
+  issued_by      TEXT,
+  issued_by_tag  TEXT NOT NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  revoked_at     TIMESTAMPTZ,
+  revoked_by_tag TEXT
+);
+CREATE INDEX IF NOT EXISTS strikes_user_idx ON strikes (guild_id, user_id);
+
+-- LOA requests: 'pending' | 'approved' | 'denied' | 'ended' | 'cancelled'
+CREATE TABLE IF NOT EXISTS loa_requests (
+  id                 SERIAL PRIMARY KEY,
+  guild_id           TEXT NOT NULL,
+  user_id            TEXT NOT NULL,
+  user_tag           TEXT NOT NULL,
+  start_date         DATE NOT NULL,
+  end_date           DATE NOT NULL,
+  reason             TEXT NOT NULL DEFAULT '',
+  status             TEXT NOT NULL DEFAULT 'pending',
+  role_applied       BOOLEAN NOT NULL DEFAULT false,
+  reviewed_by        TEXT,
+  reviewed_by_tag    TEXT,
+  reviewed_at        TIMESTAMPTZ,
+  message_channel_id TEXT,
+  message_id         TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS loa_status_idx ON loa_requests (guild_id, status);

@@ -2,6 +2,9 @@ import fs from 'node:fs';
 import pg from 'pg';
 import { config } from './config.js';
 
+// Return DATE columns as plain 'YYYY-MM-DD' strings (no timezone shifting)
+pg.types.setTypeParser(1082, (v) => v);
+
 export const pool = new pg.Pool({
   connectionString: config.databaseUrl,
   ssl: config.databaseSsl ? { rejectUnauthorized: false } : undefined,
@@ -39,6 +42,7 @@ const SETTINGS_FIELDS = [
   'ticket_log_channel_id', 'staff_role_id', 'apply_panel_message_id', 'ticket_panel_message_id',
   'apply_panel_title', 'apply_panel_description', 'ticket_panel_title', 'ticket_panel_description',
   'apply_cooldown_days', 'blocked_role_ids', 'interview_category_id', 'timezone',
+  'auto_close_hours', 'manager_role_id', 'strike_role_ids', 'strike_log_channel_id', 'loa_role_id', 'loa_channel_id',
 ];
 
 export async function updateSettings(patch, guildId = config.guildId) {
@@ -176,14 +180,40 @@ export async function listSubmissions({ status, roleId, search, limit = 50, offs
 
 /* ---------- Tickets ---------- */
 
-export async function createTicket({ openerId, openerTag, topic }) {
+export async function createTicket({ openerId, openerTag, topic, typeId = null, typeName = null, answers = [] }) {
   const { rows } = await query(
-    `INSERT INTO tickets (guild_id, number, opener_id, opener_tag, topic)
-     VALUES ($1, (SELECT COALESCE(MAX(number), 0) + 1 FROM tickets WHERE guild_id = $1), $2, $3, $4)
+    `INSERT INTO tickets (guild_id, number, opener_id, opener_tag, topic, type_id, type_name, answers)
+     VALUES ($1, (SELECT COALESCE(MAX(number), 0) + 1 FROM tickets WHERE guild_id = $1), $2, $3, $4, $5, $6, $7)
      RETURNING *`,
-    [config.guildId, openerId, openerTag, topic],
+    [config.guildId, openerId, openerTag, topic, typeId, typeName, JSON.stringify(answers)],
   );
   return rows[0];
+}
+
+export async function updateTicket(id, fields) {
+  const allowed = ['claimed_by', 'claimed_by_tag', 'claimed_at', 'welcome_message_id', 'rating', 'rated_at'];
+  const keys = Object.keys(fields).filter((k) => allowed.includes(k));
+  if (!keys.length) return getTicket(id);
+  const { rows } = await query(
+    `UPDATE tickets SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`,
+    [id, ...keys.map((k) => fields[k])],
+  );
+  return rows[0] || null;
+}
+
+/* ---------- Ticket types ---------- */
+
+export async function listTicketTypes({ enabledOnly = false } = {}) {
+  const { rows } = await query(
+    `SELECT * FROM ticket_types WHERE guild_id = $1 ${enabledOnly ? 'AND enabled' : ''} ORDER BY position, id`,
+    [config.guildId],
+  );
+  return rows;
+}
+
+export async function getTicketType(id) {
+  const { rows } = await query('SELECT * FROM ticket_types WHERE id = $1 AND guild_id = $2', [id, config.guildId]);
+  return rows[0] || null;
 }
 
 export async function setTicketChannel(id, channelId) {
@@ -261,7 +291,8 @@ export async function dashboardCounts() {
        (SELECT count(*)::int FROM submissions WHERE guild_id = $1 AND status = 'pending') AS pending,
        (SELECT count(*)::int FROM submissions WHERE guild_id = $1) AS submissions,
        (SELECT count(*)::int FROM tickets WHERE guild_id = $1 AND status = 'open') AS open_tickets,
-       (SELECT count(*)::int FROM tickets WHERE guild_id = $1) AS tickets`,
+       (SELECT count(*)::int FROM tickets WHERE guild_id = $1) AS tickets,
+       (SELECT count(*)::int FROM loa_requests WHERE guild_id = $1 AND status = 'pending') AS pending_loa`,
     [config.guildId],
   );
   return rows[0];
@@ -323,7 +354,7 @@ export async function voteTally(submissionId) {
 /* ---------- Interviews ---------- */
 
 export async function setInterview(submissionId, fields) {
-  const keys = Object.keys(fields).filter((k) => ['interview_status', 'interview_channel_id', 'interview_by_tag', 'interview_at', 'interview_joined'].includes(k));
+  const keys = Object.keys(fields).filter((k) => ['interview_status', 'interview_channel_id', 'interview_by', 'interview_by_tag', 'interview_at', 'interview_joined'].includes(k));
   if (!keys.length) return null;
   const { rows } = await query(
     `UPDATE submissions SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`,
@@ -339,5 +370,94 @@ export async function getSubmissionByInterviewChannel(channelId) {
 
 export async function listActiveInterviews() {
   const { rows } = await query(`SELECT * FROM submissions WHERE guild_id = $1 AND interview_status = 'active'`, [config.guildId]);
+  return rows;
+}
+
+/* ---------- Strikes ---------- */
+
+export async function addStrike({ userId, userTag, reason, issuedBy, issuedByTag }) {
+  const { rows } = await query(
+    `INSERT INTO strikes (guild_id, user_id, user_tag, reason, issued_by, issued_by_tag) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [config.guildId, userId, userTag, reason, issuedBy, issuedByTag],
+  );
+  return rows[0];
+}
+
+export async function activeStrikes(userId) {
+  const { rows } = await query(
+    `SELECT * FROM strikes WHERE guild_id = $1 AND user_id = $2 AND revoked_at IS NULL ORDER BY created_at`,
+    [config.guildId, userId],
+  );
+  return rows;
+}
+
+export async function revokeStrike(id, byTag) {
+  const { rows } = await query(
+    `UPDATE strikes SET revoked_at = now(), revoked_by_tag = $3 WHERE id = $1 AND guild_id = $2 AND revoked_at IS NULL RETURNING *`,
+    [id, config.guildId, byTag],
+  );
+  return rows[0] || null;
+}
+
+export async function listStrikes({ userId, includeRevoked = true, limit = 200 } = {}) {
+  const where = ['guild_id = $1'];
+  const params = [config.guildId];
+  if (userId) { params.push(userId); where.push(`user_id = $${params.length}`); }
+  if (!includeRevoked) where.push('revoked_at IS NULL');
+  params.push(limit);
+  const { rows } = await query(`SELECT * FROM strikes WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT $${params.length}`, params);
+  return rows;
+}
+
+/* ---------- LOA ---------- */
+
+export async function createLoa({ userId, userTag, startDate, endDate, reason }) {
+  const { rows } = await query(
+    `INSERT INTO loa_requests (guild_id, user_id, user_tag, start_date, end_date, reason) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [config.guildId, userId, userTag, startDate, endDate, reason],
+  );
+  return rows[0];
+}
+
+export async function getLoa(id) {
+  const { rows } = await query('SELECT * FROM loa_requests WHERE id = $1 AND guild_id = $2', [id, config.guildId]);
+  return rows[0] || null;
+}
+
+export async function updateLoa(id, fields) {
+  const allowed = ['status', 'role_applied', 'reviewed_by', 'reviewed_by_tag', 'reviewed_at', 'message_channel_id', 'message_id'];
+  const keys = Object.keys(fields).filter((k) => allowed.includes(k));
+  if (!keys.length) return getLoa(id);
+  const { rows } = await query(
+    `UPDATE loa_requests SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`,
+    [id, ...keys.map((k) => fields[k])],
+  );
+  return rows[0] || null;
+}
+
+/** Pending -> approved/denied, only if still pending. */
+export async function decideLoaRow(id, status, byId, byTag) {
+  const { rows } = await query(
+    `UPDATE loa_requests SET status = $2, reviewed_by = $3, reviewed_by_tag = $4, reviewed_at = now()
+      WHERE id = $1 AND guild_id = $5 AND status = 'pending' RETURNING *`,
+    [id, status, byId, byTag, config.guildId],
+  );
+  return rows[0] || null;
+}
+
+export async function findOpenLoa(userId) {
+  const { rows } = await query(
+    `SELECT * FROM loa_requests WHERE guild_id = $1 AND user_id = $2 AND status IN ('pending', 'approved') ORDER BY created_at DESC LIMIT 1`,
+    [config.guildId, userId],
+  );
+  return rows[0] || null;
+}
+
+export async function listLoas({ status, limit = 200 } = {}) {
+  const params = [config.guildId];
+  let where = 'guild_id = $1';
+  if (status) { params.push(status); where += ` AND status = $${params.length}`; }
+  params.push(limit);
+  const { rows } = await query(`SELECT * FROM loa_requests WHERE ${where} ORDER BY created_at DESC LIMIT $${params.length}`, params);
   return rows;
 }

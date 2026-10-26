@@ -100,6 +100,7 @@ export async function requireLogin(req, res, next) {
     res.locals.member = member;
     res.locals.guild = guild;
     res.locals.isAdmin = member.permissions.has(PermissionFlagsBits.ManageGuild);
+    res.locals.isManager = res.locals.isAdmin || Boolean(settings.manager_role_id && member.roles.cache.has(settings.manager_role_id));
     res.locals.navCounts = await dashboardCounts();
     next();
   } catch (err) {

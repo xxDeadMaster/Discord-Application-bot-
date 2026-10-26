@@ -21,7 +21,7 @@ export const BOT_PERMISSIONS =
   PermissionFlagsBits.ManageRoles;
 
 export function inviteUrl() {
-  return `https://discord.com/oauth2/authorize?client_id=${config.clientId}&scope=bot&permissions=${BOT_PERMISSIONS.toString()}&guild_id=${config.guildId}`;
+  return `https://discord.com/oauth2/authorize?client_id=${config.clientId}&scope=bot%20applications.commands&permissions=${BOT_PERMISSIONS.toString()}&guild_id=${config.guildId}`;
 }
 
 export function truncate(text, max) {

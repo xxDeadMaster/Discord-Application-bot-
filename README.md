@@ -14,8 +14,15 @@ A Discord bot for staff applications and support tickets, with a web dashboard t
 - **Interviews:** an Interview button makes a private temporary voice channel, DMs the applicant a join link, posts their answers in the channel chat, and deletes the channel when everyone leaves (or after 30 minutes if nobody joins).
 
 **Tickets**
-- An "Open a ticket" button in its own channel. The user types what they need, and the bot makes a private channel for them and your staff.
+- Ticket types (Support, Report a Player, Partnership, Punishment Appeal, or your own), each with up to 5 questions, its own staff role and category.
+- A private channel per ticket with **Claim** and **Close** buttons. Inactive tickets get a warning and then close on their own (hours set in Settings).
+- After closing, the member gets a 1–5 star rating in their DMs. Ratings count toward whoever claimed the ticket.
 - Closing a ticket saves the full transcript, posts it to a log channel as a file, and DMs the user a copy.
+
+**Staff management**
+- `/strike add|remove|list`: the bot gives the matching strike role (1–3), DMs the person, logs it, and pings managers at 3.
+- `/loa request|end`: managers approve or deny in a channel or on the dashboard; the LOA role is added on the first day and removed after the last.
+- Staff activity page: reviews, votes, interviews, tickets claimed and closed, average rating, strikes and LOA, for 7 days, 30 days or all time.
 
 **Dashboard** (sign in with Discord, staff only)
 - Add and edit categories, roles and questions. The panel in Discord updates by itself.
@@ -34,7 +41,7 @@ You'll do this once. It takes about 20 minutes.
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and click **New Application**. Name it.
 2. **Bot** tab:
    - Click **Reset Token** and copy the token. This is `DISCORD_TOKEN`. Treat it like a password: anyone with it controls your bot.
-   - Under **Privileged Gateway Intents**, turn on **Message Content Intent** (needed for ticket transcripts).
+   - Under **Privileged Gateway Intents**, turn on **Message Content Intent** (ticket transcripts) and **Server Members Intent** (staff lists, strikes and activity stats).
 3. **OAuth2** tab:
    - Copy the **Client ID** (`DISCORD_CLIENT_ID`) and **Client Secret** (`DISCORD_CLIENT_SECRET`).
    - Leave this tab open. You'll add a Redirect URL in step 3.
