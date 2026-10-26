@@ -3,11 +3,13 @@ import {
   TextInputBuilder, TextInputStyle,
 } from 'discord.js';
 import { config } from '../config.js';
+import { describeSchedule, isCategoryOpen } from '../schedule.js';
 import {
   createSubmission, findLastDenied, findPendingSubmission, getCategory, getRole, getSettings, getSubmission,
-  listQuestions, listRoles, reviewSubmission, setSubmissionMessage,
+  listQuestions, listRoles, reviewSubmission, setSubmissionMessage, toggleVote, voteTally,
 } from '../db.js';
 import { client, getGuild } from './client.js';
+import { startInterview } from './interviews.js';
 import { COLORS, answerFields, dashboardLink, ephemeral, isStaff, truncate, unix } from './ui.js';
 
 /**
@@ -22,6 +24,16 @@ function endSession(userId) {
   sessions.delete(userId);
   return s;
 }
+
+/** The first blocked role this member has, or null. */
+function blockedRole(member, settings) {
+  const blocked = settings.blocked_role_ids || [];
+  const cache = member?.roles?.cache;
+  if (!cache || !blocked.length) return null;
+  return blocked.find((id) => cache.has(id)) || null;
+}
+
+const BLOCKED_MESSAGE = "You're not allowed to apply right now. If you think this is a mistake, open a ticket.";
 
 function armTimer(userId) {
   const s = sessions.get(userId);
@@ -62,10 +74,18 @@ function reviewMessage(s) {
 
 export async function handleCategorySelect(interaction) {
   const categoryId = Number(interaction.values[0]);
+  const settings = await getSettings();
+  const tz = settings.timezone;
   const category = await getCategory(categoryId);
-  const roles = category?.enabled ? (await listRoles(categoryId, { enabledOnly: true })).filter((r) => r.question_count > 0) : [];
+  const open = isCategoryOpen(category, tz);
+  const roles = open ? (await listRoles(categoryId, { enabledOnly: true })).filter((r) => r.question_count > 0) : [];
 
-  if (!roles.length) {
+  if (blockedRole(interaction.member, settings)) {
+    await interaction.reply({ content: BLOCKED_MESSAGE, flags: ephemeral });
+  } else if (category?.enabled && !open) {
+    const d = describeSchedule(category, tz);
+    await interaction.reply({ content: `**${category.name}** is closed right now.${d.changesAt ? ` It opens <t:${unix(d.changesAt)}:F>.` : ''}`, flags: ephemeral });
+  } else if (!roles.length) {
     await interaction.reply({ content: 'Nothing is open in that category right now.', flags: ephemeral });
   } else {
     const select = new StringSelectMenuBuilder()
@@ -95,6 +115,14 @@ export async function handleRoleSelect(interaction) {
   const role = await getRole(Number(interaction.values[0]));
   if (!role || !role.enabled) return say('That role is not open anymore.');
 
+  const settings = await getSettings();
+  if (blockedRole(interaction.member, settings)) return say(BLOCKED_MESSAGE);
+  const category = await getCategory(role.category_id);
+  if (!isCategoryOpen(category, settings.timezone)) {
+    const d = category ? describeSchedule(category, settings.timezone) : {};
+    return say(`**${category?.name || 'That application'}** is closed right now.${d.changesAt ? ` It opens <t:${unix(d.changesAt)}:F>.` : ''}`);
+  }
+
   if (sessions.has(userId)) return say('You already have an application going in your DMs. Finish it, or type **cancel** there first.');
 
   const pending = await findPendingSubmission(userId);
@@ -104,7 +132,6 @@ export async function handleRoleSelect(interaction) {
     return say(`You already have the **${role.name}** role.`);
   }
 
-  const settings = await getSettings();
   const lastDenied = await findLastDenied(userId, role.id);
   if (lastDenied && settings.apply_cooldown_days > 0) {
     const until = new Date(new Date(lastDenied.reviewed_at).getTime() + settings.apply_cooldown_days * 86400000);
@@ -215,6 +242,11 @@ export async function handleDmButton(interaction) {
   if (!role) {
     return interaction.followUp('That role was removed while you were applying, so the application could not be submitted.');
   }
+  const settingsNow = await getSettings();
+  if ((settingsNow.blocked_role_ids || []).length) {
+    const member = await (await getGuild()).members.fetch(s.userId).catch(() => null);
+    if (blockedRole(member, settingsNow)) return interaction.followUp(BLOCKED_MESSAGE);
+  }
 
   const sub = await createSubmission({
     userId: s.userId, userTag: interaction.user.tag, roleId: role.id, roleName: role.name,
@@ -228,15 +260,22 @@ export async function handleDmButton(interaction) {
 
 /* ---------- Staff review ---------- */
 
-export function submissionMessage(sub) {
+/** Builds the staff card for a submission. tally = { yes, no } from voteTally(). */
+export function submissionMessage(sub, tally = { yes: 0, no: 0 }) {
   const { fields, cut } = answerFields(sub.answers, { budget: 4200 });
   const color = { pending: COLORS.pending, accepted: COLORS.accepted, denied: COLORS.denied }[sub.status] ?? COLORS.muted;
   const url = dashboardLink(`/submissions/${sub.id}`);
+
+  const lines = [`**Staff votes:** ${tally.yes} yes · ${tally.no} no`];
+  if (sub.interview_status === 'active' && sub.interview_channel_id) lines.push(`**Interview:** in progress in <#${sub.interview_channel_id}> (started by ${sub.interview_by_tag})`);
+  if (sub.interview_status === 'done') lines.push(`**Interview:** held${sub.interview_by_tag ? ` (started by ${sub.interview_by_tag})` : ''}`);
+  if (sub.interview_status === 'expired') lines.push('**Interview:** nobody joined, channel removed');
 
   const embed = new EmbedBuilder()
     .setColor(color)
     .setTitle(truncate(`New application · ${sub.role_name}`, 256))
     .setURL(url)
+    .setDescription(lines.join('\n'))
     .addFields(
       { name: 'Applicant', value: `<@${sub.user_id}> (${sub.user_tag})`, inline: true },
       { name: 'Category', value: truncate(sub.category_name, 1024), inline: true },
@@ -253,17 +292,40 @@ export function submissionMessage(sub) {
     });
   }
 
-  const buttons = [];
+  const rows = [];
+  const link = url.startsWith('https://') ? new ButtonBuilder().setLabel('Open on dashboard').setStyle(ButtonStyle.Link).setURL(url) : null;
   if (sub.status === 'pending') {
-    buttons.push(
+    const interviewing = sub.interview_status === 'active';
+    rows.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`sub:vote:yes:${sub.id}`).setLabel(`Vote yes · ${tally.yes}`).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`sub:vote:no:${sub.id}`).setLabel(`Vote no · ${tally.no}`).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`sub:interview:${sub.id}`)
+        .setLabel(interviewing ? 'Interview running' : sub.interview_status ? 'New interview' : 'Interview')
+        .setStyle(ButtonStyle.Primary),
+    ));
+    const second = [
       new ButtonBuilder().setCustomId(`sub:accept:${sub.id}`).setLabel('Accept').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`sub:deny:${sub.id}`).setLabel('Deny').setStyle(ButtonStyle.Danger),
-    );
+    ];
+    if (link) second.push(link);
+    rows.push(new ActionRowBuilder().addComponents(second));
+  } else if (link) {
+    rows.push(new ActionRowBuilder().addComponents(link));
   }
-  if (url.startsWith('https://')) {
-    buttons.push(new ButtonBuilder().setLabel('Open on dashboard').setStyle(ButtonStyle.Link).setURL(url));
+  return { embeds: [embed], components: rows };
+}
+
+/** Re-renders a submission's staff card in Discord (after a vote, interview or decision). */
+export async function refreshCard(submissionId) {
+  const sub = await getSubmission(submissionId);
+  if (!sub?.review_channel_id || !sub.review_message_id) return;
+  try {
+    const channel = await client.channels.fetch(sub.review_channel_id);
+    const msg = await channel.messages.fetch(sub.review_message_id);
+    await msg.edit(submissionMessage(sub, await voteTally(sub.id)));
+  } catch (err) {
+    console.warn(`[apply] could not update review message for #${sub.id}:`, err.message);
   }
-  return { embeds: [embed], components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : [] };
 }
 
 async function postSubmission(sub, role) {
@@ -276,6 +338,17 @@ async function postSubmission(sub, role) {
   const channel = await client.channels.fetch(channelId);
   const msg = await channel.send(submissionMessage(sub));
   await setSubmissionMessage(sub.id, channel.id, msg.id);
+}
+
+/** Staff vote from Discord or the website. Returns { ok, error?, vote, tally }. */
+export async function castVote({ submissionId, userId, userTag, vote }) {
+  if (!['yes', 'no'].includes(vote)) return { ok: false, error: 'Unknown vote.' };
+  const sub = await getSubmission(submissionId);
+  if (!sub) return { ok: false, error: 'Application not found.' };
+  if (sub.status !== 'pending') return { ok: false, error: `Voting is closed: this application was already ${sub.status}.` };
+  const now = await toggleVote(submissionId, userId, userTag, vote);
+  await refreshCard(submissionId);
+  return { ok: true, vote: now, tally: await voteTally(submissionId) };
 }
 
 /**
@@ -322,15 +395,7 @@ export async function decideSubmission({ submissionId, decision, reviewerId, rev
     notes.push('Could not DM the applicant (their DMs may be closed).');
   }
 
-  if (sub.review_channel_id && sub.review_message_id) {
-    try {
-      const channel = await client.channels.fetch(sub.review_channel_id);
-      const msg = await channel.messages.fetch(sub.review_message_id);
-      await msg.edit(submissionMessage(sub));
-    } catch (err) {
-      console.warn(`[apply] could not update review message for #${sub.id}:`, err.message);
-    }
-  }
+  await refreshCard(sub.id);
 
   return { ok: true, sub, notes };
 }
@@ -343,8 +408,23 @@ async function requireStaff(interaction) {
 }
 
 export async function handleReviewButton(interaction) {
-  const [, action, id] = interaction.customId.split(':');
+  const parts = interaction.customId.split(':');
+  const action = parts[1];
+  const id = parts.at(-1);
   if (!(await requireStaff(interaction))) return;
+
+  if (action === 'vote') {
+    await interaction.deferReply({ flags: ephemeral });
+    const r = await castVote({ submissionId: Number(id), userId: interaction.user.id, userTag: interaction.user.tag, vote: parts[2] });
+    if (!r.ok) return interaction.editReply(r.error);
+    return interaction.editReply(`${r.vote ? `You voted **${r.vote}**.` : 'Your vote was removed.'} Votes now: ${r.tally.yes} yes · ${r.tally.no} no.`);
+  }
+
+  if (action === 'interview') {
+    await interaction.deferReply({ flags: ephemeral });
+    const r = await startInterview({ submissionId: Number(id), staffId: interaction.user.id, staffTag: interaction.user.tag });
+    return interaction.editReply(r.ok ? `Interview channel ready: <#${r.channelId}>. ${r.notes.join(' ')}` : r.error);
+  }
 
   if (action === 'deny') {
     const modal = new ModalBuilder()

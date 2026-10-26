@@ -8,6 +8,10 @@ A Discord bot for staff applications and support tickets, with a web dashboard t
 - Finished applications land in your submissions channel with **Accept** / **Deny** buttons.
 - Accepting can give a Discord role automatically. The applicant gets a DM either way.
 - Built in: one application at a time, a cooldown after a denial, a 15-minute timeout in DMs, and a clear message when someone has DMs turned off.
+- **Blocked roles:** members with roles you pick in Settings (e.g. "BANNED FROM APPLYING") can't apply.
+- **Schedules:** each application (category) can be always open, open between two dates, or open on set days and times each week. It disappears from the panel while closed and comes back by itself.
+- **Staff voting:** Vote yes / Vote no buttons on every submission, with the tally on the card and the dashboard.
+- **Interviews:** an Interview button makes a private temporary voice channel, DMs the applicant a join link, posts their answers in the channel chat, and deletes the channel when everyone leaves (or after 30 minutes if nobody joins).
 
 **Tickets**
 - An "Open a ticket" button in its own channel. The user types what they need, and the bot makes a private channel for them and your staff.

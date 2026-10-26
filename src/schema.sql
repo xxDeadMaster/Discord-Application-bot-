@@ -109,3 +109,35 @@ CREATE TABLE IF NOT EXISTS ticket_messages (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ticket_messages_ticket_idx ON ticket_messages (ticket_id, created_at);
+
+-- ---------- Added later (safe to re-run) ----------
+
+-- Roles that may not apply; interview voice channel category; timezone for schedules
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS blocked_role_ids TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS interview_category_id TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'America/New_York';
+
+-- Open/close schedule for a whole application (category): 'always' | 'dates' | 'weekly'
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS schedule_mode TEXT NOT NULL DEFAULT 'always';
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS open_at TIMESTAMPTZ;
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS close_at TIMESTAMPTZ;
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS weekly_days INTEGER[] NOT NULL DEFAULT '{}';
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS weekly_start TEXT;
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS weekly_end TEXT;
+
+-- Interviews: 'active' | 'done' | 'expired'
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS interview_status TEXT;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS interview_channel_id TEXT;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS interview_by_tag TEXT;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS interview_at TIMESTAMPTZ;
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS interview_joined BOOLEAN NOT NULL DEFAULT false;
+
+-- Staff votes on submissions: 'yes' | 'no'
+CREATE TABLE IF NOT EXISTS submission_votes (
+  submission_id INTEGER NOT NULL REFERENCES submissions(id) ON DELETE CASCADE,
+  user_id       TEXT NOT NULL,
+  user_tag      TEXT NOT NULL,
+  vote          TEXT NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (submission_id, user_id)
+);

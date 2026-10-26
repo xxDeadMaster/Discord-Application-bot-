@@ -51,6 +51,52 @@
     </section>
 
     <section class="card">
+      <div class="card-head">
+        <h2>Staff votes</h2>
+        <span class="muted small"><%= votes.filter(v => v.vote === 'yes').length %> yes · <%= votes.filter(v => v.vote === 'no').length %> no</span>
+      </div>
+      <% const yes = votes.filter(v => v.vote === 'yes').length, total = votes.length; %>
+      <div class="vote-bar" aria-hidden="true"><span style="width: <%= total ? Math.round(yes / total * 100) : 0 %>%"></span></div>
+      <% if (votes.length) { %>
+        <ul class="voters">
+          <% votes.forEach(v => { %>
+            <li><span class="pill <%= v.vote === 'yes' ? 'pill-accepted' : 'pill-denied' %>"><%= v.vote === 'yes' ? 'Yes' : 'No' %></span> <%= v.user_tag %></li>
+          <% }) %>
+        </ul>
+      <% } else { %>
+        <p class="muted small">No votes yet.</p>
+      <% } %>
+      <% if (sub.status === 'pending') { %>
+        <form method="post" action="/submissions/<%= sub.id %>/vote" class="actions" style="margin-top: 12px;">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="btn btn-sm <%= myVote === 'yes' ? 'btn-success' : 'btn-ghost' %>" type="submit" name="vote" value="yes" aria-pressed="<%= myVote === 'yes' %>"><%- include('partials/icon', { name: 'check', size: 15 }) %> Vote yes</button>
+          <button class="btn btn-sm <%= myVote === 'no' ? 'btn-danger' : 'btn-ghost' %>" type="submit" name="vote" value="no" aria-pressed="<%= myVote === 'no' %>"><%- include('partials/icon', { name: 'x', size: 15 }) %> Vote no</button>
+        </form>
+        <p class="help" style="margin-top: 8px;">Click your vote again to take it back. Votes close once the application is accepted or denied.</p>
+      <% } %>
+    </section>
+
+    <section class="card">
+      <h2>Interview</h2>
+      <% if (sub.interview_status === 'active') { %>
+        <p>Running now in Discord<% if (sub.interview_by_tag) { %>, started by <strong><%= sub.interview_by_tag %></strong><% } %>.</p>
+        <p class="muted small">The voice channel deletes itself when everyone leaves, or after 30 minutes if nobody joins.</p>
+      <% } else if (sub.interview_status === 'done') { %>
+        <p>Held<% if (sub.interview_by_tag) { %> (started by <strong><%= sub.interview_by_tag %></strong>)<% } %>.</p>
+      <% } else if (sub.interview_status === 'expired') { %>
+        <p class="muted">The last interview channel was removed because nobody joined.</p>
+      <% } else { %>
+        <p class="muted small">Opens a private temporary voice channel for the applicant and staff. The applicant gets a DM to join, and their answers are posted in the channel chat.</p>
+      <% } %>
+      <% if (sub.status === 'pending' && sub.interview_status !== 'active') { %>
+        <form method="post" action="/submissions/<%= sub.id %>/interview">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="btn btn-primary btn-sm" type="submit"><%- include('partials/icon', { name: 'user', size: 15 }) %> <%= sub.interview_status ? 'Start a new interview' : 'Start interview' %></button>
+        </form>
+      <% } %>
+    </section>
+
+    <section class="card">
       <h2>Their other applications</h2>
       <% if (!history.length) { %>
         <p class="muted" style="margin: 0;">None.</p>

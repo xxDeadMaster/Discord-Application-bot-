@@ -38,7 +38,7 @@ const SETTINGS_FIELDS = [
   'apply_channel_id', 'submissions_channel_id', 'ticket_channel_id', 'ticket_category_id',
   'ticket_log_channel_id', 'staff_role_id', 'apply_panel_message_id', 'ticket_panel_message_id',
   'apply_panel_title', 'apply_panel_description', 'ticket_panel_title', 'ticket_panel_description',
-  'apply_cooldown_days',
+  'apply_cooldown_days', 'blocked_role_ids', 'interview_category_id', 'timezone',
 ];
 
 export async function updateSettings(patch, guildId = config.guildId) {
@@ -291,4 +291,53 @@ export async function deleteClosedTickets(ids) {
     [config.guildId, list],
   );
   return { deleted: rows.length, skippedOpen: list.length - rows.length };
+}
+
+/* ---------- Votes ---------- */
+
+/** Sets (or clears, when it matches the current vote) a staff member's vote. Returns the new vote or null. */
+export async function toggleVote(submissionId, userId, userTag, vote) {
+  const { rows } = await query('SELECT vote FROM submission_votes WHERE submission_id = $1 AND user_id = $2', [submissionId, userId]);
+  if (rows[0]?.vote === vote) {
+    await query('DELETE FROM submission_votes WHERE submission_id = $1 AND user_id = $2', [submissionId, userId]);
+    return null;
+  }
+  await query(
+    `INSERT INTO submission_votes (submission_id, user_id, user_tag, vote) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (submission_id, user_id) DO UPDATE SET vote = EXCLUDED.vote, user_tag = EXCLUDED.user_tag, created_at = now()`,
+    [submissionId, userId, userTag, vote],
+  );
+  return vote;
+}
+
+export async function listVotes(submissionId) {
+  const { rows } = await query('SELECT * FROM submission_votes WHERE submission_id = $1 ORDER BY created_at', [submissionId]);
+  return rows;
+}
+
+export async function voteTally(submissionId) {
+  const votes = await listVotes(submissionId);
+  return { yes: votes.filter((v) => v.vote === 'yes').length, no: votes.filter((v) => v.vote === 'no').length, votes };
+}
+
+/* ---------- Interviews ---------- */
+
+export async function setInterview(submissionId, fields) {
+  const keys = Object.keys(fields).filter((k) => ['interview_status', 'interview_channel_id', 'interview_by_tag', 'interview_at', 'interview_joined'].includes(k));
+  if (!keys.length) return null;
+  const { rows } = await query(
+    `UPDATE submissions SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')} WHERE id = $1 RETURNING *`,
+    [submissionId, ...keys.map((k) => fields[k])],
+  );
+  return rows[0] || null;
+}
+
+export async function getSubmissionByInterviewChannel(channelId) {
+  const { rows } = await query(`SELECT * FROM submissions WHERE interview_channel_id = $1 AND interview_status = 'active'`, [channelId]);
+  return rows[0] || null;
+}
+
+export async function listActiveInterviews() {
+  const { rows } = await query(`SELECT * FROM submissions WHERE guild_id = $1 AND interview_status = 'active'`, [config.guildId]);
+  return rows;
 }

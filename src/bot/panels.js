@@ -3,11 +3,13 @@ import {
 } from 'discord.js';
 import { getSettings, listCategories, listRoles, updateSettings } from '../db.js';
 import { client } from './client.js';
+import { isCategoryOpen } from '../schedule.js';
 import { COLORS, truncate } from './ui.js';
 
-/** Categories that have at least one open role with questions. */
-async function usableCategories() {
-  const cats = await listCategories({ enabledOnly: true });
+/** Applications (categories) open right now that have at least one role with questions. */
+export async function usableCategories(settings) {
+  const tz = settings?.timezone || (await getSettings()).timezone;
+  const cats = (await listCategories({ enabledOnly: true })).filter((c) => isCategoryOpen(c, tz));
   const out = [];
   for (const c of cats) {
     const roles = (await listRoles(c.id, { enabledOnly: true })).filter((r) => r.question_count > 0);
@@ -17,7 +19,7 @@ async function usableCategories() {
 }
 
 export async function buildApplyPanel(settings) {
-  const cats = await usableCategories();
+  const cats = await usableCategories(settings);
   const embed = new EmbedBuilder()
     .setColor(COLORS.brand)
     .setTitle(truncate(settings.apply_panel_title, 256))
@@ -69,6 +71,7 @@ export async function publishPanel(kind) {
     const existing = await channel.messages.fetch(settings[messageKey]).catch(() => null);
     if (existing) {
       await existing.edit(payload);
+      lastSignature = null;
       return { updated: true, channelId };
     }
   }
@@ -83,10 +86,58 @@ export async function publishPanel(kind) {
 
 /** Refreshes the application panel if one is already posted. Errors are logged, not thrown. */
 export async function refreshApplyPanelQuietly() {
+  invalidatePanelCache();
   try {
     const settings = await getSettings();
     if (settings.apply_channel_id && settings.apply_panel_message_id) await publishPanel('apply');
   } catch (err) {
     console.warn('[panels] could not refresh application panel:', err.message);
   }
+}
+
+/*
+ * Every minute, checks whether schedules opened or closed a category and refreshes the
+ * posted application panel only when what it should show has changed.
+ * Works from an in-memory copy of the roles so the database (Neon's free plan) can sleep;
+ * the copy is reloaded only after something is changed on the dashboard.
+ */
+let cache = null;
+let lastSignature = null;
+
+export function invalidatePanelCache() {
+  cache = null;
+}
+
+async function loadCache() {
+  if (cache) return cache;
+  const settings = await getSettings();
+  const cats = await listCategories({ enabledOnly: true });
+  for (const c of cats) c.roles = await listRoles(c.id, { enabledOnly: true });
+  cache = { settings, cats };
+  return cache;
+}
+
+function signatureFrom({ settings, cats }) {
+  const tz = settings.timezone;
+  const open = cats.filter((c) => isCategoryOpen(c, tz) && c.roles.some((r) => r.question_count > 0)).slice(0, 25);
+  return JSON.stringify(open.map((c) => [c.id, c.name, c.description]));
+}
+
+export function startPanelScheduler() {
+  const tick = async () => {
+    try {
+      const data = await loadCache();
+      if (!data.settings.apply_channel_id || !data.settings.apply_panel_message_id) return;
+      const signature = signatureFrom(data);
+      if (lastSignature !== null && signature !== lastSignature) {
+        await publishPanel('apply');
+        console.log('[panels] schedule changed, application panel refreshed');
+      }
+      lastSignature = signature;
+    } catch (err) {
+      console.warn('[panels] schedule check failed:', err.message);
+    }
+  };
+  tick();
+  return setInterval(tick, 60 * 1000);
 }

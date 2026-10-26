@@ -19,11 +19,15 @@
   <div class="cat-head">
     <div class="cat-title">
       <h2><%= c.name %></h2>
-      <% if (!c.enabled) { %><span class="pill pill-off">Hidden</span><% } %>
+      <% if (!c.enabled) { %><span class="pill pill-off">Off</span><% } else if (c.openNow) { %><span class="pill pill-open">Open</span><% } else { %><span class="pill pill-pending">Closed</span><% } %>
       <span class="muted small"><%= c.roles.length %> role<%= c.roles.length === 1 ? '' : 's' %><%= c.description ? ' · ' + c.description : '' %></span>
     </div>
+    <div class="schedule-line">
+      <%- include('partials/icon', { name: 'clock', size: 14 }) %>
+      <span><%= c.enabled ? c.schedule.text : 'Switched off, so it is hidden from the panel' %></span>
+    </div>
     <div class="row-actions">
-      <button type="button" class="btn btn-ghost btn-sm" data-toggle="cat-edit-<%= c.id %>" aria-expanded="false" aria-controls="cat-edit-<%= c.id %>"><%- include('partials/icon', { name: 'edit', size: 15 }) %> Edit</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-toggle="cat-edit-<%= c.id %>" aria-expanded="false" aria-controls="cat-edit-<%= c.id %>"><%- include('partials/icon', { name: 'edit', size: 15 }) %> Edit &amp; schedule</button>
       <form method="post" action="/applications/categories/<%= c.id %>/delete" data-confirm="Delete the &quot;<%= c.name %>&quot; category and all <%= c.roles.length %> of its roles? Past submissions are kept.">
         <input type="hidden" name="_csrf" value="<%= csrf %>">
         <button class="btn btn-danger-ghost btn-sm" type="submit"><%- include('partials/icon', { name: 'trash', size: 15 }) %> Delete</button>
@@ -47,9 +51,51 @@
         <input id="cat-pos-<%= c.id %>" name="position" type="number" value="<%= c.position %>">
       </div>
     </div>
+    <fieldset class="schedule" data-schedule>
+      <legend>When is this application open?</legend>
+      <p class="help">Times use <strong><%= tz.replace(/_/g, ' ') %></strong> (change it in Settings). When it's closed, it disappears from the panel and opens again by itself.</p>
+      <div class="mode-pick">
+        <% [['always', 'Always open', 'Open whenever it is switched on'], ['dates', 'Between dates', 'Open from one date until another'], ['weekly', 'Every week', 'Open on certain days and times']].forEach(([v, l, d]) => { %>
+          <label class="mode-opt">
+            <input type="radio" name="schedule_mode" value="<%= v %>" <%= (c.schedule_mode || 'always') === v ? 'checked' : '' %>>
+            <span><strong><%= l %></strong><span class="muted small"><%= d %></span></span>
+          </label>
+        <% }) %>
+      </div>
+      <div class="grid-2" data-mode-panel="dates">
+        <div class="field">
+          <label for="open-at-<%= c.id %>">Opens</label>
+          <input type="datetime-local" id="open-at-<%= c.id %>" name="open_at" value="<%= c.inputs.open_at %>">
+          <p class="help">Leave empty to open right away.</p>
+        </div>
+        <div class="field">
+          <label for="close-at-<%= c.id %>">Closes</label>
+          <input type="datetime-local" id="close-at-<%= c.id %>" name="close_at" value="<%= c.inputs.close_at %>">
+          <p class="help">Leave empty to stay open.</p>
+        </div>
+      </div>
+      <div data-mode-panel="weekly">
+        <div class="day-pick" role="group" aria-label="Days">
+          <% days.forEach((d, i) => { %>
+            <label class="day-opt"><input type="checkbox" name="weekly_days" value="<%= i %>" <%= (c.weekly_days || []).includes(i) ? 'checked' : '' %>><span><%= d %></span></label>
+          <% }) %>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="w-start-<%= c.id %>">From</label>
+            <input type="time" id="w-start-<%= c.id %>" name="weekly_start" value="<%= c.inputs.weekly_start %>">
+          </div>
+          <div class="field">
+            <label for="w-end-<%= c.id %>">Until</label>
+            <input type="time" id="w-end-<%= c.id %>" name="weekly_end" value="<%= c.inputs.weekly_end %>">
+            <p class="help">An earlier time than "From" means it runs past midnight.</p>
+          </div>
+        </div>
+      </div>
+    </fieldset>
     <div class="actions" style="justify-content: space-between;">
-      <label class="toggle"><input type="checkbox" name="enabled" <%= c.enabled ? 'checked' : '' %>> Show on the panel</label>
-      <button class="btn btn-primary btn-sm" type="submit">Save category</button>
+      <label class="toggle"><input type="checkbox" name="enabled" <%= c.enabled ? 'checked' : '' %>> Switched on</label>
+      <button class="btn btn-primary btn-sm" type="submit">Save</button>
     </div>
   </form>
 

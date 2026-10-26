@@ -39,6 +39,44 @@
   </section>
 
   <section class="card">
+    <div class="card-head">
+      <h2>Who can't apply</h2>
+      <span class="muted small"><span data-blocked-count><%= (settings.blocked_role_ids || []).length %></span> blocked</span>
+    </div>
+    <p class="muted small">Members with any of these roles are turned away when they try to apply. Already-submitted applications are not affected.</p>
+    <div class="search" style="max-width: none; margin-bottom: 10px;">
+      <%- include('partials/icon', { name: 'search', size: 16 }) %>
+      <label class="sr" for="role-filter">Filter roles</label>
+      <input id="role-filter" placeholder="Filter roles" data-filter-target="blocked-roles">
+    </div>
+    <div class="check-list" id="blocked-roles">
+      <% const blocked = settings.blocked_role_ids || []; opts.roles.slice().sort((a, b) => blocked.includes(b.id) - blocked.includes(a.id)).forEach(r => { %>
+        <label class="check-item" data-filter-text="<%= r.name.toLowerCase() %>">
+          <input type="checkbox" name="blocked_role_ids" value="<%= r.id %>" <%= blocked.includes(r.id) ? 'checked' : '' %>>
+          <span><%= r.name %></span>
+        </label>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Interviews</h2>
+    <%- include('partials/select', { name: 'interview_category_id', label: 'Category for interview voice channels', list: opts.categories, value: settings.interview_category_id,
+        emptyLabel: 'Same as tickets', help: 'Temporary voice channels made by the Interview button go here and delete themselves when everyone leaves.' }) %>
+  </section>
+
+  <section class="card">
+    <h2>Timezone</h2>
+    <div class="field field-short" style="max-width: 420px;">
+      <label for="timezone">Timezone for application schedules</label>
+      <select id="timezone" name="timezone">
+        <% timezones.forEach(z => { %><option value="<%= z %>" <%= z === settings.timezone ? 'selected' : '' %>><%= z.replace(/_/g, ' ') %></option><% }) %>
+      </select>
+      <p class="help">Open and close times you set on the Applications page use this timezone.</p>
+    </div>
+  </section>
+
+  <section class="card">
     <h2>Tickets</h2>
     <div class="grid-2">
       <%- include('partials/select', { name: 'ticket_channel_id', label: 'Open-a-ticket channel', list: opts.textChannels, value: settings.ticket_channel_id,

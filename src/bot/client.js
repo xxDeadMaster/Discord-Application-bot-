@@ -7,6 +7,7 @@ export const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent, // privileged: turn on in the Developer Portal (needed for ticket transcripts)
     GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.GuildVoiceStates, // interview voice channels: who joined and left
   ],
   // Channel partial is required to receive DMs
   partials: [Partials.Channel, Partials.Message],

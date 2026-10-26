@@ -4,6 +4,8 @@ import {
   handleCategorySelect, handleDenyModal, handleDirectMessage, handleDmButton, handleReviewButton, handleRoleSelect,
 } from './applications.js';
 import { client } from './client.js';
+import { handleInterviewChannelDelete, handleVoiceState, loadActiveInterviews } from './interviews.js';
+import { startPanelScheduler } from './panels.js';
 import {
   handleChannelDelete, handleCloseButton, handleCloseCancel, handleCloseConfirm, handleOpenButton, handleOpenModal,
   loadOpenTickets, recordTicketMessage,
@@ -59,6 +61,12 @@ client.on(Events.MessageCreate, async (message) => {
 
 client.on(Events.ChannelDelete, (channel) => {
   handleChannelDelete(channel).catch((err) => console.error('[channelDelete]', err));
+  handleInterviewChannelDelete(channel).catch((err) => console.error('[channelDelete interview]', err));
+});
+
+client.on(Events.VoiceStateUpdate, (oldState, newState) => {
+  if ((newState.guild?.id || oldState.guild?.id) !== config.guildId) return;
+  handleVoiceState(oldState, newState).catch((err) => console.error('[voiceState]', err));
 });
 
 client.once(Events.ClientReady, async (c) => {
@@ -66,6 +74,8 @@ client.once(Events.ClientReady, async (c) => {
   const guild = await c.guilds.fetch(config.guildId).catch(() => null);
   if (!guild) console.warn(`[bot] not in server ${config.guildId} yet. Invite it with the link on the dashboard.`);
   await loadOpenTickets().catch((err) => console.error('[tickets] load failed:', err));
+  await loadActiveInterviews().catch((err) => console.error('[interview] load failed:', err));
+  startPanelScheduler();
 });
 
 client.on(Events.Error, (err) => console.error('[discord]', err));

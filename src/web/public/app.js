@@ -98,3 +98,25 @@ if (list) {
   if (!list.querySelector('.question')) addBtn.click();
   renumber();
 }
+
+// Schedule editor: show only the fields for the picked mode
+document.querySelectorAll('[data-schedule]').forEach((box) => {
+  const sync = () => {
+    const mode = box.querySelector('input[name="schedule_mode"]:checked')?.value || 'always';
+    box.querySelectorAll('[data-mode-panel]').forEach((p) => { p.hidden = p.dataset.modePanel !== mode; });
+  };
+  box.addEventListener('change', sync);
+  sync();
+});
+
+// Filter a long checkbox list (blocked roles)
+document.querySelectorAll('[data-filter-target]').forEach((input) => {
+  const list = document.getElementById(input.dataset.filterTarget);
+  if (!list) return;
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    list.querySelectorAll('[data-filter-text]').forEach((el) => { el.hidden = q && !el.dataset.filterText.includes(q); });
+  });
+  const count = document.querySelector('[data-blocked-count]');
+  list.addEventListener('change', () => { if (count) count.textContent = list.querySelectorAll('input:checked').length; });
+});

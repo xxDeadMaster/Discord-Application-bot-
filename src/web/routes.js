@@ -1,12 +1,16 @@
 import { ChannelType } from 'discord.js';
 import express from 'express';
-import { decideSubmission, removeReviewMessages } from '../bot/applications.js';
-import { publishPanel, refreshApplyPanelQuietly } from '../bot/panels.js';
+import { castVote, decideSubmission, removeReviewMessages } from '../bot/applications.js';
+import { startInterview } from '../bot/interviews.js';
+import { invalidatePanelCache, publishPanel, refreshApplyPanelQuietly } from '../bot/panels.js';
 import { closeTicketFromDashboard, transcriptText } from '../bot/tickets.js';
 import { MAX_QUESTIONS, inviteUrl } from '../bot/ui.js';
 import { config } from '../config.js';
 import {
-  dashboardCounts, deleteClosedTickets, deleteSubmissions, getCategory, getRole, getSettings, getSubmission, getTicket, listCategories, listQuestions,
+  DAYS, allTimezones, describeSchedule, isCategoryOpen, isValidTimezone, parseLocalInput, parseTime, toLocalInput,
+} from '../schedule.js';
+import {
+  dashboardCounts, deleteClosedTickets, listVotes, voteTally, deleteSubmissions, getCategory, getRole, getSettings, getSubmission, getTicket, listCategories, listQuestions,
   listRoles, listSubmissions, listTicketMessages, listTickets, query, replaceQuestions, updateSettings,
 } from '../db.js';
 import { requireAdmin } from './auth.js';
@@ -73,7 +77,7 @@ routes.get('/', async (req, res) => {
 /* ---------- Settings ---------- */
 
 routes.get('/settings', requireAdmin, async (req, res) => {
-  res.render('settings', { title: 'Settings', settings: await getSettings(), opts: guildOptions(res.locals.guild) });
+  res.render('settings', { title: 'Settings', settings: await getSettings(), opts: guildOptions(res.locals.guild), timezones: allTimezones() });
 });
 
 routes.post('/settings', requireAdmin, async (req, res) => {
@@ -86,6 +90,7 @@ routes.post('/settings', requireAdmin, async (req, res) => {
     ticket_channel_id: pickId(b.ticket_channel_id, opts.textChannels),
     ticket_category_id: pickId(b.ticket_category_id, opts.categories),
     ticket_log_channel_id: pickId(b.ticket_log_channel_id, opts.textChannels),
+    interview_category_id: pickId(b.interview_category_id, opts.categories),
   };
   if (Object.values(patch).includes(undefined)) {
     flash(req, 'error', 'One of the channels or roles no longer exists. Refresh and try again.');
@@ -94,6 +99,11 @@ routes.post('/settings', requireAdmin, async (req, res) => {
   const before = await getSettings();
   if (patch.apply_channel_id !== before.apply_channel_id) patch.apply_panel_message_id = null;
   if (patch.ticket_channel_id !== before.ticket_channel_id) patch.ticket_panel_message_id = null;
+
+  patch.blocked_role_ids = toArray(b.blocked_role_ids).map(String).filter((id) => opts.roles.some((r) => r.id === id));
+  const tz = String(b.timezone || '').trim();
+  patch.timezone = isValidTimezone(tz) ? tz : before.timezone;
+  invalidatePanelCache();
 
   patch.apply_panel_title = clean(b.apply_panel_title, LIMITS.panelTitle) || 'Staff Applications';
   patch.apply_panel_description = clean(b.apply_panel_description, LIMITS.panelDescription) || 'Pick what you are applying for below.';
@@ -122,8 +132,17 @@ routes.post('/settings/panel/:kind', requireAdmin, async (req, res) => {
 
 routes.get('/applications', requireAdmin, async (req, res) => {
   const cats = await listCategories();
-  for (const c of cats) c.roles = await listRoles(c.id);
-  res.render('applications', { title: 'Applications', cats });
+  const { timezone: tz } = await getSettings();
+  for (const c of cats) {
+    c.roles = await listRoles(c.id);
+    c.schedule = describeSchedule(c, tz);
+    c.openNow = isCategoryOpen(c, tz);
+    c.inputs = {
+      open_at: toLocalInput(c.open_at, tz), close_at: toLocalInput(c.close_at, tz),
+      weekly_start: c.weekly_start || '', weekly_end: c.weekly_end || '',
+    };
+  }
+  res.render('applications', { title: 'Applications', cats, days: DAYS, tz });
 });
 
 routes.post('/applications/categories', requireAdmin, async (req, res) => {
@@ -142,11 +161,34 @@ routes.post('/applications/categories/:id', requireAdmin, async (req, res) => {
   const id = idParam(req);
   const cat = id && await getCategory(id);
   if (!cat) return res.redirect('/applications');
-  const name = clean(req.body.name, LIMITS.name) || cat.name;
-  const position = Number.parseInt(req.body.position, 10);
-  await query('UPDATE app_categories SET name = $2, description = $3, enabled = $4, position = $5 WHERE id = $1',
-    [id, name, clean(req.body.description, LIMITS.description), req.body.enabled === 'on', Number.isFinite(position) ? position : cat.position]);
-  flash(req, 'success', `Saved "${name}".`);
+  const b = req.body;
+  const name = clean(b.name, LIMITS.name) || cat.name;
+  const position = Number.parseInt(b.position, 10);
+  const { timezone: tz } = await getSettings();
+
+  const mode = ['always', 'dates', 'weekly'].includes(b.schedule_mode) ? b.schedule_mode : 'always';
+  let openAt = null; let closeAt = null; let days = []; let start = null; let end = null;
+  if (mode === 'dates') {
+    openAt = parseLocalInput(b.open_at, tz);
+    closeAt = parseLocalInput(b.close_at, tz);
+    if (!openAt && !closeAt) { flash(req, 'error', 'Pick an open date, a close date, or both.'); return res.redirect('/applications'); }
+    if (openAt && closeAt && closeAt <= openAt) { flash(req, 'error', 'The close date must be after the open date.'); return res.redirect('/applications'); }
+  }
+  if (mode === 'weekly') {
+    days = toArray(b.weekly_days).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+    start = parseTime(b.weekly_start)?.text || null;
+    end = parseTime(b.weekly_end)?.text || null;
+    if (!days.length || !start || !end || start === end) { flash(req, 'error', 'For a weekly schedule, pick at least one day and different start and end times.'); return res.redirect('/applications'); }
+  }
+
+  await query(
+    `UPDATE app_categories SET name = $2, description = $3, enabled = $4, position = $5,
+       schedule_mode = $6, open_at = $7, close_at = $8, weekly_days = $9, weekly_start = $10, weekly_end = $11 WHERE id = $1`,
+    [id, name, clean(b.description, LIMITS.description), b.enabled === 'on', Number.isFinite(position) ? position : cat.position,
+      mode, openAt, closeAt, [...new Set(days)].sort(), start, end],
+  );
+  const saved = await getCategory(id);
+  flash(req, 'success', `Saved "${name}". ${isCategoryOpen(saved, tz) ? 'It is open now.' : `It is closed now: ${describeSchedule(saved, tz).text}.`}`);
   await refreshApplyPanelQuietly();
   res.redirect('/applications');
 });
@@ -291,7 +333,25 @@ routes.get('/submissions/:id', async (req, res) => {
     `SELECT id, role_name, status, created_at FROM submissions WHERE guild_id = $1 AND user_id = $2 AND id <> $3 ORDER BY created_at DESC LIMIT 10`,
     [config.guildId, sub.user_id, sub.id],
   );
-  res.render('submission', { title: `Application #${sub.id}`, sub, history, limits: LIMITS });
+  const votes = await listVotes(sub.id);
+  const myVote = votes.find((v) => v.user_id === res.locals.user.id)?.vote || null;
+  res.render('submission', { title: `Application #${sub.id}`, sub, history, limits: LIMITS, votes, myVote });
+});
+
+routes.post('/submissions/:id/vote', async (req, res) => {
+  const id = idParam(req);
+  if (!id) return res.redirect('/submissions');
+  const r = await castVote({ submissionId: id, userId: res.locals.user.id, userTag: res.locals.user.username, vote: req.body.vote });
+  flash(req, r.ok ? 'success' : 'error', r.ok ? `${r.vote ? `You voted ${r.vote}.` : 'Your vote was removed.'} Votes: ${r.tally.yes} yes · ${r.tally.no} no.` : r.error);
+  res.redirect(`/submissions/${id}`);
+});
+
+routes.post('/submissions/:id/interview', async (req, res) => {
+  const id = idParam(req);
+  if (!id) return res.redirect('/submissions');
+  const r = await startInterview({ submissionId: id, staffId: res.locals.user.id, staffTag: res.locals.user.username });
+  flash(req, r.ok ? 'success' : 'error', r.ok ? `Interview voice channel is ready in Discord. ${r.notes.join(' ')}` : r.error);
+  res.redirect(`/submissions/${id}`);
 });
 
 routes.post('/submissions/:id/decide', async (req, res) => {
