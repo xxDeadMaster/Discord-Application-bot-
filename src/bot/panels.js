@@ -148,7 +148,7 @@ export async function publishPanel(kind) {
   if (!channelId) throw new Error(`Pick a ${kind === 'apply' ? 'applications' : 'tickets'} channel in Settings first.`);
 
   const channel = await client.channels.fetch(channelId).catch(() => null);
-  if (!channel || channel.type !== ChannelType.GuildText) throw new Error('The bot cannot find that channel. Check it still exists and the bot can see it.');
+  if (!channel || ![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type)) throw new Error('The bot cannot find that channel. Check it still exists and the bot can see it.');
 
   const payload = kind === 'apply' ? await buildApplyPanel(settings) : await buildTicketPanel(settings);
 

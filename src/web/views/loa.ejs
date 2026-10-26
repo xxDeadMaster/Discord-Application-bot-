@@ -2,12 +2,12 @@
 <div class="page-head">
   <div class="page-head-text">
     <h1>Leave of absence</h1>
-    <p>Staff request leave with <code>/loa request</code> in Discord or the form below. Once approved, the bot adds the LOA role on the first day and removes it after the last day.</p>
+    <p>Staff go on leave with <code>/loa request</code> in Discord or the form below. No approval needed: the LOA role is added on the first day and removed after the last day, or as soon as they press <strong>I'm back early</strong> (<code>/loa view</code>).</p>
   </div>
 </div>
 
 <% if (isManager && (!loaRoleSet || !loaChannelSet)) { %>
-  <div class="flash flash-error"><%- include('partials/icon', { name: 'alert' }) %><span><%= !loaRoleSet ? 'No LOA role is set, so approved leave won\'t change roles. ' : '' %><%= !loaChannelSet ? 'No LOA channel is set, so requests only show here. ' : '' %>Set them in Settings → Staff management.</span></div>
+  <div class="flash flash-error"><%- include('partials/icon', { name: 'alert' }) %><span><%= !loaRoleSet ? 'No LOA role is set, so leave won\'t change roles. ' : '' %><%= !loaChannelSet ? 'No LOA channel is set, so leave only shows here. ' : '' %>Set them in Settings → Staff management.</span></div>
 <% } %>
 
 <% const card = (l, actions) => { %>
@@ -15,12 +15,12 @@
     <span class="row-main" style="flex: 1;">
       <span class="role-icon"><%= l.user_tag.slice(0, 1).toUpperCase() %></span>
       <span><strong><%= l.user_tag %></strong> <span class="pill <%= { 'On leave': 'pill-pending', Upcoming: 'pill-open', Pending: 'pill-pending', Denied: 'pill-denied' }[l.label] || 'pill-off' %>"><%= l.label %></span><br>
-        <span class="muted small"><%= l.from %> → <%= l.until %><%= l.reason ? ' · ' + l.reason : '' %></span></span>
+        <span class="muted small"><%= l.from %> → <%= l.until %><%= l.early ? ' · came back early' : '' %><%= l.reason ? ' · ' + l.reason : '' %></span></span>
     </span>
-    <% if (actions && isManager) { %>
+    <% if (actions && (isManager || l.user_id === user.id)) { %>
       <span class="row-actions">
         <% actions.forEach(([a, label, cls]) => { %>
-          <form method="post" action="/loa/<%= l.id %>/<%= a %>"<% if (a === 'end') { %> data-confirm="End <%= l.user_tag %>'s LOA now?"<% } %>>
+          <form method="post" action="/loa/<%= l.id %>/<%= a %>"<% if (a === 'end') { %> data-confirm="<%= l.user_id === user.id ? 'End your LOA now? The LOA role will be removed.' : `End ${l.user_tag}'s LOA now?` %>"<% } %>>
             <input type="hidden" name="_csrf" value="<%= csrf %>">
             <button class="btn btn-sm <%= cls %>" type="submit"><%= label %></button>
           </form>
@@ -30,24 +30,15 @@
   </li>
 <% } %>
 
-<% if (isManager) { %>
-<section class="card">
-  <div class="card-head"><h2>Waiting for approval</h2><span class="muted small"><%= pending.length %></span></div>
-  <% if (!pending.length) { %><p class="empty-row">Nothing to review.</p><% } else { %>
-    <ul class="rows"><% pending.forEach(l => card(l, [['approve', 'Approve', 'btn-success'], ['deny', 'Deny', 'btn-danger-ghost']])) %></ul>
-  <% } %>
-</section>
-<% } %>
-
 <section class="card">
   <div class="card-head"><h2>On leave and upcoming</h2><span class="muted small"><%= current.length %></span></div>
   <% if (!current.length) { %><p class="empty-row">Nobody is on leave.</p><% } else { %>
-    <ul class="rows"><% current.forEach(l => card(l, [['end', 'End now', 'btn-ghost']])) %></ul>
+    <ul class="rows"><% current.forEach(l => card(l, [['end', l.user_id === user.id ? (l.label === 'Upcoming' ? 'Cancel' : "I'm back early") : (l.label === 'Upcoming' ? 'Cancel' : 'End now'), 'btn-ghost']])) %></ul>
   <% } %>
 </section>
 
 <section class="card">
-  <h2>Request leave</h2>
+  <h2>Go on leave</h2>
   <form method="post" action="/loa">
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div class="grid-3">
@@ -55,7 +46,7 @@
       <div class="field"><label for="end_date">Last day away</label><input type="date" id="end_date" name="end_date" min="<%= today %>" required></div>
       <div class="field"><label for="loa-reason">Reason (optional)</label><input id="loa-reason" name="reason" maxlength="500"></div>
     </div>
-    <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'calendar', size: 16 }) %> Send request</button>
+    <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'calendar', size: 16 }) %> Go on leave</button>
   </form>
 </section>
 

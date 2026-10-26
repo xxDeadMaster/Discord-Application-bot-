@@ -314,3 +314,4 @@ CREATE TABLE IF NOT EXISTS poll_votes (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (poll_id, user_id, option_index)
 );
+ALTER TABLE loa_requests ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;

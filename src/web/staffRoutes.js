@@ -5,7 +5,7 @@ import { cleanEmoji } from '../bot/ui.js';
 import { decideLoa, endLoa, isOnLoa, issueStrike, prettyDate, removeStrike, requestLoa, todayIn } from '../bot/staff.js';
 import { DEFAULT_QUESTION, toggleClaim } from '../bot/tickets.js';
 import { config } from '../config.js';
-import { getSettings, getTicketType, listLoas, listStrikes, listTicketTypes, query } from '../db.js';
+import { getLoa, getSettings, getTicketType, listLoas, listStrikes, listTicketTypes, query } from '../db.js';
 import { activityScore, staffActivity } from '../stats.js';
 
 export const staffRoutes = express.Router();
@@ -105,15 +105,18 @@ staffRoutes.post('/strikes/:id/remove', requireManager, async (req, res) => {
 
 /* ---------- LOA ---------- */
 
+const getLoaOwner = async (id) => (id ? (await getLoa(id))?.user_id : null);
+
 staffRoutes.get('/loa', async (req, res) => {
   const settings = await getSettings();
   const all = await listLoas();
   const today = todayIn(settings.timezone);
   const label = (l) => {
     if (l.status === 'approved') return l.start_date > today ? 'Upcoming' : 'On leave';
+    if (l.status === 'ended') return 'Back';
     return l.status[0].toUpperCase() + l.status.slice(1);
   };
-  const withLabel = all.map((l) => ({ ...l, label: label(l), from: prettyDate(l.start_date), until: prettyDate(l.end_date) }));
+  const withLabel = all.map((l) => ({ ...l, label: label(l), from: prettyDate(l.start_date), until: prettyDate(l.end_date), early: l.status === 'ended' && l.ended_at && new Date(l.ended_at).toISOString().slice(0, 10) < l.end_date }));
   res.render('loa', {
     title: 'Leave of absence',
     pending: withLabel.filter((l) => l.status === 'pending'),
@@ -128,11 +131,16 @@ staffRoutes.post('/loa', async (req, res) => {
     userId: res.locals.user.id, userTag: res.locals.user.username,
     start: req.body.start_date, end: req.body.end_date, reason: clean(req.body.reason, 500),
   });
-  flash(req, r.ok ? 'success' : 'error', r.ok ? 'Your LOA request was sent to managers.' : r.error);
+  flash(req, r.ok ? 'success' : 'error', r.ok ? `You're on LOA from ${prettyDate(r.loa.start_date)} to ${prettyDate(r.loa.end_date)}. ${r.notes.join(' ')}` : r.error);
   res.redirect('/loa');
 });
 
-staffRoutes.post('/loa/:id/:action', requireManager, async (req, res) => {
+staffRoutes.post('/loa/:id/:action', async (req, res) => {
+  // Managers can end anyone's LOA; staff can end their own ("I'm back early")
+  const own = await getLoaOwner(idParam(req));
+  if (!res.locals.isManager && !(req.params.action === 'end' && own === res.locals.user.id)) {
+    return res.status(403).render('error', { title: 'Managers only', message: 'Only managers can change other people\'s LOA.', user: res.locals.user });
+  }
   const id = idParam(req);
   const action = req.params.action;
   let r;
@@ -140,7 +148,7 @@ staffRoutes.post('/loa/:id/:action', requireManager, async (req, res) => {
   else if (action === 'approve' || action === 'deny') r = await decideLoa({ id, approve: action === 'approve', byId: res.locals.user.id, byTag: res.locals.user.username });
   else if (action === 'end') r = await endLoa({ id, byTag: res.locals.user.username });
   else r = { ok: false, error: 'Unknown action.' };
-  const done = { approve: 'Approved', deny: 'Denied', end: 'Ended' }[action];
+  const done = { approve: 'Approved', deny: 'Denied', end: r.loa?.status === 'cancelled' ? 'Cancelled' : 'Ended, and the LOA role was removed' }[action];
   flash(req, r.ok ? 'success' : 'error', r.ok ? `${done}. ${(r.notes || []).join(' ')}` : r.error);
   res.redirect('/loa');
 });

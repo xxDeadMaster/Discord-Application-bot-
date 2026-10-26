@@ -182,7 +182,7 @@ export async function publishVerifyPanel() {
   if (!c.verify_channel_id) throw new Error('Pick a verify channel first.');
   if (!c.verify_role_id) throw new Error('Pick the role to give when someone verifies first.');
   const channel = await client.channels.fetch(c.verify_channel_id).catch(() => null);
-  if (!channel || channel.type !== ChannelType.GuildText) throw new Error('The bot cannot find that channel. Check it still exists and the bot can see it.');
+  if (!channel || ![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type)) throw new Error('The bot cannot find that channel. Check it still exists and the bot can see it.');
   const payload = await buildVerifyPanel(c);
   if (c.verify_panel_message_id) {
     const existing = await channel.messages.fetch(c.verify_panel_message_id).catch(() => null);

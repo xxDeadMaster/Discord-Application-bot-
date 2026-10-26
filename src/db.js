@@ -425,7 +425,7 @@ export async function getLoa(id) {
 }
 
 export async function updateLoa(id, fields) {
-  const allowed = ['status', 'role_applied', 'reviewed_by', 'reviewed_by_tag', 'reviewed_at', 'message_channel_id', 'message_id'];
+  const allowed = ['status', 'role_applied', 'reviewed_by', 'reviewed_by_tag', 'reviewed_at', 'message_channel_id', 'message_id', 'ended_at'];
   const keys = Object.keys(fields).filter((k) => allowed.includes(k));
   if (!keys.length) return getLoa(id);
   const { rows } = await query(

@@ -157,32 +157,54 @@ export async function removeStrike({ strikeId, userId, byTag }) {
 /** Approved LOAs kept in memory so the daily start/end check doesn't wake the database. */
 const loaSchedule = new Map(); // id -> { id, user_id, start_date, end_date, role_applied }
 
-function loaCard(loa) {
-  const color = { pending: COLORS.pending, approved: COLORS.accepted, denied: COLORS.denied }[loa.status] ?? COLORS.muted;
-  const icon = { pending: '⏳', approved: '✅', denied: '❌', cancelled: '🚫', ended: '👋' }[loa.status] || '•';
-  const embed = new EmbedBuilder().setColor(color).setAuthor({ name: '🌴 Leave of absence' }).setTitle(`LOA request · ${loa.user_tag}`)
+/** What an LOA looks like right now: { icon, text, color, active, onLeave }. */
+function loaState(loa, today) {
+  const early = loa.ended_at && loa.status === 'ended' && toDateStr(loa.ended_at) < loa.end_date;
+  if (loa.status === 'approved') {
+    return loa.role_applied || loa.start_date <= today
+      ? { icon: '🌴', text: `On leave until ${prettyDate(loa.end_date)}`, color: COLORS.sky, active: true, onLeave: true }
+      : { icon: '📅', text: `Starts ${prettyDate(loa.start_date)}`, color: COLORS.brand, active: true, onLeave: false };
+  }
+  if (loa.status === 'ended') {
+    return early
+      ? { icon: '👋', text: `Came back early on ${prettyDate(toDateStr(loa.ended_at))}`, color: COLORS.accepted }
+      : { icon: '👋', text: 'Back from leave', color: COLORS.accepted };
+  }
+  if (loa.status === 'pending') return { icon: '⏳', text: 'Waiting', color: COLORS.pending, active: true };
+  if (loa.status === 'cancelled') return { icon: '🚫', text: 'Cancelled', color: COLORS.muted };
+  return { icon: '❌', text: 'Denied', color: COLORS.denied };
+}
+
+/** YYYY-MM-DD for a timestamp, in UTC (good enough for "came back early on"). */
+function toDateStr(d) {
+  return new Date(d).toISOString().slice(0, 10);
+}
+
+export function loaCard(loa, today) {
+  const st = loaState(loa, today);
+  const embed = new EmbedBuilder().setColor(st.color).setAuthor({ name: '🌴 Leave of absence' }).setTitle(truncate(loa.user_tag, 256))
+    .setDescription(`${st.icon} **${st.text}**`)
     .addFields(
       { name: 'Member', value: `<@${loa.user_id}>`, inline: true },
       { name: 'From', value: `📅 ${prettyDate(loa.start_date)}`, inline: true },
       { name: 'Until', value: `📅 ${prettyDate(loa.end_date)}`, inline: true },
       { name: 'Reason', value: truncate(loa.reason || '(none)', 1024) },
-    ).setFooter(footer(`LOA #${loa.id}`, client));
-  if (loa.status !== 'pending') {
-    embed.addFields({ name: 'Status', value: `${icon} ${loa.status[0].toUpperCase()}${loa.status.slice(1)}${loa.reviewed_by_tag ? ` by ${loa.reviewed_by_tag}` : ''}` });
-  }
-  const components = loa.status === 'pending' ? [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`loa:approve:${loa.id}`).setLabel('Approve').setEmoji('✅').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`loa:deny:${loa.id}`).setLabel('Deny').setEmoji('✖️').setStyle(ButtonStyle.Danger),
+    ).setFooter(footer(`LOA #${loa.id}${st.active ? ' · only they (or a manager) can use the button' : ''}`, client));
+  const components = st.active ? [new ActionRowBuilder().addComponents(
+    st.onLeave
+      ? new ButtonBuilder().setCustomId(`loa:back:${loa.id}`).setLabel("I'm back early").setEmoji('👋').setStyle(ButtonStyle.Primary)
+      : new ButtonBuilder().setCustomId(`loa:back:${loa.id}`).setLabel('Cancel this LOA').setEmoji('🚫').setStyle(ButtonStyle.Secondary),
   )] : [];
-  return { embeds: [embed], components };
+  return { embeds: [embed], components, allowedMentions: { users: [] } };
 }
 
-async function refreshLoaCard(loa) {
-  if (!loa.message_channel_id || !loa.message_id) return;
+async function refreshLoaCard(loa, settingsArg) {
+  if (!loa?.message_channel_id || !loa.message_id) return;
   try {
+    const settings = settingsArg || await getSettings();
     const ch = await client.channels.fetch(loa.message_channel_id);
     const msg = await ch.messages.fetch(loa.message_id);
-    await msg.edit(loaCard(loa));
+    await msg.edit(loaCard(loa, todayIn(settings.timezone)));
   } catch { /* gone */ }
 }
 
@@ -196,11 +218,27 @@ async function setLoaRole(userId, on, settings) {
     else await member.roles.remove(settings.loa_role_id, 'LOA ended');
     return null;
   } catch (err) {
-    return `Could not change the LOA role (${err.message}). The bot's role must be above it.`;
+    return `Could not change the LOA role (${err.message}). In Server Settings → Roles, drag the bot's role above the LOA role.`;
   }
 }
 
-/** Returns { ok, error?, loa }. */
+/** Gives the LOA role now if the leave has started. Returns a note for the person, or null. */
+async function applyIfStarted(loa, settings) {
+  const today = todayIn(settings.timezone);
+  if (loa.start_date > today) return `Your LOA role will be added on ${prettyDate(loa.start_date)}.`;
+  const problem = await setLoaRole(loa.user_id, true, settings);
+  if (problem) { console.warn(`[loa] #${loa.id}:`, problem); return problem; }
+  const e = loaSchedule.get(loa.id);
+  if (e) e.role_applied = true;
+  await updateLoa(loa.id, { role_applied: true });
+  return 'You have the LOA role now.';
+}
+
+/**
+ * Requests are approved on their own (no manager step): the LOA is set right away,
+ * the role is given on the first day, and a card is posted in the LOA channel.
+ * Returns { ok, error?, loa, notes[] }.
+ */
 export async function requestLoa({ userId, userTag, start, end, reason }) {
   const settings = await getSettings();
   const tz = settings.timezone;
@@ -210,26 +248,33 @@ export async function requestLoa({ userId, userTag, start, end, reason }) {
   if (endDate < startDate) return { ok: false, error: 'The last day must be on or after the first day.' };
   if (endDate < todayIn(tz)) return { ok: false, error: 'Those dates are already in the past.' };
   const open = await findOpenLoa(userId);
-  if (open) return { ok: false, error: `You already have a ${open.status} LOA (${prettyDate(open.start_date)} to ${prettyDate(open.end_date)}).` };
+  if (open) return { ok: false, error: `You already have an LOA (${prettyDate(open.start_date)} to ${prettyDate(open.end_date)}). Use /loa view to see it or end it.` };
 
-  const loa = await createLoa({ userId, userTag, startDate, endDate, reason: truncate(reason?.trim() || '', 500) });
+  const created = await createLoa({ userId, userTag, startDate, endDate, reason: truncate(reason?.trim() || '', 500) });
+  let loa = await decideLoaRow(created.id, 'approved', null, 'Automatic');
+  loaSchedule.set(loa.id, { id: loa.id, user_id: loa.user_id, start_date: loa.start_date, end_date: loa.end_date, role_applied: false });
+  const notes = [await applyIfStarted(loa, settings)].filter(Boolean);
+  loa = await getLoa(loa.id);
+  const today = todayIn(tz);
+
   if (settings.loa_channel_id) {
     try {
       const ch = await client.channels.fetch(settings.loa_channel_id);
-      const msg = await ch.send({
-        content: settings.manager_role_id ? `<@&${settings.manager_role_id}> new LOA request` : undefined,
-        allowedMentions: { roles: settings.manager_role_id ? [settings.manager_role_id] : [] },
-        ...loaCard(loa),
-      });
-      await updateLoa(loa.id, { message_channel_id: ch.id, message_id: msg.id });
+      const msg = await ch.send(loaCard(loa, today));
+      loa = await updateLoa(loa.id, { message_channel_id: ch.id, message_id: msg.id });
     } catch (err) {
-      console.warn('[loa] could not post request:', err.message);
+      console.warn('[loa] could not post to the LOA channel:', err.message);
+      notes.push('It could not be posted in the LOA channel (the bot needs View Channel, Send Messages and Embed Links there).');
     }
   }
-  return { ok: true, loa };
+  try {
+    const user = await client.users.fetch(loa.user_id);
+    await user.send(loaCard(loa, today));
+  } catch { /* DMs closed */ }
+  return { ok: true, loa, notes };
 }
 
-/** Approve or deny. Returns { ok, error?, loa, notes[] }. */
+/** Old manager approval (kept for LOAs that were waiting before approval was removed). */
 export async function decideLoa({ id, approve, byId, byTag }) {
   const settings = await getSettings();
   const loa = await decideLoaRow(id, approve ? 'approved' : 'denied', byId, byTag);
@@ -240,34 +285,28 @@ export async function decideLoa({ id, approve, byId, byTag }) {
   const notes = [];
   if (approve) {
     loaSchedule.set(loa.id, { id: loa.id, user_id: loa.user_id, start_date: loa.start_date, end_date: loa.end_date, role_applied: false });
-    await runLoaSchedule(settings);
-    if (loaSchedule.get(loa.id)?.role_applied) notes.push('LOA role given.');
-    else if (loa.start_date > todayIn(settings.timezone)) notes.push(`The LOA role will be added on ${prettyDate(loa.start_date)}.`);
+    notes.push(await applyIfStarted(loa, settings));
   }
-  try {
-    const user = await client.users.fetch(loa.user_id);
-    await user.send({ embeds: [new EmbedBuilder().setColor(approve ? COLORS.accepted : COLORS.denied)
-      .setAuthor({ name: '🌴 Leave of absence' })
-      .setTitle(approve ? '✅ LOA approved' : '❌ LOA denied')
-      .setFooter(footer('Staff team', client))
-      .setDescription(`Your leave from **${prettyDate(loa.start_date)}** to **${prettyDate(loa.end_date)}** was ${approve ? 'approved' : 'denied'} by ${byTag}.`)] });
-    notes.push('They were told by DM.');
-  } catch { notes.push('Could not DM them.'); }
-  await refreshLoaCard(await getLoa(loa.id));
-  return { ok: true, loa, notes };
+  await refreshLoaCard(await getLoa(loa.id), settings);
+  return { ok: true, loa, notes: notes.filter(Boolean) };
 }
 
-/** Ends an LOA early (or cancels a pending one). */
+/** Back early (or cancel one that hasn't started). Removes the LOA role. */
 export async function endLoa({ id, byTag }) {
   const settings = await getSettings();
   const loa = await getLoa(id);
-  if (!loa || !['pending', 'approved'].includes(loa.status)) return { ok: false, error: 'That LOA is not active.' };
-  const status = loa.status === 'pending' ? 'cancelled' : 'ended';
-  if (loa.role_applied || loaSchedule.get(id)?.role_applied) await setLoaRole(loa.user_id, false, settings);
+  if (!loa || !['pending', 'approved'].includes(loa.status)) return { ok: false, error: 'That LOA is already over.' };
+  const started = loa.status === 'approved' && (loa.role_applied || loa.start_date <= todayIn(settings.timezone));
+  const status = started ? 'ended' : 'cancelled';
+  const notes = [];
+  if (loa.role_applied || loaSchedule.get(id)?.role_applied || started) {
+    const problem = await setLoaRole(loa.user_id, false, settings);
+    if (problem && settings.loa_role_id) notes.push(problem);
+  }
   loaSchedule.delete(id);
-  const updated = await updateLoa(id, { status, role_applied: false, reviewed_by_tag: loa.reviewed_by_tag || byTag });
-  await refreshLoaCard(updated);
-  return { ok: true, loa: updated };
+  const updated = await updateLoa(id, { status, role_applied: false, ended_at: new Date(), reviewed_by_tag: loa.reviewed_by_tag || byTag });
+  await refreshLoaCard(updated, settings);
+  return { ok: true, loa: updated, notes };
 }
 
 /** Adds the LOA role on the first day and removes it after the last day. Runs from memory. */
@@ -278,20 +317,27 @@ export async function runLoaSchedule(settingsArg) {
   for (const e of [...loaSchedule.values()]) {
     if (today > e.end_date) {
       if (e.role_applied) await setLoaRole(e.user_id, false, settings);
-      await updateLoa(e.id, { status: 'ended', role_applied: false });
+      const updated = await updateLoa(e.id, { status: 'ended', role_applied: false, ended_at: new Date() });
       loaSchedule.delete(e.id);
-      try { (await client.users.fetch(e.user_id)).send('Welcome back! Your LOA has ended.'); } catch { /* ignore */ }
+      await refreshLoaCard(updated, settings);
+      try {
+        (await client.users.fetch(e.user_id)).send({ embeds: [notice('Welcome back! 👋 Your LOA has ended and the LOA role was removed.', 'success')] });
+      } catch { /* ignore */ }
     } else if (!e.role_applied && today >= e.start_date) {
       const note = await setLoaRole(e.user_id, true, settings);
-      if (!note) {
-        e.role_applied = true;
-        await updateLoa(e.id, { role_applied: true });
-      }
+      if (note) { console.warn(`[loa] #${e.id}:`, note); continue; }
+      e.role_applied = true;
+      await refreshLoaCard(await updateLoa(e.id, { role_applied: true }), settings);
     }
   }
 }
 
 export async function loadLoaSchedule() {
+  // Approval was removed: anything still waiting is approved now
+  for (const l of await listLoas({ status: 'pending' })) {
+    const loa = await decideLoaRow(l.id, 'approved', null, 'Automatic');
+    if (loa) await refreshLoaCard(loa);
+  }
   for (const l of await listLoas({ status: 'approved' })) {
     loaSchedule.set(l.id, { id: l.id, user_id: l.user_id, start_date: l.start_date, end_date: l.end_date, role_applied: l.role_applied });
   }
@@ -327,8 +373,9 @@ export const commandData = [
     name: 'loa',
     description: 'Leave of absence',
     options: [
-      { type: ApplicationCommandOptionType.Subcommand, name: 'request', description: 'Ask for a leave of absence' },
-      { type: ApplicationCommandOptionType.Subcommand, name: 'end', description: 'End your leave early, or cancel your request' },
+      { type: ApplicationCommandOptionType.Subcommand, name: 'request', description: 'Go on leave (you get the LOA role on your first day)' },
+      { type: ApplicationCommandOptionType.Subcommand, name: 'view', description: 'See your LOA, with a button to come back early' },
+      { type: ApplicationCommandOptionType.Subcommand, name: 'end', description: "I'm back early: end your LOA now (or cancel an upcoming one)" },
     ],
   },
 ];
@@ -386,10 +433,13 @@ export async function handleCommand(interaction) {
       return interaction.showModal(modal);
     }
     const open = await findOpenLoa(interaction.user.id);
-    if (!open) return interaction.reply({ ...say("You don't have an LOA to end.", 'info'), flags: ephemeral });
+    if (!open) return interaction.reply({ ...say("You don't have an LOA right now. Use `/loa request` to go on leave.", 'info'), flags: ephemeral });
+    if (sub === 'view') {
+      return interaction.reply({ ...loaCard(open, todayIn(settings.timezone)), flags: ephemeral });
+    }
     await interaction.deferReply({ flags: ephemeral });
     const r = await endLoa({ id: open.id, byTag: interaction.user.tag });
-    return interaction.editReply(r.ok ? say(r.loa.status === 'cancelled' ? 'Your LOA request was cancelled.' : 'Welcome back! Your LOA has ended. 👋', 'success') : say(r.error, 'error'));
+    return interaction.editReply(r.ok ? say(backText(r), 'success') : say(r.error, 'error'));
   }
   return null;
 }
@@ -401,15 +451,37 @@ export async function handleLoaModal(interaction) {
     start: interaction.fields.getTextInputValue('start'), end: interaction.fields.getTextInputValue('end'),
     reason: interaction.fields.getTextInputValue('reason'),
   });
-  return interaction.editReply(r.ok
-    ? say(`🌴 Your LOA request (**${prettyDate(r.loa.start_date)}** to **${prettyDate(r.loa.end_date)}**) was sent to managers. I'll DM you when it's reviewed.`, 'success')
-    : say(r.error, 'error'));
+  if (!r.ok) return interaction.editReply(say(r.error, 'error'));
+  return interaction.editReply(say(`🌴 You're on LOA from **${prettyDate(r.loa.start_date)}** to **${prettyDate(r.loa.end_date)}**.\n${r.notes.join('\n')}\n\nCome back early any time with \`/loa view\` or the button in your DMs.`, 'success'));
 }
 
+/** "Welcome back" / "cancelled" text after ending an LOA. */
+function backText(r) {
+  const base = r.loa.status === 'cancelled' ? 'Your upcoming LOA was cancelled.' : 'Welcome back! 👋 Your LOA has ended and the LOA role was removed.';
+  return [base, ...(r.notes || [])].join('\n');
+}
+
+/** Buttons on LOA cards: loa:back:<id> (the member, or a manager). Old loa:approve / loa:deny still work. */
 export async function handleLoaButton(interaction) {
   const [, action, id] = interaction.customId.split(':');
   const settings = await getSettings();
-  if (!isManager(interaction.member, settings)) return interaction.reply({ ...say('Only managers can review LOA requests.', 'blocked'), flags: ephemeral });
+  if (action === 'back') {
+    const loa = await getLoa(Number(id));
+    if (!loa) return interaction.reply({ ...say('That LOA no longer exists.', 'info'), flags: ephemeral });
+    const own = loa.user_id === interaction.user.id;
+    if (!own && !isManager(interaction.member, settings)) {
+      return interaction.reply({ ...say('Only the person on leave (or a manager) can use this button.', 'blocked'), flags: ephemeral });
+    }
+    const r = await endLoa({ id: loa.id, byTag: interaction.user.tag || interaction.user.username });
+    if (!r.ok) return interaction.reply({ ...say(r.error, 'info'), flags: ephemeral });
+    // The card in the LOA channel was refreshed by endLoa. A DM or /loa view card is updated in place.
+    if (interaction.message && interaction.message.id !== loa.message_id) {
+      await interaction.update(loaCard(r.loa, todayIn(settings.timezone)));
+      return interaction.followUp({ ...say(own ? backText(r) : `Ended <@${loa.user_id}>'s LOA.`, 'success'), flags: ephemeral }).catch(() => {});
+    }
+    return interaction.reply({ ...say(own ? backText(r) : `Ended <@${loa.user_id}>'s LOA and removed the role.`, 'success'), flags: ephemeral });
+  }
+  if (!isManager(interaction.member, settings)) return interaction.reply({ ...say('Only managers can do that.', 'blocked'), flags: ephemeral });
   await interaction.deferReply({ flags: ephemeral });
   const r = await decideLoa({ id: Number(id), approve: action === 'approve', byId: interaction.user.id, byTag: interaction.user.tag });
   return interaction.editReply(r.ok ? say(`${action === 'approve' ? 'Approved' : 'Denied'}. ${r.notes.join(' ')}`, 'success') : say(r.error, 'error'));

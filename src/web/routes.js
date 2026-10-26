@@ -35,9 +35,9 @@ const toArray = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
 export function guildOptions(guild) {
   const textChannels = guild.channels.cache
-    .filter((c) => c.type === ChannelType.GuildText)
+    .filter((c) => c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement)
     .sort((a, b) => a.rawPosition - b.rawPosition)
-    .map((c) => ({ id: c.id, name: `#${c.name}`, parent: c.parent?.name || '' }));
+    .map((c) => ({ id: c.id, name: `#${c.name}${c.type === ChannelType.GuildAnnouncement ? ' 📢' : ''}`, parent: c.parent?.name || '' }));
   const categories = guild.channels.cache
     .filter((c) => c.type === ChannelType.GuildCategory)
     .sort((a, b) => a.rawPosition - b.rawPosition)
