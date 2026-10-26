@@ -326,3 +326,16 @@ CREATE TABLE IF NOT EXISTS stat_counters (
   position    INTEGER NOT NULL DEFAULT 0,
   UNIQUE (guild_id, channel_id)
 );
+
+/* ---------- Role menus (buttons that give or take a role) + giveaway ping ---------- */
+CREATE TABLE IF NOT EXISTS role_menus (
+  id          SERIAL PRIMARY KEY,
+  guild_id    TEXT NOT NULL,
+  channel_id  TEXT,
+  message_id  TEXT,
+  title       TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  items       JSONB NOT NULL DEFAULT '[]',  -- [{ role_id, emoji, label }]
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS giveaway_ping_role_id TEXT;

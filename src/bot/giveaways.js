@@ -5,7 +5,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import { randomInt } from 'node:crypto';
 import {
-  createGiveaway, createPoll, getGiveaway, getPoll, giveawayEntrants, listGiveaways, listPolls, pollResults,
+  createGiveaway, getSettings, createPoll, getGiveaway, getPoll, giveawayEntrants, listGiveaways, listPolls, pollResults,
   toggleGiveawayEntry, updateGiveaway, updatePoll, votePoll,
 } from '../db.js';
 import { client } from './client.js';
@@ -78,8 +78,13 @@ export function giveawayMessage(g, entryCount = g.entry_count ?? 0) {
 
 export async function startGiveaway({ channelId, prize, description, winnerCount, requiredRoleId, endsAt, hostId, hostTag }) {
   const g = await createGiveaway({ channelId, prize, description, winnerCount, requiredRoleId, endsAt, hostId, hostTag });
+  // Ping the giveaway notifications role (set on the Giveaways page), like Sapphire did
+  const pingRole = (await getSettings()).giveaway_ping_role_id;
   try {
-    const msg = await postTo(channelId, giveawayMessage({ ...g, entry_count: 0 }));
+    const msg = await postTo(channelId, {
+      ...giveawayMessage({ ...g, entry_count: 0 }),
+      ...(pingRole ? { content: `<@&${pingRole}> 🎉 New giveaway!`, allowedMentions: { roles: [pingRole] } } : {}),
+    });
     await updateGiveaway(g.id, { message_id: msg.id });
   } catch (err) {
     await updateGiveaway(g.id, { status: 'cancelled', ended_at: new Date() });

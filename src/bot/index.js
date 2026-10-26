@@ -17,6 +17,7 @@ import {
   handleMemberJoin, handleMemberLeave, handleMemberUpdate, handleVerifyButton, handleVerifyModal, loadWelcomeConfig,
 } from './welcome.js';
 import { loadCounters, startCounters } from './counters.js';
+import { handleRoleMenuButton } from './roleMenus.js';
 import { handleCommunityAutocomplete, handleCommunityCommand } from './communityCommands.js';
 import { handleGiveawayButton, handlePollButton, loadCommunity, startCommunityLoop } from './giveaways.js';
 
@@ -46,6 +47,7 @@ function route(interaction) {
     if (id === 'verify:start') return handleVerifyButton(interaction);
     if (id.startsWith('gw:enter:')) return handleGiveawayButton(interaction);
     if (id.startsWith('poll:vote:')) return handlePollButton(interaction);
+    if (id.startsWith('rm:')) return handleRoleMenuButton(interaction);
   }
   if (interaction.isModalSubmit()) {
     if (id.startsWith('sub:denymodal:')) return handleDenyModal(interaction);

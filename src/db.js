@@ -43,6 +43,7 @@ const SETTINGS_FIELDS = [
   'apply_panel_title', 'apply_panel_description', 'ticket_panel_title', 'ticket_panel_description',
   'apply_cooldown_days', 'blocked_role_ids', 'interview_category_id', 'timezone',
   'auto_close_hours', 'manager_role_id', 'strike_role_ids', 'strike_log_channel_id', 'loa_role_id', 'loa_channel_id',
+  'giveaway_ping_role_id',
 ];
 
 export async function updateSettings(patch, guildId = config.guildId) {
@@ -622,4 +623,39 @@ export async function replaceCounters(list) {
     );
   }
   return listCounters();
+}
+
+/* ---------- Role menus ---------- */
+
+export async function listRoleMenus() {
+  const { rows } = await query('SELECT * FROM role_menus WHERE guild_id = $1 ORDER BY id', [config.guildId]);
+  return rows;
+}
+
+export async function getRoleMenu(id) {
+  const { rows } = await query('SELECT * FROM role_menus WHERE id = $1 AND guild_id = $2', [id, config.guildId]);
+  return rows[0] || null;
+}
+
+export async function saveRoleMenu({ id = null, channelId, title, description, items }) {
+  if (id) {
+    const { rows } = await query(
+      'UPDATE role_menus SET channel_id = $2, title = $3, description = $4, items = $5 WHERE id = $1 AND guild_id = $6 RETURNING *',
+      [id, channelId, title, description, JSON.stringify(items), config.guildId],
+    );
+    return rows[0] || null;
+  }
+  const { rows } = await query(
+    'INSERT INTO role_menus (guild_id, channel_id, title, description, items) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    [config.guildId, channelId, title, description, JSON.stringify(items)],
+  );
+  return rows[0];
+}
+
+export async function setRoleMenuMessage(id, channelId, messageId) {
+  await query('UPDATE role_menus SET channel_id = $2, message_id = $3 WHERE id = $1', [id, channelId, messageId]);
+}
+
+export async function deleteRoleMenu(id) {
+  await query('DELETE FROM role_menus WHERE id = $1 AND guild_id = $2', [id, config.guildId]);
 }

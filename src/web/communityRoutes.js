@@ -14,7 +14,13 @@ import { ChannelType } from 'discord.js';
 import {
   COUNTER_KINDS, countFor, counterName, detectCounters, normalizeName, setCounters, updateCounters,
 } from '../bot/counters.js';
-import { listCounters, replaceCounters } from '../db.js';
+import {
+  deleteRoleMenu, getRoleMenu, getSettings, listCounters, listRoleMenus, replaceCounters, saveRoleMenu, updateSettings,
+} from '../db.js';
+import {
+  MAX_MENU_ITEMS, publishRoleMenu, unpublishRoleMenu,
+} from '../bot/roleMenus.js';
+import { cleanEmoji } from '../bot/ui.js';
 
 export const communityRoutes = express.Router();
 
@@ -130,7 +136,7 @@ communityRoutes.post('/welcome/verify-panel', requireAdmin, async (req, res) => 
 /* ---------- Giveaways ---------- */
 
 communityRoutes.get('/giveaways', requireManager, async (req, res) => {
-  res.render('giveaways', { title: 'Giveaways', giveaways: await listGiveaways(), opts: res.locals.guildOpts() });
+  res.render('giveaways', { title: 'Giveaways', giveaways: await listGiveaways(), opts: res.locals.guildOpts(), pingRoleId: (await getSettings()).giveaway_ping_role_id });
 });
 
 communityRoutes.post('/giveaways', requireManager, async (req, res) => {
@@ -270,4 +276,86 @@ communityRoutes.post('/stats', requireAdmin, async (req, res) => {
     ? `Saved ${saved.length} counter${saved.length === 1 ? '' : 's'}. ${renamed ? `${renamed} channel${renamed === 1 ? ' was' : 's were'} updated now.` : 'Names were already up to date.'} They update every 10 minutes from now on.`
     : 'All counters removed. Orbit will not rename any channels.');
   res.redirect('/stats');
+});
+
+
+/* ---------- Giveaway ping role ---------- */
+
+communityRoutes.post('/giveaways/ping-role', requireManager, async (req, res) => {
+  const role = pick(req.body.giveaway_ping_role_id, res.locals.guildOpts().roles);
+  await updateSettings({ giveaway_ping_role_id: role });
+  flash(req, 'success', role ? 'Saved. That role is pinged whenever a new giveaway starts.' : 'Saved. New giveaways will not ping anyone.');
+  res.redirect('/giveaways');
+});
+
+/* ---------- Role menus (role buttons) ---------- */
+
+/** A starting menu for giveaway pings, filled in from the server's own channel and role names. */
+function giveawayStarter(opts) {
+  const channel = opts.textChannels.find((c) => /giveaway/i.test(c.name));
+  const role = opts.roles.find((r) => /^@giveaways?$/i.test(r.name.trim())) || opts.roles.find((r) => /giveaway/i.test(r.name));
+  return {
+    title: '🎉 Giveaway Notifications',
+    description: 'Get pinged whenever a new giveaway starts in the server.',
+    channel_id: channel?.id || null,
+    items: role ? [{ role_id: role.id, emoji: '🎁', label: 'Giveaway pings' }] : [],
+  };
+}
+
+function menuFromForm(body, opts) {
+  const roles = toArray(body.item_role);
+  const emojis = toArray(body.item_emoji);
+  const labels = toArray(body.item_label);
+  const items = [];
+  roles.forEach((roleId, i) => {
+    if (!roleId || !opts.roles.some((r) => r.id === roleId) || items.some((it) => it.role_id === roleId)) return;
+    items.push({ role_id: roleId, emoji: cleanEmoji(emojis[i]) || '', label: clean(labels[i], 80) });
+  });
+  return {
+    title: clean(body.title, 200) || 'Pick your roles',
+    description: clean(body.description, 1500),
+    channelId: pick(body.channel_id, opts.textChannels),
+    items: items.slice(0, MAX_MENU_ITEMS),
+  };
+}
+
+communityRoutes.get('/role-menus', requireAdmin, async (req, res) => {
+  const opts = res.locals.guildOpts();
+  const menus = await listRoleMenus();
+  res.render('role-menus', { title: 'Role buttons', menus, opts, starter: menus.length ? null : giveawayStarter(opts), maxItems: MAX_MENU_ITEMS });
+});
+
+async function saveAndMaybePost(req, res, id) {
+  const opts = res.locals.guildOpts();
+  const data = menuFromForm(req.body, opts);
+  const menu = await saveRoleMenu({ id, ...data });
+  if (!menu) return res.redirect('/role-menus');
+  if (req.body.then_post) {
+    try {
+      const r = await publishRoleMenu(menu.id);
+      flash(req, 'success', `Saved, and the menu was ${r.updated ? 'updated' : 'posted'} in Discord.`);
+    } catch (err) {
+      flash(req, 'error', `Saved, but it could not be posted: ${err.message}`);
+    }
+  } else {
+    flash(req, 'success', menu.message_id ? 'Saved. Press "Save and post" to update the message in Discord.' : 'Saved.');
+  }
+  res.redirect(`/role-menus#menu-${menu.id}`);
+}
+
+communityRoutes.post('/role-menus', requireAdmin, (req, res) => saveAndMaybePost(req, res, null));
+communityRoutes.post('/role-menus/:id', requireAdmin, async (req, res) => {
+  const id = idParam(req);
+  if (!id || !(await getRoleMenu(id))) return res.redirect('/role-menus');
+  return saveAndMaybePost(req, res, id);
+});
+communityRoutes.post('/role-menus/:id/delete', requireAdmin, async (req, res) => {
+  const id = idParam(req);
+  const menu = id && await getRoleMenu(id);
+  if (menu) {
+    await unpublishRoleMenu(menu);
+    await deleteRoleMenu(id);
+    flash(req, 'success', `Deleted "${menu.title}" and removed its message from Discord.`);
+  }
+  res.redirect('/role-menus');
 });

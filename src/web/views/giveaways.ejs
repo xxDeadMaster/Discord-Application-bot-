@@ -47,6 +47,18 @@
 </section>
 
 <section class="card">
+  <h2>Giveaway pings</h2>
+  <form method="post" action="/giveaways/ping-role" class="tab-actions" style="align-items: flex-end;">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div style="flex: 1; min-width: 220px;">
+      <%- include('partials/select', { name: 'giveaway_ping_role_id', label: 'Role to ping when a giveaway starts', list: opts.roles, value: pingRoleId, emptyLabel: 'Don\'t ping anyone',
+          help: 'Members get this role from a Role buttons menu. The role must be mentionable, or Orbit needs the "Mention all roles" permission.' }) %>
+    </div>
+    <button class="btn" type="submit" style="margin-bottom: 30px;"><%- include('partials/icon', { name: 'check', size: 16 }) %> Save</button>
+  </form>
+</section>
+
+<section class="card">
   <div class="card-head">
     <h2>All giveaways</h2>
     <span class="muted small"><%= giveaways.filter(g => g.status === 'active').length %> running</span>

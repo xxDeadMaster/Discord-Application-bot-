@@ -1,0 +1,76 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Role buttons</h1>
+    <p>A message with buttons: members press one to get that role and press it again to remove it. Use it for ping roles like giveaways, events or QOTD.</p>
+  </div>
+</div>
+
+<%
+// One editor for a menu (existing or new). items: [{ role_id, emoji, label }]
+const editor = (m, action, isNew) => { const items = (m.items && m.items.length ? m.items : [{ role_id: '', emoji: '', label: '' }]); %>
+  <form method="post" action="<%= action %>" class="stack" style="gap: 14px;">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid-2">
+      <div class="field">
+        <label for="t-<%= m.id || 'new' %>">Title</label>
+        <input id="t-<%= m.id || 'new' %>" name="title" maxlength="200" value="<%= m.title || '' %>" placeholder="🎉 Giveaway Notifications" required>
+      </div>
+      <%- include('partials/select', { name: 'channel_id', label: 'Channel', list: opts.textChannels, value: m.channel_id, emptyLabel: 'Pick a channel' }) %>
+    </div>
+    <div class="field">
+      <label for="d-<%= m.id || 'new' %>">Message (optional)</label>
+      <textarea id="d-<%= m.id || 'new' %>" name="description" rows="2" maxlength="1500" placeholder="Get pinged whenever a new giveaway starts."><%= m.description || '' %></textarea>
+    </div>
+    <fieldset class="field">
+      <legend>Buttons <span class="muted small">(up to <%= maxItems %>)</span></legend>
+      <div class="menu-items" data-menu-items data-max="<%= maxItems %>">
+        <% items.forEach(it => { %>
+          <div class="menu-item" data-menu-item>
+            <input class="emoji-input" name="item_emoji" maxlength="64" value="<%= it.emoji || '' %>" placeholder="🎁" aria-label="Button emoji">
+            <select name="item_role" aria-label="Role to give">
+              <option value="">Pick a role</option>
+              <% opts.roles.forEach(r => { %><option value="<%= r.id %>" <%= r.id === it.role_id ? 'selected' : '' %>><%= r.name %></option><% }) %>
+            </select>
+            <input name="item_label" maxlength="80" value="<%= it.label || '' %>" placeholder="Button text (role name if empty)" aria-label="Button text">
+            <button type="button" class="icon-btn danger" data-remove-item aria-label="Remove this button" title="Remove"><%- include('partials/icon', { name: 'trash', size: 16 }) %></button>
+          </div>
+        <% }) %>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" data-add-item><%- include('partials/icon', { name: 'plus', size: 15 }) %> Add button</button>
+    </fieldset>
+    <div class="tab-actions">
+      <button class="btn btn-primary" type="submit" name="then_post" value="1"><%- include('partials/icon', { name: 'send', size: 16 }) %> Save and post</button>
+      <button class="btn" type="submit"><%- include('partials/icon', { name: 'check', size: 16 }) %> Save only</button>
+      <span class="muted small"><%= isNew ? 'Posts a new message in that channel.' : (m.message_id ? 'Updates the message already in Discord.' : 'Not posted yet.') %></span>
+    </div>
+  </form>
+<% } %>
+
+<% menus.forEach(m => { const ch = opts.textChannels.find(c => c.id === m.channel_id); %>
+<section class="card" id="menu-<%= m.id %>">
+  <div class="card-head">
+    <div>
+      <h2 style="margin: 0;"><%= m.title %></h2>
+      <span class="muted small"><%= (m.items || []).length %> button<%= (m.items || []).length === 1 ? '' : 's' %> · <%= ch ? ch.name : 'no channel' %></span>
+    </div>
+    <div class="row-actions">
+      <% if (m.message_id) { %><span class="pill pill-open">Posted</span><% } else { %><span class="pill pill-off">Not posted</span><% } %>
+      <form method="post" action="/role-menus/<%= m.id %>/delete" data-confirm="Delete &quot;<%= m.title %>&quot;? Its message is removed from Discord. People keep the roles they have.">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="icon-btn danger" type="submit" aria-label="Delete" title="Delete"><%- include('partials/icon', { name: 'trash', size: 16 }) %></button>
+      </form>
+    </div>
+  </div>
+  <% editor(m, `/role-menus/${m.id}`, false) %>
+</section>
+<% }) %>
+
+<section class="card" id="new">
+  <h2><%= starter ? 'Replace Sapphire\'s giveaway notifications' : 'New role menu' %></h2>
+  <% if (starter) { %>
+    <p class="muted small">Filled in from your server. Press <strong>Save and post</strong>, then delete Sapphire's old message. Everyone who already has the role keeps it.</p>
+  <% } %>
+  <% editor(starter || {}, '/role-menus', true) %>
+</section>
+<%- include('partials/foot') %>

@@ -559,3 +559,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .counter-row:last-child { border-bottom: 0; }
 .counter-remove { margin-top: 30px; }
 @media (max-width: 760px) { .counter-row { grid-template-columns: 1fr 1fr; } .counter-remove { margin-top: 0; } }
+
+/* ---------- Role buttons ---------- */
+.menu-items { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.menu-item { display: grid; grid-template-columns: 70px 1.2fr 1fr auto; gap: 10px; align-items: center; }
+.menu-item .emoji-input { max-width: none; }
+@media (max-width: 700px) { .menu-item { grid-template-columns: 60px 1fr auto; } .menu-item input[name=item_label] { grid-column: 1 / 3; } }

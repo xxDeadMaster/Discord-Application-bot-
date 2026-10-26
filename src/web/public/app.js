@@ -291,3 +291,28 @@ document.querySelectorAll('[data-collapse-all]').forEach((btn) => {
   });
   sync();
 })();
+
+/* ---------- Role buttons: add/remove button rows ---------- */
+document.querySelectorAll('[data-menu-items]').forEach((list) => {
+  const addBtn = list.parentElement.querySelector('[data-add-item]');
+  const max = Number(list.dataset.max || 10);
+  const sync = () => { addBtn.hidden = list.querySelectorAll('[data-menu-item]').length >= max; };
+  addBtn.addEventListener('click', () => {
+    const rows = list.querySelectorAll('[data-menu-item]');
+    const copy = rows[rows.length - 1].cloneNode(true);
+    copy.querySelectorAll('input').forEach((el) => { el.value = ''; });
+    copy.querySelector('select').value = '';
+    list.appendChild(copy);
+    copy.querySelector('select').focus();
+    sync();
+  });
+  list.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-remove-item]');
+    if (!btn) return;
+    const rows = list.querySelectorAll('[data-menu-item]');
+    const row = btn.closest('[data-menu-item]');
+    if (rows.length === 1) { row.querySelectorAll('input').forEach((el) => { el.value = ''; }); row.querySelector('select').value = ''; } else row.remove();
+    sync();
+  });
+  sync();
+});
