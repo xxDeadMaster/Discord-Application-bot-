@@ -603,3 +603,23 @@ export async function pollResults(poll) {
   const v = await query('SELECT count(DISTINCT user_id)::int AS n FROM poll_votes WHERE poll_id = $1', [poll.id]);
   return { counts, voters: v.rows[0].n };
 }
+
+/* ---------- Server stat counters ---------- */
+
+export async function listCounters() {
+  const { rows } = await query('SELECT * FROM stat_counters WHERE guild_id = $1 ORDER BY position, id', [config.guildId]);
+  return rows;
+}
+
+/** Replaces all counters with this list: [{ channelId, kind, template }]. */
+export async function replaceCounters(list) {
+  await query('DELETE FROM stat_counters WHERE guild_id = $1', [config.guildId]);
+  let i = 0;
+  for (const c of list) {
+    await query(
+      'INSERT INTO stat_counters (guild_id, channel_id, kind, template, position) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (guild_id, channel_id) DO NOTHING',
+      [config.guildId, c.channelId, c.kind, c.template, i++],
+    );
+  }
+  return listCounters();
+}

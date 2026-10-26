@@ -10,6 +10,11 @@ import {
   deleteGiveaway, deletePoll, getGiveaway, getPoll, getWelcomeConfig, listGiveaways, listPolls, pollResults, updateWelcomeConfig,
 } from '../db.js';
 import { requireAdmin } from './auth.js';
+import { ChannelType } from 'discord.js';
+import {
+  COUNTER_KINDS, countFor, counterName, detectCounters, normalizeName, setCounters, updateCounters,
+} from '../bot/counters.js';
+import { listCounters, replaceCounters } from '../db.js';
 
 export const communityRoutes = express.Router();
 
@@ -216,4 +221,53 @@ communityRoutes.post('/polls/:id/:action', requireManager, async (req, res) => {
   } else return res.redirect('/polls');
   flash(req, r.ok ? 'success' : 'error', r.ok ? (req.params.action === 'end' ? 'Poll closed. Final results are shown in Discord.' : 'Poll deleted from the dashboard.') : r.error);
   res.redirect('/polls');
+});
+
+
+/* ---------- Server stats (counter channels) ---------- */
+
+/** Channels a counter can live in: text, announcement and voice channels. */
+function counterChannels(guild) {
+  const kinds = [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildVoice, ChannelType.GuildStageVoice];
+  return guild.channels.cache
+    .filter((c) => kinds.includes(c.type))
+    .sort((a, b) => (a.parent?.rawPosition ?? -1) - (b.parent?.rawPosition ?? -1) || a.rawPosition - b.rawPosition)
+    .map((c) => ({ id: c.id, name: `${c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildStageVoice ? '🔊 ' : '#'}${c.name}`, parent: c.parent?.name || '', type: c.type }));
+}
+
+communityRoutes.get('/stats', requireAdmin, async (req, res) => {
+  const guild = res.locals.guild;
+  const saved = await listCounters();
+  const suggested = saved.length ? [] : detectCounters(guild);
+  const rows = (saved.length ? saved.map((c) => ({ channelId: c.channel_id, kind: c.kind, template: c.template })) : suggested);
+  const channels = counterChannels(guild);
+  const preview = rows.map((r) => {
+    const ch = guild.channels.cache.get(r.channelId);
+    return ch ? normalizeName(counterName({ kind: r.kind, template: r.template }, guild), ch.type) : '';
+  });
+  const counts = Object.fromEntries(Object.keys(COUNTER_KINDS).map((k) => [k, countFor(k, guild)]));
+  res.render('stats', { title: 'Server stats', rows, preview, channels, kinds: COUNTER_KINDS, counts, isSuggestion: !saved.length && suggested.length > 0 });
+});
+
+communityRoutes.post('/stats', requireAdmin, async (req, res) => {
+  const guild = res.locals.guild;
+  const channels = counterChannels(guild);
+  const ids = toArray(req.body.channel_id);
+  const kinds = toArray(req.body.kind);
+  const templates = toArray(req.body.template);
+  const list = [];
+  ids.forEach((id, i) => {
+    const kind = kinds[i];
+    if (!id || !channels.some((c) => c.id === id) || !COUNTER_KINDS[kind] || list.some((l) => l.channelId === id)) return;
+    let template = clean(templates[i], 90) || COUNTER_KINDS[kind].template;
+    if (!template.includes('{count}')) template = `${template} {count}`;
+    list.push({ channelId: id, kind, template });
+  });
+  const saved = await replaceCounters(list.slice(0, 10));
+  setCounters(saved);
+  const renamed = await updateCounters({ force: true });
+  flash(req, 'success', saved.length
+    ? `Saved ${saved.length} counter${saved.length === 1 ? '' : 's'}. ${renamed ? `${renamed} channel${renamed === 1 ? ' was' : 's were'} updated now.` : 'Names were already up to date.'} They update every 10 minutes from now on.`
+    : 'All counters removed. Orbit will not rename any channels.');
+  res.redirect('/stats');
 });

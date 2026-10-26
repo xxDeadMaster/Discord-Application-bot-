@@ -27,6 +27,7 @@
   if (manager) links.push({ href: '/strikes', label: 'Strikes', icon: 'alert', active: path.startsWith('/strikes') });
   if (admin || manager) links.push({ section: 'Community' });
   if (admin) links.push({ href: '/welcome', label: 'Welcome', icon: 'wave', active: path.startsWith('/welcome') });
+  if (admin) links.push({ href: '/stats', label: 'Server stats', icon: 'hash', active: path.startsWith('/stats') });
   if (manager) links.push({ href: '/giveaways', label: 'Giveaways', icon: 'gift', active: path.startsWith('/giveaways') });
   if (manager) links.push({ href: '/polls', label: 'Polls', icon: 'poll', active: path.startsWith('/polls') });
   if (admin || manager) links.push({ section: 'Setup' });

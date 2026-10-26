@@ -315,3 +315,14 @@ CREATE TABLE IF NOT EXISTS poll_votes (
   PRIMARY KEY (poll_id, user_id, option_index)
 );
 ALTER TABLE loa_requests ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;
+
+/* ---------- Server stat counters (channels renamed with live numbers) ---------- */
+CREATE TABLE IF NOT EXISTS stat_counters (
+  id          SERIAL PRIMARY KEY,
+  guild_id    TEXT NOT NULL,
+  channel_id  TEXT NOT NULL,
+  kind        TEXT NOT NULL,       -- members | humans | bots | channels | boosts | staff
+  template    TEXT NOT NULL,       -- e.g. "all-members-{count}"
+  position    INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (guild_id, channel_id)
+);

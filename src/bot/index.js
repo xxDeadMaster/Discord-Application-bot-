@@ -16,6 +16,7 @@ import { ephemeral } from './ui.js';
 import {
   handleMemberJoin, handleMemberLeave, handleMemberUpdate, handleVerifyButton, handleVerifyModal, loadWelcomeConfig,
 } from './welcome.js';
+import { loadCounters, startCounters } from './counters.js';
 import { handleCommunityAutocomplete, handleCommunityCommand } from './communityCommands.js';
 import { handleGiveawayButton, handlePollButton, loadCommunity, startCommunityLoop } from './giveaways.js';
 
@@ -140,6 +141,8 @@ client.once(Events.ClientReady, async (c) => {
   await loadWelcomeConfig().catch((err) => console.error('[welcome] load failed:', err));
   await loadCommunity().catch((err) => console.error('[community] load failed:', err));
   startCommunityLoop();
+  await loadCounters().catch((err) => console.error('[counters] load failed:', err));
+  startCounters();
 });
 
 client.on(Events.Error, (err) => console.error('[discord]', err));

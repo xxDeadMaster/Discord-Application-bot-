@@ -253,3 +253,41 @@ document.querySelectorAll('[data-collapse-all]').forEach((btn) => {
   new MutationObserver(() => list.querySelectorAll('textarea').forEach(fit)).observe(list, { childList: true });
   window.addEventListener('resize', () => list.querySelectorAll('textarea').forEach(fit));
 })();
+
+/* ---------- Server stats: add/remove counter rows, default name per kind ---------- */
+(() => {
+  const list = document.querySelector('[data-counter-list]');
+  if (!list) return;
+  const addBtn = document.querySelector('[data-add-counter]');
+  const sync = () => { addBtn.hidden = list.querySelectorAll('[data-counter-row]').length >= 10; };
+  addBtn.addEventListener('click', () => {
+    const rows = list.querySelectorAll('[data-counter-row]');
+    const copy = rows[rows.length - 1].cloneNode(true);
+    const n = Date.now();
+    copy.querySelectorAll('select, input').forEach((el) => {
+      if (el.name === 'kind') el.selectedIndex = 0; else if (el.tagName === 'SELECT') el.value = ''; else el.value = '';
+      const label = copy.querySelector(`label[for="${el.id}"]`);
+      el.id = `${el.name}-${n}`;
+      if (label) label.setAttribute('for', el.id);
+    });
+    copy.querySelectorAll('.help').forEach((h) => h.remove());
+    const kind = copy.querySelector('[data-kind]');
+    copy.querySelector('[data-template]').placeholder = kind.selectedOptions[0].dataset.template;
+    list.appendChild(copy);
+    sync();
+  });
+  list.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-remove-counter]');
+    if (!btn) return;
+    const rows = list.querySelectorAll('[data-counter-row]');
+    const row = btn.closest('[data-counter-row]');
+    if (rows.length === 1) { row.querySelectorAll('select, input').forEach((el) => { el.value = el.name === 'kind' ? 'members' : ''; }); } else row.remove();
+    sync();
+  });
+  list.addEventListener('change', (e) => {
+    if (!e.target.matches('[data-kind]')) return;
+    const tpl = e.target.closest('[data-counter-row]').querySelector('[data-template]');
+    tpl.placeholder = e.target.selectedOptions[0].dataset.template;
+  });
+  sync();
+})();

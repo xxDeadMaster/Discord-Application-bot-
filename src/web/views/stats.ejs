@@ -1,0 +1,69 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Server stats</h1>
+    <p>Channels whose names show live numbers, like <code>all-members-170</code>. Orbit updates them every 10 minutes, only when a number changes.</p>
+  </div>
+</div>
+
+<% if (isSuggestion) { %>
+  <div class="flash flash-success" role="status">
+    <%- include('partials/icon', { name: 'check' }) %>
+    <span>Orbit found your existing counter channels and filled them in below. Check them, then press <strong>Save counters</strong> to let Orbit take over (and remove the ServerStats bot so they don't both rename the channels).</span>
+  </div>
+<% } %>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Right now</h2>
+    <span class="muted small">Live from your server</span>
+  </div>
+  <div class="count-chips">
+    <% Object.entries(kinds).forEach(([k, v]) => { %>
+      <span class="count-chip"><b><%= counts[k].toLocaleString('en-US') %></b> <%= v.label %></span>
+    <% }) %>
+  </div>
+</section>
+
+<form method="post" action="/stats" class="stack">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <section class="card">
+    <div class="card-head">
+      <h2>Counters</h2>
+      <span class="muted small">Up to 10. <code>{count}</code> is replaced with the number.</span>
+    </div>
+    <div class="counter-list" data-counter-list>
+      <% const blank = { channelId: '', kind: 'members', template: '' }; const list = rows.length ? rows : [blank]; %>
+      <% list.forEach((r, i) => { %>
+        <div class="counter-row" data-counter-row>
+          <div class="field">
+            <label for="cc-<%= i %>">Channel</label>
+            <select id="cc-<%= i %>" name="channel_id">
+              <option value="">Pick a channel</option>
+              <% channels.forEach(c => { %><option value="<%= c.id %>" <%= c.id === r.channelId ? 'selected' : '' %>><%= c.name %><%= c.parent ? `  (${c.parent})` : '' %></option><% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ck-<%= i %>">Shows</label>
+            <select id="ck-<%= i %>" name="kind" data-kind>
+              <% Object.entries(kinds).forEach(([k, v]) => { %><option value="<%= k %>" data-template="<%= v.template %>" <%= k === r.kind ? 'selected' : '' %>><%= v.label %></option><% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label for="ct-<%= i %>">Name</label>
+            <input id="ct-<%= i %>" name="template" maxlength="90" value="<%= r.template %>" placeholder="<%= kinds[r.kind]?.template %>" data-template>
+            <% if (preview[i]) { %><p class="help">Shows as <strong><%= preview[i] %></strong></p><% } %>
+          </div>
+          <button type="button" class="icon-btn danger counter-remove" data-remove-counter aria-label="Remove this counter" title="Remove"><%- include('partials/icon', { name: 'trash', size: 16 }) %></button>
+        </div>
+      <% }) %>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm" data-add-counter><%- include('partials/icon', { name: 'plus', size: 15 }) %> Add counter</button>
+    <p class="help" style="margin-top: 12px;">Text channel names are always lowercase with dashes. Voice channels can show spaces and capitals, like <code>All Members: {count}</code>. Orbit needs the Manage Channels permission on these channels.</p>
+  </section>
+  <div class="actions sticky-actions">
+    <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'check', size: 16 }) %> Save counters</button>
+    <span class="muted small">Updates the names right away.</span>
+  </div>
+</form>
+<%- include('partials/foot') %>

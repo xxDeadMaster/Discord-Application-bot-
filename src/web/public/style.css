@@ -549,3 +549,13 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .hero-chip { background: rgba(8, 18, 46, 0.72); backdrop-filter: blur(4px); }
 .hero-chip-main { background: #fff; }
 .ptabs { position: sticky; }
+
+/* ---------- Server stats ---------- */
+.count-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.count-chip { padding: 6px 12px; border-radius: 999px; background: var(--field); border: 1px solid var(--border); font-size: 14px; color: var(--text-2); }
+.count-chip b { color: #fff; font-size: 15px; }
+.counter-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.counter-row { display: grid; grid-template-columns: 1.3fr 1fr 1.3fr auto; gap: 12px; align-items: start; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.counter-row:last-child { border-bottom: 0; }
+.counter-remove { margin-top: 30px; }
+@media (max-width: 760px) { .counter-row { grid-template-columns: 1fr 1fr; } .counter-remove { margin-top: 0; } }
