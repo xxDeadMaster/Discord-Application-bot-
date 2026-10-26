@@ -32,7 +32,8 @@ export function startWeb() {
   app.use(express.urlencoded({ extended: false, limit: '200kb' }));
 
   app.use(session({
-    store: new PgStore({ pool, createTableIfMissing: true }),
+    // Prune expired logins once a day rather than every 15 minutes, so the database can sleep
+    store: new PgStore({ pool, createTableIfMissing: false, pruneSessionInterval: 24 * 60 * 60 }),
     secret: config.sessionSecret,
     name: 'appbot.sid',
     resave: false,

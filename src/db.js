@@ -5,7 +5,11 @@ import { config } from './config.js';
 export const pool = new pg.Pool({
   connectionString: config.databaseUrl,
   ssl: config.databaseSsl ? { rejectUnauthorized: false } : undefined,
+  max: 5,
+  // Close idle connections quickly so serverless databases (like Neon's free plan) can sleep
+  idleTimeoutMillis: 10_000,
 });
+pool.on('error', (err) => console.warn('[db] idle connection error:', err.message));
 
 export const query = (text, params) => pool.query(text, params);
 
