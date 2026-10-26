@@ -8,7 +8,9 @@ if (missing.length) {
   process.exit(1);
 }
 
-const publicUrl = (process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/+$/, '');
+// Hosts name the web port differently (PORT on Fly/Railway, SERVER_PORT on Pterodactyl-style panels)
+const port = Number(process.env.PORT || process.env.SERVER_PORT) || 3000;
+const publicUrl = (process.env.PUBLIC_URL || `http://localhost:${port}`).replace(/\/+$/, '');
 
 export const config = {
   token: process.env.DISCORD_TOKEN,
@@ -19,7 +21,7 @@ export const config = {
   databaseSsl: process.env.DATABASE_SSL === 'true',
   sessionSecret: process.env.SESSION_SECRET || null, // filled from the database at startup if unset
   publicUrl,
-  port: Number(process.env.PORT) || 3000,
+  port,
   secureCookies: publicUrl.startsWith('https://'),
 
   // How long an applicant can go quiet in DMs before the application expires
