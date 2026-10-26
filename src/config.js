@@ -1,6 +1,7 @@
 import 'dotenv/config';
 
-const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'GUILD_ID', 'DATABASE_URL', 'SESSION_SECRET'];
+// SESSION_SECRET is optional: if it's not set, one is generated and saved in the database.
+const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'GUILD_ID', 'DATABASE_URL'];
 const missing = required.filter((k) => !process.env[k]);
 if (missing.length) {
   console.error(`Missing environment variables: ${missing.join(', ')}. See .env.example.`);
@@ -16,7 +17,7 @@ export const config = {
   guildId: process.env.GUILD_ID,
   databaseUrl: process.env.DATABASE_URL,
   databaseSsl: process.env.DATABASE_SSL === 'true',
-  sessionSecret: process.env.SESSION_SECRET,
+  sessionSecret: process.env.SESSION_SECRET || null, // filled from the database at startup if unset
   publicUrl,
   port: Number(process.env.PORT) || 3000,
   secureCookies: publicUrl.startsWith('https://'),

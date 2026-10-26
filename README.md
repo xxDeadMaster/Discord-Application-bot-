@@ -50,7 +50,6 @@ You'll do this once. It takes about 20 minutes.
    | `DISCORD_CLIENT_SECRET` | from step 1 |
    | `GUILD_ID` | from step 1 |
    | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (Railway links it to the database) |
-   | `SESSION_SECRET` | any long random string |
    | `PUBLIC_URL` | fill in after the next step |
 
 5. Bot service > **Settings > Networking > Generate Domain**. Copy the address (like `https://app-bot-production.up.railway.app`) into `PUBLIC_URL`, with no slash at the end.

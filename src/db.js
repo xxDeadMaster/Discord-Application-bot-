@@ -14,6 +14,14 @@ export async function migrate() {
   await pool.query(sql);
 }
 
+/** Returns a stored secret, creating a random one the first time. */
+export async function getOrCreateSecret(name) {
+  const value = (await import('node:crypto')).randomBytes(48).toString('hex');
+  await query('INSERT INTO app_secrets (name, value) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING', [name, value]);
+  const { rows } = await query('SELECT value FROM app_secrets WHERE name = $1', [name]);
+  return rows[0].value;
+}
+
 /* ---------- Settings ---------- */
 
 export async function getSettings(guildId = config.guildId) {

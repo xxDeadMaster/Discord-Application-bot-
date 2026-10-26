@@ -1,5 +1,5 @@
 import { config } from './config.js';
-import { migrate, pool } from './db.js';
+import { getOrCreateSecret, migrate, pool } from './db.js';
 import { startBot } from './bot/index.js';
 import { client } from './bot/client.js';
 import { startWeb } from './web/server.js';
@@ -7,6 +7,7 @@ import { startWeb } from './web/server.js';
 async function main() {
   await migrate();
   console.log('[db] schema ready');
+  if (!config.sessionSecret) config.sessionSecret = await getOrCreateSecret('session');
   startWeb();
   await startBot();
   console.log(`[app] running for server ${config.guildId}`);

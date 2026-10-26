@@ -8,6 +8,12 @@ CREATE TABLE IF NOT EXISTS "session" (
 );
 CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
 
+-- Secrets the app generates for itself (e.g. the website's cookie signing key)
+CREATE TABLE IF NOT EXISTS app_secrets (
+  name  TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
   guild_id                 TEXT PRIMARY KEY,
   apply_channel_id         TEXT,
