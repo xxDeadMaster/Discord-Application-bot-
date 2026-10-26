@@ -1,7 +1,9 @@
 import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, StringSelectMenuBuilder,
 } from 'discord.js';
-import { getSettings, listCategories, listRoles, updateSettings } from '../db.js';
+import {
+  getSettings, listCategories, listRoles, listTicketTypes, updateSettings,
+} from '../db.js';
 import { client } from './client.js';
 import { isCategoryOpen, scheduleState } from '../schedule.js';
 import { ticketPanelComponents } from './tickets.js';
@@ -70,9 +72,57 @@ export async function buildApplyPanel(settings) {
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select)], files, attachments: [] };
 }
 
+/** Old default text that mentions a button; replaced when the panel shows a dropdown. */
+const OLD_TICKET_TEXT = 'Click the button below to open a private ticket with staff.';
+
 export async function buildTicketPanel(settings) {
-  const { embed, files } = panelBase(settings.ticket_panel_title, settings.ticket_panel_description, 'SUPPORT TICKETS', 'tickets.png');
+  const types = (await listTicketTypes({ enabledOnly: true })).slice(0, 25);
+  let text = settings.ticket_panel_description;
+  if (types.length && (!text || text === OLD_TICKET_TEXT)) {
+    text = 'Need a hand from staff? Pick a topic below and a **private channel** opens just for you and the team.';
+  }
+  const { embed, files } = panelBase(settings.ticket_panel_title, text, 'SUPPORT TICKETS', 'tickets.png');
   embed.setColor(COLORS.sky);
+
+  if (types.length) {
+    // Discord fits 3 inline fields per row. 3, 6 or 9 types fill rows of 3; any other count
+    // goes 2 per row (a blank third field keeps the columns lined up) so nothing sits alone.
+    const shown = types.slice(0, 9);
+    const perRow = shown.length % 3 === 0 ? 3 : 2;
+    const blank = { name: '\u200b', value: '\u200b', inline: true };
+    shown.slice(0, perRow === 2 ? 8 : 9).forEach((t, i, list) => {
+      embed.addFields({
+        name: truncate(withEmoji(t.emoji, t.name), 256),
+        value: truncate(t.description || 'Open a ticket about this.', 1024),
+        inline: list.length > 1,
+      });
+      if (perRow === 2 && list.length > 1 && (i % 2 === 1 || i === list.length - 1)) {
+        if (i % 2 === 0) embed.addFields(blank);
+        embed.addFields(blank);
+      }
+    });
+  }
+
+  const hours = Number(settings.auto_close_hours ?? 48);
+  embed.addFields(
+    {
+      name: 'How it works',
+      value: [
+        `1️⃣ ${types.length ? 'Pick a topic from the menu below' : 'Press **Open a ticket** below'}`,
+        '2️⃣ Answer a few quick questions',
+        '3️⃣ Chat with staff in your private channel',
+      ].join('\n'),
+    },
+    {
+      name: 'Good to know',
+      value: [
+        '🎫 One open ticket at a time',
+        '📎 Screenshots and links help us help you faster',
+        hours > 0 ? `⏰ Quiet tickets close after ${hours} hour${hours === 1 ? '' : 's'}` : null,
+        '⭐ Rate us when your ticket closes',
+      ].filter(Boolean).join('\n'),
+    },
+  );
   return { embeds: [embed], components: await ticketPanelComponents(), files, attachments: [] };
 }
 
