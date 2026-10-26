@@ -87,6 +87,21 @@ client.on(Events.ChannelDelete, (channel) => {
   handleInterviewChannelDelete(channel).catch((err) => console.error('[channelDelete interview]', err));
 });
 
+/** Orbit is private to BloxVerse: leave any other server it gets added to. */
+export async function leaveOtherServers() {
+  for (const g of client.guilds.cache.values()) {
+    if (g.id === config.guildId) continue;
+    console.warn(`[bot] leaving server that isn't BloxVerse: ${g.name} (${g.id})`);
+    await g.leave().catch((err) => console.warn('[bot] could not leave server:', err.message));
+  }
+}
+
+client.on(Events.GuildCreate, (guild) => {
+  if (guild.id === config.guildId) return;
+  console.warn(`[bot] added to another server: ${guild.name} (${guild.id}), leaving`);
+  guild.leave().catch((err) => console.warn('[bot] could not leave server:', err.message));
+});
+
 client.on(Events.GuildMemberAdd, (member) => {
   if (member.guild.id !== config.guildId) return;
   handleMemberJoin(member).catch((err) => console.error('[memberAdd]', err));
@@ -112,6 +127,7 @@ client.once(Events.ClientReady, async (c) => {
   const guild = await c.guilds.fetch(config.guildId).catch(() => null);
   if (!guild) console.warn(`[bot] not in server ${config.guildId} yet. Invite it with the link on the dashboard.`);
   syncProfile(c).catch((err) => console.warn('[profile] sync failed:', err.message));
+  await leaveOtherServers();
   if (guild) {
     await registerCommands(guild);
     await guild.members.fetch().catch((err) => console.warn('[bot] could not load member list (turn on Server Members Intent):', err.message));
