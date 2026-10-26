@@ -102,7 +102,7 @@ routes.get('/settings', requireAdmin, async (req, res) => {
   delete req.session.newConnectorKey;
   res.render('settings', {
     title: 'Settings', settings: await getSettings(), opts: guildOptions(res.locals.guild), timezones: allTimezones(),
-    connector: { enabled: await connectorEnabled(), url: `${config.publicUrl}/mcp`, newKey, keyUrl: newKey ? `${config.publicUrl}/mcp?key=${newKey}` : null },
+    connector: { enabled: await connectorEnabled(), url: `${config.publicUrl}/mcp`, newKey },
   });
 });
 
