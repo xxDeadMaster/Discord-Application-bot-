@@ -19,6 +19,8 @@ export function startWeb() {
   app.set('view engine', 'ejs');
   app.set('views', path.join(here, 'views'));
   app.disable('x-powered-by');
+  // Changes on every deploy, so browsers fetch fresh CSS/JS instead of a cached old copy
+  app.locals.assetVersion = Date.now().toString(36);
 
   app.use((req, res, next) => {
     res.set('X-Frame-Options', 'DENY');
