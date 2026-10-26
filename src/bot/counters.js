@@ -38,7 +38,7 @@ export function countFor(kind, guild) {
     case 'members': return guild.memberCount ?? members?.size ?? 0;
     case 'humans': return members ? members.filter((m) => !m.user?.bot).size : 0;
     case 'bots': return members ? members.filter((m) => m.user?.bot).size : 0;
-    case 'channels': return guild.channels.cache.filter((c) => !c.isThread?.()).size;
+    case 'channels': return guild.channels.cache.filter((c) => !c.isThread?.() && c.type !== ChannelType.GuildCategory).size; // like ServerStats: no categories or threads
     case 'boosts': return guild.premiumSubscriptionCount ?? 0;
     case 'staff': return staffRoleId ? (guild.roles.cache.get(staffRoleId)?.members?.size ?? 0) : 0;
     default: return 0;
