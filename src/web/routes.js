@@ -15,6 +15,7 @@ import {
   listRoles, listSubmissions, listTicketMessages, listTickets, query, replaceQuestions, updateSettings,
 } from '../db.js';
 import { requireAdmin } from './auth.js';
+import { connectorEnabled, createConnectorKey, removeConnectorKey } from './mcp.js';
 
 export const routes = express.Router();
 
@@ -97,7 +98,24 @@ routes.get('/', async (req, res) => {
 /* ---------- Settings ---------- */
 
 routes.get('/settings', requireAdmin, async (req, res) => {
-  res.render('settings', { title: 'Settings', settings: await getSettings(), opts: guildOptions(res.locals.guild), timezones: allTimezones() });
+  const newKey = req.session.newConnectorKey || null;
+  delete req.session.newConnectorKey;
+  res.render('settings', {
+    title: 'Settings', settings: await getSettings(), opts: guildOptions(res.locals.guild), timezones: allTimezones(),
+    connector: { enabled: await connectorEnabled(), url: `${config.publicUrl}/mcp`, newKey },
+  });
+});
+
+/* Claude connector key: shown once right after it's made, only its hash is stored */
+routes.post('/settings/connector/:action', requireAdmin, async (req, res) => {
+  if (req.params.action === 'create') {
+    req.session.newConnectorKey = await createConnectorKey();
+    flash(req, 'success', 'New connector key made. Copy it now: it is only shown once. Any older key stopped working.');
+  } else if (req.params.action === 'remove') {
+    await removeConnectorKey();
+    flash(req, 'success', 'Claude connector turned off. The old key no longer works.');
+  }
+  res.redirect('/settings#connector');
 });
 
 routes.post('/settings', requireAdmin, async (req, res) => {

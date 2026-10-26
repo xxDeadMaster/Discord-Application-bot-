@@ -10,6 +10,7 @@ import { authRouter, requireLogin } from './auth.js';
 import { guildOptions, routes } from './routes.js';
 import { staffRoutes } from './staffRoutes.js';
 import { communityRoutes } from './communityRoutes.js';
+import { mcpRouter } from './mcp.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,6 +33,8 @@ export function startWeb() {
   });
 
   app.get('/health', (req, res) => res.json({ ok: true }));
+  // Claude connector (MCP). Uses its own key, so it sits before the session and form checks.
+  app.use(mcpRouter());
   app.use('/static', express.static(path.join(here, 'public'), { maxAge: '1h' }));
   app.use(express.urlencoded({ extended: false, limit: '200kb' }));
 
