@@ -1,0 +1,46 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <h1>Tickets</h1>
+</div>
+
+<form method="get" action="/tickets" class="filters">
+  <div class="tabs" role="group" aria-label="Filter by status">
+    <% [['', 'All'], ['open', 'Open'], ['closed', 'Closed']].forEach(([v, l]) => { %>
+      <a class="tab <%= status === v ? 'active' : '' %>" href="/tickets?status=<%= v %><%= search ? '&q=' + encodeURIComponent(search) : '' %>"><%= l %></a>
+    <% }) %>
+  </div>
+  <input type="hidden" name="status" value="<%= status %>">
+  <label class="sr" for="q">Search by username or topic</label>
+  <input id="q" name="q" value="<%= search %>" placeholder="Search username or topic">
+  <button class="btn" type="submit">Search</button>
+</form>
+
+<section class="card flush">
+  <% if (!tickets.length) { %>
+    <p class="muted pad">No tickets match.</p>
+  <% } else { %>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ticket</th><th>Opened by</th><th>Topic</th><th>Status</th><th>Messages</th><th>Opened</th></tr></thead>
+        <tbody>
+          <% tickets.forEach(t => { %>
+            <tr>
+              <td><a href="/tickets/<%= t.id %>"><strong>#<%= String(t.number).padStart(4, '0') %></strong></a></td>
+              <td><%= t.opener_tag %></td>
+              <td class="clip"><%= t.topic %></td>
+              <td><%- include('partials/status', { status: t.status }) %></td>
+              <td><%= t.message_count %></td>
+              <td><time datetime="<%= new Date(t.created_at).toISOString() %>"></time></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<nav class="pager" aria-label="Pages">
+  <% if (page > 1) { %><a class="btn btn-ghost" href="?status=<%= status %>&q=<%= encodeURIComponent(search) %>&page=<%= page - 1 %>">Newer</a><% } %>
+  <% if (hasMore) { %><a class="btn btn-ghost" href="?status=<%= status %>&q=<%= encodeURIComponent(search) %>&page=<%= page + 1 %>">Older</a><% } %>
+</nav>
+<%- include('partials/foot') %>

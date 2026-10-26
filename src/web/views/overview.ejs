@@ -1,0 +1,84 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <h1>Overview</h1>
+</div>
+
+<section class="stats">
+  <a class="stat" href="/submissions?status=pending">
+    <span class="stat-num"><%= counts.pending %></span>
+    <span class="stat-label">Pending applications</span>
+  </a>
+  <a class="stat" href="/submissions">
+    <span class="stat-num"><%= counts.submissions %></span>
+    <span class="stat-label">All applications</span>
+  </a>
+  <a class="stat" href="/tickets?status=open">
+    <span class="stat-num"><%= counts.open_tickets %></span>
+    <span class="stat-label">Open tickets</span>
+  </a>
+  <a class="stat" href="/tickets">
+    <span class="stat-num"><%= counts.tickets %></span>
+    <span class="stat-label">All tickets</span>
+  </a>
+</section>
+
+<% if (isAdmin && checklist.some(c => !c.done)) { %>
+<section class="card">
+  <h2>Finish setting up</h2>
+  <ol class="checklist">
+    <% checklist.forEach(c => { %>
+      <li class="<%= c.done ? 'done' : '' %>">
+        <span class="check" aria-hidden="true"><%= c.done ? '✓' : '' %></span>
+        <a href="<%= c.href %>"><%= c.text %></a>
+        <span class="sr"><%= c.done ? '(done)' : '(to do)' %></span>
+      </li>
+    <% }) %>
+  </ol>
+  <p class="muted small">Bot not in your server yet? <a href="<%= inviteUrl %>" target="_blank" rel="noopener">Invite it with the right permissions</a>.</p>
+</section>
+<% } %>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head">
+      <h2>Latest applications</h2>
+      <a href="/submissions" class="small">See all</a>
+    </div>
+    <% if (!recentSubs.length) { %>
+      <p class="muted">No applications yet.</p>
+    <% } else { %>
+      <ul class="rows">
+        <% recentSubs.forEach(s => { %>
+          <li>
+            <a href="/submissions/<%= s.id %>">
+              <span class="row-main"><strong><%= s.user_tag %></strong> · <%= s.role_name %></span>
+              <span class="row-meta"><%- include('partials/status', { status: s.status }) %> <time datetime="<%= new Date(s.created_at).toISOString() %>"></time></span>
+            </a>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Latest tickets</h2>
+      <a href="/tickets" class="small">See all</a>
+    </div>
+    <% if (!recentTickets.length) { %>
+      <p class="muted">No tickets yet.</p>
+    <% } else { %>
+      <ul class="rows">
+        <% recentTickets.forEach(t => { %>
+          <li>
+            <a href="/tickets/<%= t.id %>">
+              <span class="row-main"><strong>#<%= String(t.number).padStart(4, '0') %></strong> · <%= t.opener_tag %></span>
+              <span class="row-meta"><%- include('partials/status', { status: t.status }) %> <time datetime="<%= new Date(t.created_at).toISOString() %>"></time></span>
+            </a>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </section>
+</div>
+<%- include('partials/foot') %>

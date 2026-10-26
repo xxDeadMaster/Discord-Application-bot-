@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · App Bot</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+<% if (user) { %>
+<header class="topbar">
+  <a class="brand" href="/">
+    <span class="brand-mark" aria-hidden="true">A</span>
+    <span>App Bot</span>
+  </a>
+  <nav class="nav" aria-label="Main">
+    <a href="/" class="<%= path === '/' ? 'active' : '' %>">Overview</a>
+    <a href="/submissions" class="<%= path.startsWith('/submissions') ? 'active' : '' %>">Submissions</a>
+    <a href="/tickets" class="<%= path.startsWith('/tickets') ? 'active' : '' %>">Tickets</a>
+    <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+      <a href="/applications" class="<%= path.startsWith('/applications') ? 'active' : '' %>">Applications</a>
+      <a href="/settings" class="<%= path.startsWith('/settings') ? 'active' : '' %>">Settings</a>
+    <% } %>
+  </nav>
+  <div class="me">
+    <% if (user.avatar) { %><img src="<%= user.avatar %>" alt="" width="28" height="28"><% } %>
+    <span class="me-name"><%= user.name %></span>
+    <form method="post" action="/logout">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn btn-ghost btn-sm" type="submit">Sign out</button>
+    </form>
+  </div>
+</header>
+<% } %>
+<main class="page">
+<% if (flash) { %>
+  <div class="flash flash-<%= flash.type %>" role="status"><%= flash.text %></div>
+<% } %>

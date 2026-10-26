@@ -1,0 +1,95 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <h1>Applications</h1>
+  <p class="muted">Applicants first pick a category, then a role inside it, and get that role's questions in their DMs. Changes here update the panel in Discord automatically.</p>
+</div>
+
+<% if (!cats.length) { %>
+  <section class="card empty">
+    <h2>No categories yet</h2>
+    <p class="muted">Start with something like "Roblox Staff", then add roles such as Admin and Developer to it.</p>
+  </section>
+<% } %>
+
+<% cats.forEach(c => { %>
+<section class="card">
+  <details class="edit-cat">
+    <summary>
+      <span class="cat-title">
+        <strong><%= c.name %></strong>
+        <% if (!c.enabled) { %><span class="pill pill-off">off</span><% } %>
+      </span>
+      <span class="muted small"><%= c.description || 'No description' %> · Edit category</span>
+    </summary>
+    <form method="post" action="/applications/categories/<%= c.id %>" class="inline-form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="grid-3">
+        <div class="field">
+          <label for="cat-name-<%= c.id %>">Name</label>
+          <input id="cat-name-<%= c.id %>" name="name" maxlength="80" value="<%= c.name %>" required>
+        </div>
+        <div class="field">
+          <label for="cat-desc-<%= c.id %>">Short description</label>
+          <input id="cat-desc-<%= c.id %>" name="description" maxlength="100" value="<%= c.description %>">
+        </div>
+        <div class="field field-short">
+          <label for="cat-pos-<%= c.id %>">Order</label>
+          <input id="cat-pos-<%= c.id %>" name="position" type="number" value="<%= c.position %>">
+        </div>
+      </div>
+      <label class="toggle"><input type="checkbox" name="enabled" <%= c.enabled ? 'checked' : '' %>> Show this category on the panel</label>
+      <div class="actions">
+        <button class="btn btn-primary" type="submit">Save category</button>
+      </div>
+    </form>
+    <form method="post" action="/applications/categories/<%= c.id %>/delete" data-confirm="Delete &quot;<%= c.name %>&quot; and all its roles? Past submissions are kept.">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn btn-danger-ghost btn-sm" type="submit">Delete category</button>
+    </form>
+  </details>
+
+  <% if (!c.roles.length) { %>
+    <p class="muted">No roles in this category yet.</p>
+  <% } else { %>
+    <ul class="rows">
+      <% c.roles.forEach(r => { %>
+        <li>
+          <a href="/applications/roles/<%= r.id %>">
+            <span class="row-main"><strong><%= r.name %></strong> <span class="muted">· <%= r.question_count %> question<%= r.question_count === 1 ? '' : 's' %></span></span>
+            <span class="row-meta">
+              <% if (r.enabled && r.question_count > 0) { %><span class="pill pill-accepted">open</span><% } else { %><span class="pill pill-off">off</span><% } %>
+              <span class="muted small">Edit</span>
+            </span>
+          </a>
+        </li>
+      <% }) %>
+    </ul>
+  <% } %>
+
+  <form method="post" action="/applications/categories/<%= c.id %>/roles" class="add-row">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label class="sr" for="new-role-<%= c.id %>">New role name</label>
+    <input id="new-role-<%= c.id %>" name="name" maxlength="80" placeholder="New role, e.g. Developer" required>
+    <button class="btn" type="submit">Add role</button>
+  </form>
+</section>
+<% }) %>
+
+<section class="card">
+  <h2>Add a category</h2>
+  <form method="post" action="/applications/categories" class="stack">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid-2">
+      <div class="field">
+        <label for="new-cat-name">Name</label>
+        <input id="new-cat-name" name="name" maxlength="80" placeholder="Roblox Staff" required>
+      </div>
+      <div class="field">
+        <label for="new-cat-desc">Short description</label>
+        <input id="new-cat-desc" name="description" maxlength="100" placeholder="Admin, Developer, Builder">
+      </div>
+    </div>
+    <div class="actions"><button class="btn btn-primary" type="submit">Add category</button></div>
+  </form>
+</section>
+<%- include('partials/foot') %>

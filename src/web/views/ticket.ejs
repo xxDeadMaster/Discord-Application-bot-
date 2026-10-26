@@ -1,0 +1,55 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <p class="crumbs"><a href="/tickets">Tickets</a> / <%= title %></p>
+  <h1><%= title %></h1>
+</div>
+
+<div class="detail">
+  <section class="card">
+    <div class="card-head">
+      <h2>Transcript</h2>
+      <a class="btn btn-ghost btn-sm" href="/tickets/<%= ticket.id %>/transcript.txt">Download .txt</a>
+    </div>
+    <% if (!messages.length) { %>
+      <p class="muted">No messages recorded.</p>
+    <% } else { %>
+      <ol class="transcript">
+        <% messages.forEach(m => { %>
+          <li class="<%= m.is_bot ? 'bot' : '' %>">
+            <div class="t-head">
+              <strong><%= m.author_tag %></strong>
+              <% if (m.is_bot) { %><span class="pill pill-bot">bot</span><% } %>
+              <time datetime="<%= new Date(m.created_at).toISOString() %>"></time>
+            </div>
+            <% if (m.content) { %><p class="t-body"><%= m.content %></p><% } %>
+            <% (m.attachments || []).forEach(a => { %>
+              <p class="small"><a href="<%= a.url %>" target="_blank" rel="noopener noreferrer">Attachment: <%= a.name %></a></p>
+            <% }) %>
+          </li>
+        <% }) %>
+      </ol>
+      <p class="help">Attachment links come from Discord and can stop working after a while.</p>
+    <% } %>
+  </section>
+
+  <aside class="stack">
+    <section class="card">
+      <dl class="meta meta-col">
+        <div><dt>Status</dt><dd><%- include('partials/status', { status: ticket.status }) %></dd></div>
+        <div><dt>Opened by</dt><dd><strong><%= ticket.opener_tag %></strong><br><span class="muted small">ID <%= ticket.opener_id %></span></dd></div>
+        <div><dt>Topic</dt><dd><%= ticket.topic %></dd></div>
+        <div><dt>Opened</dt><dd><time datetime="<%= new Date(ticket.created_at).toISOString() %>"></time></dd></div>
+        <% if (ticket.closed_at) { %>
+          <div><dt>Closed</dt><dd><time datetime="<%= new Date(ticket.closed_at).toISOString() %>"></time><br><span class="muted small">by <%= ticket.closed_by_tag || 'unknown' %></span></dd></div>
+        <% } %>
+      </dl>
+      <% if (ticket.status === 'open') { %>
+        <form method="post" action="/tickets/<%= ticket.id %>/close" data-confirm="Close this ticket? The channel will be deleted and the transcript saved.">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="btn btn-danger" type="submit">Close ticket</button>
+        </form>
+      <% } %>
+    </section>
+  </aside>
+</div>
+<%- include('partials/foot') %>

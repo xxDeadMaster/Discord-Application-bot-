@@ -1,0 +1,78 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <h1>Settings</h1>
+  <p class="muted">Pick where everything goes. Channel lists come straight from your server.</p>
+</div>
+
+<form method="post" action="/settings" class="stack">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+  <section class="card">
+    <h2>Staff</h2>
+    <%- include('partials/select', { name: 'staff_role_id', label: 'Staff role', list: opts.roles, value: settings.staff_role_id,
+        help: 'People with this role can sign in here, review applications and see tickets. Server admins always can.' }) %>
+  </section>
+
+  <section class="card">
+    <h2>Applications</h2>
+    <div class="grid-2">
+      <%- include('partials/select', { name: 'apply_channel_id', label: 'Applications channel', list: opts.textChannels, value: settings.apply_channel_id,
+          help: 'Where the application panel (the dropdown) is posted.' }) %>
+      <%- include('partials/select', { name: 'submissions_channel_id', label: 'Submissions channel', list: opts.textChannels, value: settings.submissions_channel_id,
+          help: 'Where finished applications go for staff. Each role can override this.' }) %>
+    </div>
+    <div class="field">
+      <label for="apply_panel_title">Panel title</label>
+      <input id="apply_panel_title" name="apply_panel_title" maxlength="200" value="<%= settings.apply_panel_title %>">
+    </div>
+    <div class="field">
+      <label for="apply_panel_description">Panel message</label>
+      <textarea id="apply_panel_description" name="apply_panel_description" rows="3" maxlength="2000"><%= settings.apply_panel_description %></textarea>
+    </div>
+    <div class="field field-short">
+      <label for="apply_cooldown_days">Days before someone can reapply after a denial</label>
+      <input id="apply_cooldown_days" name="apply_cooldown_days" type="number" min="0" max="365" value="<%= settings.apply_cooldown_days %>">
+      <p class="help">Set to 0 for no wait.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Tickets</h2>
+    <div class="grid-2">
+      <%- include('partials/select', { name: 'ticket_channel_id', label: 'Open-a-ticket channel', list: opts.textChannels, value: settings.ticket_channel_id,
+          help: 'Where the "Open a ticket" button is posted.' }) %>
+      <%- include('partials/select', { name: 'ticket_category_id', label: 'Category for ticket channels', list: opts.categories, value: settings.ticket_category_id,
+          emptyLabel: 'No category (top of the list)', help: 'New ticket channels are created inside this category.' }) %>
+      <%- include('partials/select', { name: 'ticket_log_channel_id', label: 'Ticket log channel', list: opts.textChannels, value: settings.ticket_log_channel_id,
+          help: 'Closed tickets are posted here with a transcript file. Keep it staff-only.' }) %>
+    </div>
+    <div class="field">
+      <label for="ticket_panel_title">Panel title</label>
+      <input id="ticket_panel_title" name="ticket_panel_title" maxlength="200" value="<%= settings.ticket_panel_title %>">
+    </div>
+    <div class="field">
+      <label for="ticket_panel_description">Panel message</label>
+      <textarea id="ticket_panel_description" name="ticket_panel_description" rows="3" maxlength="2000"><%= settings.ticket_panel_description %></textarea>
+    </div>
+  </section>
+
+  <div class="actions sticky-actions">
+    <button class="btn btn-primary" type="submit">Save settings</button>
+  </div>
+</form>
+
+<section class="card" id="panels">
+  <h2>Panels</h2>
+  <p class="muted">Posts the panel in its channel, or updates the one already there. Application panels also update on their own when you change roles.</p>
+  <div class="panel-actions">
+    <form method="post" action="/settings/panel/apply">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn" type="submit">Post or update application panel</button>
+    </form>
+    <form method="post" action="/settings/panel/ticket">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <button class="btn" type="submit">Post or update ticket panel</button>
+    </form>
+  </div>
+</section>
+<%- include('partials/foot') %>

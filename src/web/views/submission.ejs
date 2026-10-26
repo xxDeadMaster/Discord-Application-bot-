@@ -1,0 +1,67 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <p class="crumbs"><a href="/submissions">Submissions</a> / #<%= sub.id %></p>
+  <h1><%= sub.role_name %> application</h1>
+</div>
+
+<div class="detail">
+  <section class="card">
+    <dl class="meta">
+      <div><dt>Applicant</dt><dd><strong><%= sub.user_tag %></strong><br><span class="muted small">ID <%= sub.user_id %></span></dd></div>
+      <div><dt>Category</dt><dd><%= sub.category_name %></dd></div>
+      <div><dt>Submitted</dt><dd><time datetime="<%= new Date(sub.created_at).toISOString() %>"></time></dd></div>
+      <div><dt>Status</dt><dd><%- include('partials/status', { status: sub.status }) %></dd></div>
+    </dl>
+
+    <h2>Answers</h2>
+    <ol class="answers">
+      <% sub.answers.forEach(item => { %>
+        <li>
+          <p class="q"><%= item.q %></p>
+          <p class="a"><%= item.a %></p>
+        </li>
+      <% }) %>
+    </ol>
+  </section>
+
+  <aside class="stack">
+    <section class="card">
+      <h2>Decision</h2>
+      <% if (sub.status === 'pending') { %>
+        <form method="post" action="/submissions/<%= sub.id %>/decide" class="stack">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <div class="field">
+            <label for="reason">Note to the applicant (optional)</label>
+            <textarea id="reason" name="reason" rows="3" maxlength="<%= limits.reason %>" placeholder="Sent in their DM with the result"></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn btn-success" type="submit" name="decision" value="accepted">Accept</button>
+            <button class="btn btn-danger" type="submit" name="decision" value="denied">Deny</button>
+          </div>
+          <p class="help">Accepting gives the role set for <%= sub.role_name %> (if any) and DMs the applicant. The card in Discord updates too.</p>
+        </form>
+      <% } else { %>
+        <p><%= sub.status === 'accepted' ? 'Accepted' : 'Denied' %> by <strong><%= sub.reviewed_by_tag || 'unknown' %></strong>
+          <time datetime="<%= new Date(sub.reviewed_at).toISOString() %>"></time></p>
+        <% if (sub.reason) { %><p class="muted">Note: <%= sub.reason %></p><% } %>
+      <% } %>
+    </section>
+
+    <section class="card">
+      <h2>Their other applications</h2>
+      <% if (!history.length) { %>
+        <p class="muted">None.</p>
+      <% } else { %>
+        <ul class="rows">
+          <% history.forEach(h => { %>
+            <li><a href="/submissions/<%= h.id %>">
+              <span class="row-main">#<%= h.id %> · <%= h.role_name %></span>
+              <span class="row-meta"><%- include('partials/status', { status: h.status }) %></span>
+            </a></li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+  </aside>
+</div>
+<%- include('partials/foot') %>

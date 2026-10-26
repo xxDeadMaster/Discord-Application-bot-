@@ -1,0 +1,46 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <h1>Submissions</h1>
+</div>
+
+<form method="get" action="/submissions" class="filters">
+  <div class="tabs" role="group" aria-label="Filter by status">
+    <% [['', 'All'], ['pending', 'Pending'], ['accepted', 'Accepted'], ['denied', 'Denied']].forEach(([v, l]) => { %>
+      <a class="tab <%= status === v ? 'active' : '' %>" href="/submissions?status=<%= v %><%= search ? '&q=' + encodeURIComponent(search) : '' %>"><%= l %></a>
+    <% }) %>
+  </div>
+  <input type="hidden" name="status" value="<%= status %>">
+  <label class="sr" for="q">Search by username or user ID</label>
+  <input id="q" name="q" value="<%= search %>" placeholder="Search username or user ID">
+  <button class="btn" type="submit">Search</button>
+</form>
+
+<section class="card flush">
+  <% if (!subs.length) { %>
+    <p class="muted pad">No applications match.</p>
+  <% } else { %>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Applicant</th><th>Role</th><th>Status</th><th>Submitted</th><th>Reviewed by</th></tr></thead>
+        <tbody>
+          <% subs.forEach(s => { %>
+            <tr>
+              <td><a href="/submissions/<%= s.id %>"><%= s.id %></a></td>
+              <td><a href="/submissions/<%= s.id %>"><strong><%= s.user_tag %></strong></a></td>
+              <td><%= s.role_name %> <span class="muted small">· <%= s.category_name %></span></td>
+              <td><%- include('partials/status', { status: s.status }) %></td>
+              <td><time datetime="<%= new Date(s.created_at).toISOString() %>"></time></td>
+              <td><%= s.reviewed_by_tag || '—' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<nav class="pager" aria-label="Pages">
+  <% if (page > 1) { %><a class="btn btn-ghost" href="?status=<%= status %>&q=<%= encodeURIComponent(search) %>&page=<%= page - 1 %>">Newer</a><% } %>
+  <% if (hasMore) { %><a class="btn btn-ghost" href="?status=<%= status %>&q=<%= encodeURIComponent(search) %>&page=<%= page + 1 %>">Older</a><% } %>
+</nav>
+<%- include('partials/foot') %>

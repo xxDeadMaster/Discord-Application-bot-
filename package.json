@@ -1,0 +1,23 @@
+{
+  "name": "app-bot",
+  "version": "1.0.0",
+  "description": "Discord application + ticket bot with a web dashboard",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "connect-pg-simple": "^10.0.0",
+    "discord.js": "^14.27.0",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "express-session": "^1.18.1",
+    "pg": "^8.13.1"
+  }
+}

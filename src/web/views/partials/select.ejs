@@ -1,0 +1,10 @@
+<div class="field">
+  <label for="<%= name %>"><%= label %></label>
+  <select id="<%= name %>" name="<%= name %>">
+    <option value=""><%= typeof emptyLabel !== 'undefined' ? emptyLabel : 'Not set' %></option>
+    <% list.forEach(item => { %>
+      <option value="<%= item.id %>" <%= item.id === value ? 'selected' : '' %>><%= item.name %><%= item.parent ? `  (${item.parent})` : '' %></option>
+    <% }) %>
+  </select>
+  <% if (typeof help !== 'undefined' && help) { %><p class="help"><%= help %></p><% } %>
+</div>

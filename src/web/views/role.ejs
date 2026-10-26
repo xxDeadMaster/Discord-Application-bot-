@@ -1,0 +1,76 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <p class="crumbs"><a href="/applications">Applications</a> / <%= role.category_name %></p>
+  <h1><%= role.name %></h1>
+</div>
+
+<form method="post" action="/applications/roles/<%= role.id %>" class="stack">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+  <section class="card">
+    <h2>Role details</h2>
+    <div class="grid-2">
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" name="name" maxlength="<%= limits.name %>" value="<%= role.name %>" required>
+      </div>
+      <div class="field">
+        <label for="description">Short description</label>
+        <input id="description" name="description" maxlength="<%= limits.description %>" value="<%= role.description %>" placeholder="Shown under the role in the dropdown">
+      </div>
+      <%- include('partials/select', { name: 'discord_role_id', label: 'Discord role to give when accepted', list: opts.roles, value: role.discord_role_id,
+          emptyLabel: "Don't give a role", help: "The bot's own role must be above this role in Server Settings > Roles." }) %>
+      <%- include('partials/select', { name: 'submissions_channel_id', label: 'Send submissions to', list: opts.textChannels, value: role.submissions_channel_id,
+          emptyLabel: 'Default submissions channel', help: 'Leave on default unless this role needs its own review channel.' }) %>
+    </div>
+    <label class="toggle"><input type="checkbox" name="enabled" <%= role.enabled ? 'checked' : '' %>> Open for applications</label>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Questions</h2>
+      <span class="muted small"><span data-q-count><%= questions.length %></span> of <%= maxQuestions %></span>
+    </div>
+    <p class="muted">Asked one at a time in DMs, in this order. Answers can be up to 1000 characters.</p>
+    <ol class="questions" data-questions data-max="<%= maxQuestions %>">
+      <% questions.forEach((q, i) => { %>
+        <li class="question">
+          <label class="sr" for="q-<%= i %>">Question <%= i + 1 %></label>
+          <textarea id="q-<%= i %>" name="questions" rows="2" maxlength="<%= limits.question %>"><%= q.prompt %></textarea>
+          <div class="q-tools">
+            <button type="button" class="icon-btn" data-move="up" aria-label="Move question up">↑</button>
+            <button type="button" class="icon-btn" data-move="down" aria-label="Move question down">↓</button>
+            <button type="button" class="icon-btn icon-danger" data-remove aria-label="Remove question">✕</button>
+          </div>
+        </li>
+      <% }) %>
+    </ol>
+    <template data-question-template>
+      <li class="question">
+        <label class="sr">New question</label>
+        <textarea name="questions" rows="2" maxlength="<%= limits.question %>" placeholder="Type the question"></textarea>
+        <div class="q-tools">
+          <button type="button" class="icon-btn" data-move="up" aria-label="Move question up">↑</button>
+          <button type="button" class="icon-btn" data-move="down" aria-label="Move question down">↓</button>
+          <button type="button" class="icon-btn icon-danger" data-remove aria-label="Remove question">✕</button>
+        </div>
+      </li>
+    </template>
+    <button type="button" class="btn" data-add-question>Add question</button>
+  </section>
+
+  <div class="actions sticky-actions">
+    <button class="btn btn-primary" type="submit">Save role and questions</button>
+    <a class="btn btn-ghost" href="/applications">Back</a>
+  </div>
+</form>
+
+<section class="card">
+  <h2>Delete role</h2>
+  <p class="muted">Removes the role from the panel. Past submissions for it are kept.</p>
+  <form method="post" action="/applications/roles/<%= role.id %>/delete" data-confirm="Delete the &quot;<%= role.name %>&quot; role? Past submissions are kept.">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <button class="btn btn-danger" type="submit">Delete role</button>
+  </form>
+</section>
+<%- include('partials/foot') %>
