@@ -16,10 +16,15 @@ import { ephemeral } from './ui.js';
 import {
   handleMemberJoin, handleMemberLeave, handleMemberUpdate, handleVerifyButton, handleVerifyModal, loadWelcomeConfig,
 } from './welcome.js';
+import { handleCommunityAutocomplete, handleCommunityCommand } from './communityCommands.js';
 import { handleGiveawayButton, handlePollButton, loadCommunity, startCommunityLoop } from './giveaways.js';
 
 function route(interaction) {
-  if (interaction.isChatInputCommand()) return handleCommand(interaction);
+  if (interaction.isAutocomplete()) return handleCommunityAutocomplete(interaction);
+  if (interaction.isChatInputCommand()) {
+    if (['giveaway', 'poll'].includes(interaction.commandName)) return handleCommunityCommand(interaction);
+    return handleCommand(interaction);
+  }
   const id = interaction.customId;
   if (interaction.isStringSelectMenu()) {
     if (id === 'apply:category') return handleCategorySelect(interaction);
@@ -51,13 +56,14 @@ function route(interaction) {
 }
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.customId && !interaction.isChatInputCommand()) return;
+  if (!interaction.customId && !interaction.isChatInputCommand() && !interaction.isAutocomplete()) return;
   // Only serve our own server (DM buttons have no guild)
   if (interaction.guildId && interaction.guildId !== config.guildId) return;
   try {
     await route(interaction);
   } catch (err) {
     console.error(`[interaction ${interaction.customId || interaction.commandName}]`, err);
+    if (interaction.isAutocomplete()) return;
     const msg = { content: 'Something went wrong. Please try again, or tell a staff member.', flags: ephemeral };
     if (interaction.deferred || interaction.replied) await interaction.followUp(msg).catch(() => {});
     else await interaction.reply(msg).catch(() => {});
