@@ -16,8 +16,9 @@ import { ephemeral } from './ui.js';
 import {
   handleMemberJoin, handleMemberLeave, handleMemberUpdate, handleVerifyButton, handleVerifyModal, loadWelcomeConfig,
 } from './welcome.js';
-import { loadCounters, startCounters } from './counters.js';
+import { loadCounters, startCounters, startSnapshots } from './counters.js';
 import { handleRoleMenuButton } from './roleMenus.js';
+import { MOD_COMMANDS, handleModCommand } from './moderation.js';
 import {
   handleLevelBoost, handleLevelMessage, loadLevels, startLeveling,
 } from './levels.js';
@@ -27,6 +28,7 @@ import { handleGiveawayButton, handlePollButton, loadCommunity, startCommunityLo
 function route(interaction) {
   if (interaction.isAutocomplete()) return handleCommunityAutocomplete(interaction);
   if (interaction.isChatInputCommand()) {
+    if (MOD_COMMANDS.includes(interaction.commandName)) return handleModCommand(interaction);
     if (['giveaway', 'poll', 'rank', 'leaderboard', 'xp'].includes(interaction.commandName)) return handleCommunityCommand(interaction);
     return handleCommand(interaction);
   }
@@ -152,6 +154,7 @@ client.once(Events.ClientReady, async (c) => {
   startCommunityLoop();
   await loadCounters().catch((err) => console.error('[counters] load failed:', err));
   startCounters();
+  startSnapshots();
   await loadLevels().catch((err) => console.error('[levels] load failed:', err));
   startLeveling();
 });

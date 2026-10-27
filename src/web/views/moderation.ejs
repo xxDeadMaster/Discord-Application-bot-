@@ -1,0 +1,105 @@
+<%- include('partials/head') %>
+<%
+  const tones = { warn: 'orange', timeout: 'purple', untimeout: 'green', kick: 'red', ban: 'red', unban: 'green' };
+  const qs = (extra) => {
+    const p = new URLSearchParams();
+    if (action) p.set('action', action);
+    if (search) p.set('q', search);
+    Object.entries(extra || {}).forEach(([k, v]) => (v ? p.set(k, v) : p.delete(k)));
+    const s = p.toString();
+    return s ? `?${s}` : '';
+  };
+%>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Moderation</h1>
+    <p>Every <code>/warn</code>, <code>/timeout</code>, <code>/kick</code> and <code>/ban</code> becomes a numbered case here. Members get a DM with the reason. Use <code>/modlogs</code> in Discord to see someone's history.</p>
+  </div>
+</div>
+
+<section class="stats stats-v3 mod-stats">
+  <% [['warn', 'Warns'], ['timeout', 'Timeouts'], ['kick', 'Kicks'], ['ban', 'Bans']].forEach(([k, label]) => { %>
+    <a class="stat stat-v3" href="/moderation?action=<%= k %>">
+      <span class="stat-top">
+        <span class="stat-icon tone-<%= tones[k] %>" aria-hidden="true"><%= actions[k].emoji %></span>
+        <span class="stat-view">Filter <%- include('partials/icon', { name: 'chevronRight', size: 14 }) %></span>
+      </span>
+      <span class="stat-num"><%= week[k] || 0 %></span>
+      <span class="stat-label"><%= label %> · last 7 days</span>
+    </a>
+  <% }) %>
+</section>
+
+<div class="ov-grid ov-grid-b mod-top">
+  <section class="card">
+    <h2>Mod log channel</h2>
+    <p class="muted small">Orbit posts a card here for every action.</p>
+    <form method="post" action="/moderation/log-channel" class="mod-log-form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <select name="mod_log_channel_id" aria-label="Mod log channel">
+        <option value="">Off (only save cases here)</option>
+        <% channels.forEach(c => { %><option value="<%= c.id %>" <%= c.id === logChannelId ? 'selected' : '' %>><%= c.name %><%= c.parent ? ` · ${c.parent}` : '' %></option><% }) %>
+      </select>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Commands</h2>
+    <ul class="cmd-list">
+      <li><code>/warn member reason</code><span>DM + case</span></li>
+      <li><code>/timeout member 1h reason</code><span>10m, 2h, 1d, up to 28d</span></li>
+      <li><code>/kick member reason</code> · <code>/ban user reason</code><span>DM before they leave</span></li>
+      <li><code>/untimeout</code> · <code>/unban</code> · <code>/modlogs member</code></li>
+    </ul>
+  </section>
+</div>
+
+<section class="card flush">
+  <form class="bulk-bar mod-filter" method="get" action="/moderation">
+    <div class="seg" role="group" aria-label="Filter by action">
+      <a class="seg-btn <%= !action ? 'active' : '' %>" href="/moderation<%= search ? `?q=${encodeURIComponent(search)}` : '' %>">All</a>
+      <% Object.entries(actions).forEach(([k, a]) => { %>
+        <a class="seg-btn <%= action === k ? 'active' : '' %>" href="/moderation?action=<%= k %><%= search ? `&q=${encodeURIComponent(search)}` : '' %>"><%= a.label %></a>
+      <% }) %>
+    </div>
+    <% if (action) { %><input type="hidden" name="action" value="<%= action %>"><% } %>
+    <input type="search" name="q" value="<%= search || '' %>" placeholder="Search name, ID or reason" aria-label="Search cases">
+  </form>
+  <% if (!cases.length) { %>
+    <p class="muted pad"><%= action || search ? 'No cases match that filter.' : 'No cases yet. They show up here when staff use /warn, /timeout, /kick or /ban.' %></p>
+  <% } else { %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Case</th><th>Action</th><th>Member</th><th>Reason</th><th>By</th><th>When</th><% if (isAdmin) { %><th></th><% } %></tr></thead>
+      <tbody>
+        <% cases.forEach(c => { const a = actions[c.action] || { label: c.action, emoji: '•' }; %>
+          <tr>
+            <td class="muted">#<%= c.id %></td>
+            <td><span class="mod-pill tone-<%= tones[c.action] || 'blue' %>"><%= a.emoji %> <%= a.label %></span><% if (c.duration_minutes) { %><br><span class="muted small"><%= prettyMinutes(c.duration_minutes) %></span><% } %></td>
+            <td><strong><%= c.user_tag || 'Unknown' %></strong><br><span class="muted small"><%= c.user_id %></span></td>
+            <td class="clip" title="<%= c.reason %>"><%= c.reason || '—' %></td>
+            <td class="muted"><%= c.mod_tag || '—' %></td>
+            <td class="muted"><time datetime="<%= new Date(c.created_at).toISOString() %>"></time></td>
+            <% if (isAdmin) { %>
+            <td>
+              <form method="post" action="/moderation/<%= c.id %>/delete" data-confirm="Delete case #<%= c.id %>? This only removes the record, it doesn't undo the action.">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button class="btn btn-ghost btn-sm" type="submit">Delete</button>
+              </form>
+            </td>
+            <% } %>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% if (page > 1 || hasMore) { %>
+    <div class="mod-pager">
+      <% if (page > 1) { %><a class="btn btn-sm" href="/moderation<%= qs({ page: page - 1 > 1 ? page - 1 : null }) %>">← Newer</a><% } %>
+      <span class="muted small">Page <%= page %></span>
+      <% if (hasMore) { %><a class="btn btn-sm" href="/moderation<%= qs({ page: page + 1 }) %>">Older →</a><% } %>
+    </div>
+  <% } %>
+  <% } %>
+</section>
+<%- include('partials/foot') %>

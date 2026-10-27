@@ -43,7 +43,7 @@ const SETTINGS_FIELDS = [
   'apply_panel_title', 'apply_panel_description', 'ticket_panel_title', 'ticket_panel_description',
   'apply_cooldown_days', 'blocked_role_ids', 'interview_category_id', 'timezone',
   'auto_close_hours', 'manager_role_id', 'strike_role_ids', 'strike_log_channel_id', 'loa_role_id', 'loa_channel_id',
-  'giveaway_ping_role_id',
+  'giveaway_ping_role_id', 'mod_log_channel_id',
 ];
 
 export async function updateSettings(patch, guildId = config.guildId) {
@@ -702,4 +702,63 @@ export async function saveLevels(list) {
     [config.guildId, list.map((l) => l.userId), list.map((l) => l.tag || ''), list.map((l) => l.xp),
       list.map((l) => l.lastDaily || null), list.map((l) => l.lastQotd || null)],
   );
+}
+
+/* ---------- Moderation cases ---------- */
+
+export async function addModCase(c) {
+  const { rows } = await query(
+    `INSERT INTO mod_cases (guild_id, user_id, user_tag, mod_id, mod_tag, action, reason, duration_minutes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+    [config.guildId, c.userId, c.userTag || '', c.modId || null, c.modTag || '', c.action, c.reason || '', c.durationMinutes ?? null],
+  );
+  return rows[0];
+}
+
+export async function listModCases({ userId = null, action = null, search = null, limit = 50, offset = 0 } = {}) {
+  const params = [config.guildId];
+  const where = ['guild_id = $1'];
+  if (userId) { params.push(userId); where.push(`user_id = $${params.length}`); }
+  if (action) { params.push(action); where.push(`action = $${params.length}`); }
+  if (search) { params.push(`%${search}%`); where.push(`(user_tag ILIKE $${params.length} OR mod_tag ILIKE $${params.length} OR reason ILIKE $${params.length} OR user_id = $${params.length + 1})`); params.push(search); }
+  params.push(limit, offset);
+  const { rows } = await query(
+    `SELECT * FROM mod_cases WHERE ${where.join(' AND ')} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`, params,
+  );
+  return rows;
+}
+
+export async function getModCase(id) {
+  const { rows } = await query('SELECT * FROM mod_cases WHERE id = $1 AND guild_id = $2', [id, config.guildId]);
+  return rows[0] || null;
+}
+
+export async function deleteModCase(id) {
+  await query('DELETE FROM mod_cases WHERE id = $1 AND guild_id = $2', [id, config.guildId]);
+}
+
+/** Counts per action since a date: { warn: 3, timeout: 1, ... , total } */
+export async function modCounts(since) {
+  const { rows } = await query(
+    'SELECT action, count(*)::int AS n FROM mod_cases WHERE guild_id = $1 AND created_at >= $2 GROUP BY action', [config.guildId, since],
+  );
+  const out = { total: 0 };
+  for (const r of rows) { out[r.action] = r.n; out.total += r.n; }
+  return out;
+}
+
+/* ---------- Server snapshots (one row per day) ---------- */
+
+export async function saveSnapshot(day, s) {
+  await query(
+    `INSERT INTO server_snapshots (guild_id, day, members, bots, channels, roles, boosts) VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (guild_id, day) DO UPDATE SET members = EXCLUDED.members, bots = EXCLUDED.bots, channels = EXCLUDED.channels,
+       roles = EXCLUDED.roles, boosts = EXCLUDED.boosts`,
+    [config.guildId, day, s.members, s.bots, s.channels, s.roles, s.boosts],
+  );
+}
+
+export async function listSnapshots(days = 30) {
+  const { rows } = await query('SELECT * FROM server_snapshots WHERE guild_id = $1 ORDER BY day DESC LIMIT $2', [config.guildId, days]);
+  return rows.reverse();
 }

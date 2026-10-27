@@ -369,3 +369,31 @@ CREATE TABLE IF NOT EXISTS leveling_config (
   rewards             JSONB NOT NULL DEFAULT '[]',   -- [{ level, role_id }]
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+/* ---------- Moderation ---------- */
+CREATE TABLE IF NOT EXISTS mod_cases (
+  id               SERIAL PRIMARY KEY,
+  guild_id         TEXT NOT NULL,
+  user_id          TEXT NOT NULL,
+  user_tag         TEXT NOT NULL DEFAULT '',
+  mod_id           TEXT,
+  mod_tag          TEXT NOT NULL DEFAULT '',
+  action           TEXT NOT NULL,          -- warn | timeout | untimeout | kick | ban | unban
+  reason           TEXT NOT NULL DEFAULT '',
+  duration_minutes INTEGER,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS mod_cases_user_idx ON mod_cases (guild_id, user_id, created_at DESC);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS mod_log_channel_id TEXT;
+
+/* Daily server numbers for the overview chart (one small row per day) */
+CREATE TABLE IF NOT EXISTS server_snapshots (
+  guild_id  TEXT NOT NULL,
+  day       TEXT NOT NULL,   -- YYYY-MM-DD
+  members   INTEGER NOT NULL DEFAULT 0,
+  bots      INTEGER NOT NULL DEFAULT 0,
+  channels  INTEGER NOT NULL DEFAULT 0,
+  roles     INTEGER NOT NULL DEFAULT 0,
+  boosts    INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, day)
+);

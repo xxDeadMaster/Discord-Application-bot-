@@ -1,42 +1,103 @@
 <%- include('partials/head') %>
+<%
+  const srv = typeof server !== 'undefined' && server ? server : { name: 'Server', members: 0 };
+  const online = typeof botOnline !== 'undefined' ? botOnline : true;
+  const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+  const change = (now, prev, unit) => {
+    if (now == null || prev == null) return null;
+    const d = now - prev;
+    return { cls: d > 0 ? 'up' : d < 0 ? 'down' : 'flat', text: `${d > 0 ? '+' : ''}${fmt(d)} ${unit}` };
+  };
+  const ago = (d) => {
+    const s = Math.max(0, (Date.now() - new Date(d).getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
+  const KINDS = {
+    application: { icon: 'inbox', tone: 'blue', label: 'Application', text: (a) => `applied for ${a.what}` },
+    ticket: { icon: 'ticket', tone: 'green', label: 'Ticket', text: (a) => `opened ${a.what}` },
+    moderation: { icon: 'shield', tone: 'red', label: 'Moderation', text: (a) => `was ${({ warn: 'warned', timeout: 'timed out', untimeout: 'un-timed out', kick: 'kicked', ban: 'banned', unban: 'unbanned' })[a.what] || a.what}${a.status ? ` by ${a.status}` : ''}` },
+    giveaway: { icon: 'gift', tone: 'pink', label: 'Giveaway', text: (a) => `started a giveaway: ${a.what}` },
+    poll: { icon: 'poll', tone: 'purple', label: 'Poll', text: (a) => `started a poll: ${a.what}` },
+    loa: { icon: 'calendar', tone: 'orange', label: 'Leave', text: (a) => `is on leave ${a.what}` },
+    strike: { icon: 'alert', tone: 'red', label: 'Strike', text: (a) => `got a strike: ${a.what}` },
+  };
+  const kindsHere = [...new Set(activity.map((a) => a.kind))];
+  // Managers-only pages: other staff see the row without a link
+  const canOpen = (href) => isManager || !['/moderation', '/strikes', '/giveaways', '/polls'].includes(href);
+  const pending = [
+    { n: counts.pending, text: 'Applications to review', href: '/review', icon: 'inbox', tone: 'blue' },
+    { n: todo.need_my_vote, text: 'Need your vote', href: '/submissions?status=pending', icon: 'check', tone: 'purple' },
+    { n: todo.unclaimed, text: 'Tickets nobody claimed', href: '/tickets?status=open', icon: 'ticket', tone: 'green' },
+    { n: todo.my_tickets, text: 'Tickets you claimed', href: '/tickets?status=open', icon: 'ticket', tone: 'green' },
+    { n: todo.giveaways_ended, text: 'Giveaways just ended', href: '/giveaways', icon: 'gift', tone: 'pink' },
+    { n: todo.polls_active, text: 'Polls running', href: '/polls', icon: 'poll', tone: 'orange' },
+  ];
+  const quick = [
+    isAdmin && { href: '/applications', icon: 'list', tone: 'blue', text: 'Create application' },
+    isManager && { href: '/ticket-types', icon: 'tag', tone: 'green', text: 'Ticket settings' },
+    isManager && { href: '/giveaways', icon: 'gift', tone: 'pink', text: 'Start giveaway' },
+    isManager && { href: '/polls', icon: 'poll', tone: 'orange', text: 'Start poll' },
+    isAdmin && { href: '/role-menus', icon: 'check', tone: 'purple', text: 'Role buttons' },
+    isAdmin && { href: '/stats', icon: 'hash', tone: 'blue', text: 'Server stats' },
+    isManager && { href: '/moderation', icon: 'shield', tone: 'red', text: 'Moderation log' },
+    { href: '/loa', icon: 'calendar', tone: 'orange', text: myLoa ? 'My leave' : 'Request leave' },
+  ].filter(Boolean).slice(0, 6);
+  // Chart: inline SVG line, no libraries
+  const pts = chart.points.map((p) => Number(p.value) || 0);
+  const W = 560, H = 150, pad = 8;
+  const max = Math.max(1, ...pts), min = chart.kind === 'members' ? Math.min(...pts) : 0;
+  const span = Math.max(1, max - min);
+  const xy = pts.map((v, i) => [pad + (pts.length > 1 ? i * (W - pad * 2) / (pts.length - 1) : (W - pad * 2) / 2), H - pad - ((v - min) / span) * (H - pad * 2)]);
+  const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const area = xy.length ? `${pad},${H - pad} ${line} ${xy[xy.length - 1][0].toFixed(1)},${H - pad}` : '';
+  const shortDay = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const statCards = [
+    { n: counts.pending, label: 'Pending applications', href: '/review', icon: 'inbox', tone: 'blue', change: change(todo.apps_week, todo.apps_prev, 'new this week'), sub: `${fmt(todo.apps_week)} new this week` },
+    { n: counts.open_tickets, label: 'Open tickets', href: '/tickets?status=open', icon: 'ticket', tone: 'green', change: change(todo.tickets_week, todo.tickets_prev, 'vs last week'), sub: `${fmt(todo.tickets_week)} opened this week` },
+    { n: todo.mod_week, label: 'Mod actions (7 days)', href: isManager ? '/moderation' : '/staff', icon: 'shield', tone: 'red', change: change(todo.mod_week, todo.mod_prev, 'vs last week'), sub: 'warns, timeouts, kicks, bans' },
+    { n: numbers.members, label: 'Total members', href: isAdmin ? '/stats' : '/', icon: 'users', tone: 'purple', change: memberChange == null ? null : change(memberChange, 0, 'this week'), sub: `${fmt(numbers.humans)} people · ${fmt(numbers.bots)} bots` },
+  ];
+%>
 <section class="hero">
   <img class="hero-logo" src="/static/orbit-logo.png" alt="" width="84" height="84">
   <div class="hero-text">
     <h1>Welcome back, <%= user.name %>!</h1>
-    <p>Overview · your to-do right now.</p>
-    <div class="hero-chips" aria-label="Your to-do">
-      <% const nothing = !counts.pending && !todo.unclaimed && !todo.my_tickets; %>
-      <% if (counts.pending) { %><a class="hero-chip hero-chip-main" href="/submissions/<%= todo.oldest_pending %>">📨 Review <b><%= counts.pending %></b> application<%= counts.pending == 1 ? '' : 's' %> →</a><% } %>
-      <% if (todo.need_my_vote) { %><a class="hero-chip" href="/submissions?status=pending">🗳️ <b><%= todo.need_my_vote %></b> need your vote</a><% } %>
-      <% if (todo.unclaimed) { %><a class="hero-chip" href="/tickets?status=open">🎫 <b><%= todo.unclaimed %></b> unclaimed ticket<%= todo.unclaimed == 1 ? '' : 's' %></a><% } %>
-      <% if (todo.my_tickets) { %><a class="hero-chip" href="/tickets?status=open">✋ <b><%= todo.my_tickets %></b> ticket<%= todo.my_tickets == 1 ? '' : 's' %> you claimed</a><% } %>
-      <% if (nothing) { %><span class="hero-chip">✅ All caught up!</span><% } %>
-      <% if (myLoa) { %>
-        <a class="hero-chip" href="/loa"><%= myLoa.started ? `🌴 On LOA until ${myLoa.until}` : `📅 LOA starts ${myLoa.from}` %></a>
-      <% } else { %>
-        <a class="hero-chip hero-chip-quiet" href="/loa">🌴 Going away? Set LOA</a>
-      <% } %>
+    <p>Here's what's happening in your server today.</p>
+    <div class="hero-chips">
+      <span class="hero-chip"><%- include('partials/icon', { name: 'server', size: 15 }) %><%= srv.name %></span>
+      <span class="hero-chip"><%- include('partials/icon', { name: 'users', size: 15 }) %><b><%= fmt(numbers.members) %></b> member<%= numbers.members == 1 ? '' : 's' %></span>
+      <span class="hero-chip"><span class="dot <%= online ? 'on' : 'off' %>"></span>Orbit is <%= online ? 'online' : 'offline' %></span>
+      <% if (myLoa) { %><a class="hero-chip" href="/loa"><%= myLoa.started ? `🌴 On leave until ${myLoa.until}` : `📅 Leave starts ${myLoa.from}` %></a><% } %>
     </div>
+  </div>
+  <div class="hero-actions">
+    <% if (counts.pending) { %>
+      <a class="btn btn-primary btn-lg" href="/review"><%- include('partials/icon', { name: 'inbox', size: 18 }) %>Review <%= counts.pending %> application<%= counts.pending == 1 ? '' : 's' %></a>
+    <% } else if (todo.unclaimed) { %>
+      <a class="btn btn-primary btn-lg" href="/tickets?status=open"><%- include('partials/icon', { name: 'ticket', size: 18 }) %>Answer <%= todo.unclaimed %> ticket<%= todo.unclaimed == 1 ? '' : 's' %></a>
+    <% } else { %>
+      <span class="hero-done"><%- include('partials/icon', { name: 'check', size: 18 }) %>All caught up</span>
+    <% } %>
   </div>
 </section>
 
-<section class="stats">
-  <a class="stat" href="/submissions?status=pending">
-    <span class="stat-icon warn"><%- include('partials/icon', { name: 'clock', size: 20 }) %></span>
-    <span class="stat-text"><span class="stat-num"><%= counts.pending %></span><span class="stat-label">Pending applications</span></span>
-  </a>
-  <a class="stat" href="/submissions">
-    <span class="stat-icon"><%- include('partials/icon', { name: 'inbox', size: 20 }) %></span>
-    <span class="stat-text"><span class="stat-num"><%= counts.submissions %></span><span class="stat-label">All applications</span></span>
-  </a>
-  <a class="stat" href="/tickets?status=open">
-    <span class="stat-icon green"><%- include('partials/icon', { name: 'ticket', size: 20 }) %></span>
-    <span class="stat-text"><span class="stat-num"><%= counts.open_tickets %></span><span class="stat-label">Open tickets</span></span>
-  </a>
-  <a class="stat" href="/tickets">
-    <span class="stat-icon"><%- include('partials/icon', { name: 'list', size: 20 }) %></span>
-    <span class="stat-text"><span class="stat-num"><%= counts.tickets %></span><span class="stat-label">All tickets</span></span>
-  </a>
+<section class="stats stats-v3">
+  <% statCards.forEach(c => { %>
+    <a class="stat stat-v3" href="<%= c.href %>">
+      <span class="stat-top">
+        <span class="stat-icon tone-<%= c.tone %>"><%- include('partials/icon', { name: c.icon, size: 20 }) %></span>
+        <span class="stat-view">View <%- include('partials/icon', { name: 'chevronRight', size: 14 }) %></span>
+      </span>
+      <span class="stat-num"><%= fmt(c.n) %></span>
+      <span class="stat-label"><%= c.label %></span>
+      <span class="stat-sub">
+        <% if (c.change && c.change.cls !== 'flat') { %><span class="delta <%= c.change.cls %>"><%= c.change.text %></span><% } else { %><span class="muted"><%= c.sub %></span><% } %>
+      </span>
+    </a>
+  <% }) %>
 </section>
 
 <% if (isAdmin && checklist.some(c => !c.done)) { const done = checklist.filter(c => c.done).length; %>
@@ -61,47 +122,95 @@
 </section>
 <% } %>
 
-<div class="grid-2" style="gap: 20px;">
-  <section class="card">
+<div class="ov-grid">
+  <section class="card ov-activity">
     <div class="card-head">
-      <h2>Latest applications</h2>
-      <a href="/submissions" class="small">See all</a>
+      <h2>Recent activity</h2>
+      <% if (kindsHere.length > 1) { %>
+        <div class="seg" role="group" aria-label="Filter activity" data-activity-filter>
+          <button type="button" class="seg-btn active" data-filter="all">All</button>
+          <% kindsHere.forEach(k => { %><button type="button" class="seg-btn" data-filter="<%= k %>"><%= KINDS[k].label %></button><% }) %>
+        </div>
+      <% } %>
     </div>
-    <% if (!recentSubs.length) { %>
-      <p class="empty-row">No applications yet.</p>
+    <% if (!activity.length) { %>
+      <p class="empty-row">Nothing yet. Applications, tickets, giveaways and mod actions will show up here.</p>
     <% } else { %>
-      <ul class="rows">
-        <% recentSubs.forEach(s => { %>
-          <li>
-            <a class="row-link" href="/submissions/<%= s.id %>">
-              <span class="row-main"><span class="role-icon"><%= s.user_tag.slice(0, 1).toUpperCase() %></span><span><strong><%= s.user_tag %></strong><br><span class="muted small"><%= s.role_name %></span></span></span>
-              <span class="row-meta"><%- include('partials/status', { status: s.status }) %></span>
-            </a>
+      <ul class="feed" data-activity-list>
+        <% activity.forEach(a => { const k = KINDS[a.kind]; %>
+          <li data-kind="<%= a.kind %>">
+            <% if (canOpen(a.href)) { %><a href="<%= a.href %>" class="feed-row"><% } else { %><div class="feed-row"><% } %>
+              <span class="feed-icon tone-<%= k.tone %>"><%- include('partials/icon', { name: k.icon, size: 16 }) %></span>
+              <span class="feed-text"><strong><%= a.who || 'Someone' %></strong> <%= k.text(a) %></span>
+              <span class="feed-time" title="<%= new Date(a.at).toISOString() %>"><%= ago(a.at) %></span>
+            <%- canOpen(a.href) ? '</a>' : '</div>' %>
           </li>
         <% }) %>
       </ul>
     <% } %>
   </section>
 
-  <section class="card">
-    <div class="card-head">
-      <h2>Latest tickets</h2>
-      <a href="/tickets" class="small">See all</a>
-    </div>
-    <% if (!recentTickets.length) { %>
-      <p class="empty-row">No tickets yet.</p>
+  <section class="card ov-pending">
+    <div class="card-head"><h2>Pending actions</h2></div>
+    <% const open = pending.filter(p => p.n); %>
+    <% if (!open.length) { %>
+      <p class="empty-row">Nothing waiting on staff right now. 🎉</p>
     <% } else { %>
-      <ul class="rows">
-        <% recentTickets.forEach(t => { %>
-          <li>
-            <a class="row-link" href="/tickets/<%= t.id %>">
-              <span class="row-main"><span class="role-icon">#</span><span><strong>Ticket #<%= String(t.number).padStart(4, '0') %></strong><br><span class="muted small"><%= t.opener_tag %></span></span></span>
-              <span class="row-meta"><%- include('partials/status', { status: t.status }) %></span>
-            </a>
-          </li>
+      <ul class="todo-list">
+        <% open.forEach(p => { %>
+          <li><a href="<%= canOpen(p.href) ? p.href : '/' %>" class="todo-row">
+            <span class="feed-icon tone-<%= p.tone %>"><%- include('partials/icon', { name: p.icon, size: 16 }) %></span>
+            <span class="todo-text"><%= p.text %></span>
+            <span class="todo-count"><%= fmt(p.n) %></span>
+            <%- include('partials/icon', { name: 'chevronRight', size: 16 }) %>
+          </a></li>
         <% }) %>
       </ul>
     <% } %>
+  </section>
+</div>
+
+<div class="ov-grid ov-grid-b">
+  <section class="card">
+    <div class="card-head"><h2>Quick actions</h2></div>
+    <div class="quick-grid">
+      <% quick.forEach(q => { %>
+        <a class="quick" href="<%= q.href %>">
+          <span class="quick-icon tone-<%= q.tone %>"><%- include('partials/icon', { name: q.icon, size: 22 }) %></span>
+          <span><%= q.text %></span>
+        </a>
+      <% }) %>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Server overview</h2>
+      <% if (isAdmin) { %><a href="/stats" class="small">Stat channels</a><% } %>
+    </div>
+    <div class="srv-nums">
+      <div><span class="srv-num"><%= fmt(numbers.members) %></span><span class="srv-label">Members</span></div>
+      <div><span class="srv-num"><%= fmt(numbers.bots) %></span><span class="srv-label">Bots</span></div>
+      <div><span class="srv-num"><%= fmt(numbers.channels) %></span><span class="srv-label">Channels</span></div>
+      <div><span class="srv-num"><%= fmt(numbers.roles) %></span><span class="srv-label">Roles</span></div>
+      <div><span class="srv-num"><%= fmt(numbers.boosts) %></span><span class="srv-label">Boosts</span></div>
+    </div>
+    <figure class="chart">
+      <figcaption class="muted small"><%= chart.label %><%= chart.kind === 'members' ? ` · last ${chart.points.length} days` : ' · last 14 days' %></figcaption>
+      <svg viewBox="0 0 <%= W %> <%= H %>" preserveAspectRatio="none" role="img" aria-label="<%= chart.label %> chart">
+        <line x1="<%= pad %>" x2="<%= W - pad %>" y1="<%= H - pad %>" y2="<%= H - pad %>" class="chart-axis"/>
+        <line x1="<%= pad %>" x2="<%= W - pad %>" y1="<%= H / 2 %>" y2="<%= H / 2 %>" class="chart-grid"/>
+        <% if (xy.length) { %>
+          <polygon points="<%= area %>" class="chart-area"/>
+          <polyline points="<%= line %>" class="chart-line" vector-effect="non-scaling-stroke"/>
+        <% } %>
+      </svg>
+      <div class="chart-x muted small">
+        <span><%= chart.points.length ? shortDay(chart.points[0].day) : '' %></span>
+        <span>max <%= fmt(max) %></span>
+        <span><%= chart.points.length ? shortDay(chart.points[chart.points.length - 1].day) : '' %></span>
+      </div>
+    </figure>
   </section>
 </div>
 <%- include('partials/foot') %>

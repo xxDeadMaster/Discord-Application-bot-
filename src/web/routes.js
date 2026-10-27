@@ -12,8 +12,9 @@ import {
 } from '../schedule.js';
 import {
   dashboardCounts, deleteClosedTickets, findOpenLoa, listVotes, voteTally, deleteSubmissions, getCategory, getRole, getSettings, getSubmission, getTicket, listCategories, listQuestions,
-  listRoles, listSubmissions, listTicketMessages, listTickets, query, replaceQuestions, updateSettings,
+  listRoles, listSnapshots, listSubmissions, listTicketMessages, listTickets, query, replaceQuestions, updateSettings,
 } from '../db.js';
+import { serverNumbers } from '../bot/counters.js';
 import { requireAdmin } from './auth.js';
 
 export const routes = express.Router();
@@ -64,10 +65,11 @@ function nameOf(list, id) {
 /* ---------- Overview ---------- */
 
 routes.get('/', async (req, res) => {
-  const [counts, settings, recentSubs, recentTickets, cats] = await Promise.all([
-    dashboardCounts(), getSettings(), listSubmissions({ limit: 5 }), listTickets({ limit: 5 }), listCategories(),
+  const guild = res.locals.guild;
+  const me = res.locals.user.id;
+  const [counts, settings, cats, snapshots, myLoa] = await Promise.all([
+    dashboardCounts(), getSettings(), listCategories(), listSnapshots(30), findOpenLoa(me),
   ]);
-  const opts = guildOptions(res.locals.guild);
   const checklist = [
     { done: Boolean(settings.staff_role_id), text: 'Pick a staff role', href: '/settings' },
     { done: Boolean(settings.apply_channel_id && settings.submissions_channel_id), text: 'Pick application + submissions channels', href: '/settings' },
@@ -75,23 +77,69 @@ routes.get('/', async (req, res) => {
     { done: Boolean(settings.apply_panel_message_id), text: 'Post the application panel', href: '/settings#applications' },
     { done: Boolean(settings.ticket_channel_id && settings.ticket_panel_message_id), text: 'Pick a ticket channel and post the ticket panel', href: '/settings#tickets' },
   ];
-  // "Your to-do" for whoever is signed in
-  const me = res.locals.user.id;
+  // One round trip for the to-do list and the "this week vs last week" numbers
   const { rows: [todo] } = await query(
     `SELECT
        (SELECT id FROM submissions WHERE guild_id = $1 AND status = 'pending' ORDER BY created_at ASC LIMIT 1) AS oldest_pending,
        (SELECT count(*)::int FROM submissions s WHERE s.guild_id = $1 AND s.status = 'pending'
           AND NOT EXISTS (SELECT 1 FROM submission_votes v WHERE v.submission_id = s.id AND v.user_id = $2)) AS need_my_vote,
        (SELECT count(*)::int FROM tickets WHERE guild_id = $1 AND status = 'open' AND claimed_by IS NULL) AS unclaimed,
-       (SELECT count(*)::int FROM tickets WHERE guild_id = $1 AND status = 'open' AND claimed_by = $2) AS my_tickets`,
+       (SELECT count(*)::int FROM tickets WHERE guild_id = $1 AND status = 'open' AND claimed_by = $2) AS my_tickets,
+       (SELECT count(*)::int FROM submissions WHERE guild_id = $1 AND created_at >= now() - interval '7 days') AS apps_week,
+       (SELECT count(*)::int FROM submissions WHERE guild_id = $1 AND created_at >= now() - interval '14 days' AND created_at < now() - interval '7 days') AS apps_prev,
+       (SELECT count(*)::int FROM tickets WHERE guild_id = $1 AND created_at >= now() - interval '7 days') AS tickets_week,
+       (SELECT count(*)::int FROM tickets WHERE guild_id = $1 AND created_at >= now() - interval '14 days' AND created_at < now() - interval '7 days') AS tickets_prev,
+       (SELECT count(*)::int FROM mod_cases WHERE guild_id = $1 AND created_at >= now() - interval '7 days') AS mod_week,
+       (SELECT count(*)::int FROM mod_cases WHERE guild_id = $1 AND created_at >= now() - interval '14 days' AND created_at < now() - interval '7 days') AS mod_prev,
+       (SELECT count(*)::int FROM giveaways WHERE guild_id = $1 AND status = 'active') AS giveaways_active,
+       (SELECT count(*)::int FROM giveaways WHERE guild_id = $1 AND status = 'ended' AND ended_at >= now() - interval '3 days') AS giveaways_ended,
+       (SELECT count(*)::int FROM polls WHERE guild_id = $1 AND status = 'active') AS polls_active`,
     [config.guildId, me],
   );
-  const myLoa = await findOpenLoa(me);
+  // Recent activity across the bot (newest first)
+  const { rows: activity } = await query(
+    `(SELECT 'application' AS kind, created_at AS at, user_tag AS who, role_name AS what, '/submissions/' || id AS href, status FROM submissions WHERE guild_id = $1 ORDER BY created_at DESC LIMIT 8)
+     UNION ALL (SELECT 'ticket', created_at, opener_tag, coalesce(type_name, 'Ticket') || ' #' || lpad(number::text, 4, '0'), '/tickets/' || id, status FROM tickets WHERE guild_id = $1 ORDER BY created_at DESC LIMIT 8)
+     UNION ALL (SELECT 'moderation', created_at, user_tag, action, '/moderation', mod_tag FROM mod_cases WHERE guild_id = $1 ORDER BY created_at DESC LIMIT 8)
+     UNION ALL (SELECT 'giveaway', created_at, coalesce(host_tag, ''), prize, '/giveaways', status FROM giveaways WHERE guild_id = $1 ORDER BY created_at DESC LIMIT 4)
+     UNION ALL (SELECT 'poll', created_at, coalesce(host_tag, ''), question, '/polls', status FROM polls WHERE guild_id = $1 ORDER BY created_at DESC LIMIT 4)
+     UNION ALL (SELECT 'loa', created_at, user_tag, to_char(start_date, 'Mon DD') || ' – ' || to_char(end_date, 'Mon DD'), '/loa', status FROM loa_requests WHERE guild_id = $1 ORDER BY created_at DESC LIMIT 4)
+     UNION ALL (SELECT 'strike', created_at, user_tag, reason, '/strikes', issued_by_tag FROM strikes WHERE guild_id = $1 ORDER BY created_at DESC LIMIT 4)
+     ORDER BY at DESC LIMIT 12`,
+    [config.guildId],
+  );
+  // Members chart: daily snapshots once there are a few, otherwise daily activity for the last 14 days
+  let chart;
+  if (snapshots.length >= 3) {
+    chart = { kind: 'members', label: 'Members', points: snapshots.map((s) => ({ day: s.day, value: s.members })) };
+  } else {
+    const { rows } = await query(
+      `SELECT to_char(d, 'YYYY-MM-DD') AS day,
+         (SELECT count(*)::int FROM submissions WHERE guild_id = $1 AND created_at::date = d)
+         + (SELECT count(*)::int FROM tickets WHERE guild_id = $1 AND created_at::date = d)
+         + (SELECT count(*)::int FROM mod_cases WHERE guild_id = $1 AND created_at::date = d) AS value
+       FROM generate_series(current_date - 13, current_date, interval '1 day') AS d`,
+      [config.guildId],
+    );
+    chart = { kind: 'activity', label: 'Applications, tickets and mod actions per day', points: rows };
+  }
+  const numbers = serverNumbers(guild);
+  const weekAgo = snapshots.length ? snapshots[Math.max(0, snapshots.length - 8)] : null;
   res.render('overview', {
-    title: 'Overview', counts, recentSubs, recentTickets, checklist, inviteUrl: inviteUrl(), todo,
+    title: 'Overview', counts, checklist, inviteUrl: inviteUrl(), todo, activity, chart, numbers,
+    memberChange: weekAgo && snapshots.length > 1 ? numbers.members - weekAgo.members : null,
     myLoa: myLoa ? { ...myLoa, from: prettyDate(myLoa.start_date), until: prettyDate(myLoa.end_date), started: myLoa.start_date <= todayIn(settings.timezone) } : null,
-    applyChannel: nameOf(opts.textChannels, settings.apply_channel_id),
   });
+});
+
+/** Review queue: jumps straight to the oldest application still waiting. */
+routes.get('/review', async (req, res) => {
+  const { rows: [next] } = await query(
+    "SELECT id FROM submissions WHERE guild_id = $1 AND status = 'pending' ORDER BY created_at ASC LIMIT 1", [config.guildId],
+  );
+  if (next) return res.redirect(`/submissions/${next.id}`);
+  flash(req, 'success', 'No applications are waiting for review. 🎉');
+  return res.redirect('/submissions');
 });
 
 /* ---------- Settings ---------- */

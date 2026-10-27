@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { PermissionFlagsBits } from 'discord.js';
 import express from 'express';
-import { getGuild } from '../bot/client.js';
+import { client, getGuild } from '../bot/client.js';
 import { inviteUrl, isStaff } from '../bot/ui.js';
 import { config } from '../config.js';
 import { dashboardCounts, getSettings } from '../db.js';
@@ -102,6 +102,8 @@ export async function requireLogin(req, res, next) {
     res.locals.isAdmin = member.permissions.has(PermissionFlagsBits.ManageGuild);
     res.locals.isManager = res.locals.isAdmin || Boolean(settings.manager_role_id && member.roles.cache.has(settings.manager_role_id));
     res.locals.navCounts = await dashboardCounts();
+    res.locals.botOnline = Boolean(client.isReady?.());
+    res.locals.server = { name: guild.name, icon: guild.iconURL?.({ size: 64 }) || null, members: guild.memberCount || 0 };
     next();
   } catch (err) {
     next(err);

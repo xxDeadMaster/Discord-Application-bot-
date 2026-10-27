@@ -5,7 +5,11 @@ import { cleanEmoji } from '../bot/ui.js';
 import { decideLoa, endLoa, isOnLoa, issueStrike, prettyDate, removeStrike, requestLoa, todayIn } from '../bot/staff.js';
 import { DEFAULT_QUESTION, toggleClaim } from '../bot/tickets.js';
 import { config } from '../config.js';
-import { getLoa, getSettings, getTicketType, listLoas, listStrikes, listTicketTypes, query } from '../db.js';
+import {
+  deleteModCase, getLoa, getModCase, getSettings, getTicketType, listLoas, listModCases, listStrikes, listTicketTypes, modCounts, query, updateSettings,
+} from '../db.js';
+import { ACTIONS, prettyMinutes } from '../bot/moderation.js';
+import { guildOptions } from './routes.js';
 import { activityScore, staffActivity } from '../stats.js';
 
 export const staffRoutes = express.Router();
@@ -41,6 +45,41 @@ function staffMembers(guild, settings) {
   }
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/* ---------- Moderation (case history from /warn /timeout /kick /ban) ---------- */
+const MOD_PAGE = 50;
+staffRoutes.get('/moderation', requireManager, async (req, res) => {
+  const action = Object.hasOwn(ACTIONS, String(req.query.action || '')) ? String(req.query.action) : null;
+  const search = clean(req.query.q, 100) || null;
+  const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+  const [settings, cases, week] = await Promise.all([
+    getSettings(),
+    listModCases({ action, search, limit: MOD_PAGE + 1, offset: (page - 1) * MOD_PAGE }),
+    modCounts(new Date(Date.now() - 7 * 24 * 3600 * 1000)),
+  ]);
+  res.render('moderation', {
+    title: 'Moderation', cases: cases.slice(0, MOD_PAGE), hasMore: cases.length > MOD_PAGE, page, action, search, week,
+    actions: ACTIONS, prettyMinutes, channels: guildOptions(res.locals.guild).textChannels, logChannelId: settings.mod_log_channel_id,
+  });
+});
+
+staffRoutes.post('/moderation/log-channel', requireManager, async (req, res) => {
+  const id = String(req.body.mod_log_channel_id || '').trim();
+  const channels = guildOptions(res.locals.guild).textChannels;
+  if (id && !channels.some((c) => c.id === id)) { flash(req, 'error', 'Pick a channel from the list.'); return res.redirect('/moderation'); }
+  await updateSettings({ mod_log_channel_id: id || null });
+  flash(req, 'success', id ? 'Mod log channel saved. Every /warn, /timeout, /kick and /ban will be posted there.' : 'Mod log turned off. Cases are still saved here.');
+  res.redirect('/moderation');
+});
+
+staffRoutes.post('/moderation/:id/delete', async (req, res) => {
+  if (!res.locals.isAdmin) { flash(req, 'error', 'Only admins can delete cases.'); return res.redirect('/moderation'); }
+  const c = await getModCase(idParam(req));
+  if (!c) { flash(req, 'error', 'That case no longer exists.'); return res.redirect('/moderation'); }
+  await deleteModCase(c.id);
+  flash(req, 'success', `Deleted case #${c.id}. This doesn't undo the action in Discord.`);
+  res.redirect('/moderation');
+});
 
 /* ---------- Activity ---------- */
 

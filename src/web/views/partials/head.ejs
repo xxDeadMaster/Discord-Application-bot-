@@ -6,68 +6,129 @@
   <title><%= title %> · Orbit</title>
   <link rel="icon" type="image/png" href="/static/orbit-logo.png">
   <meta name="theme-color" content="#05070C">
+  <script>
+    // Pick the saved theme before anything paints (no flash of the wrong theme)
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('orbit-theme'); } catch (e) {}
+      if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.classList.add('js');
+    })();
+  </script>
   <link rel="stylesheet" href="/static/style.css?v=<%= assetVersion %>">
   <script src="/static/app.js?v=<%= assetVersion %>" defer></script>
-  <script>document.documentElement.classList.add('js')</script>
 </head>
 <body class="<%= user ? 'has-sidebar' : 'no-sidebar' %>">
 <% if (user) {
   const nc = typeof navCounts !== 'undefined' && navCounts ? navCounts : {};
   const admin = typeof isAdmin !== 'undefined' && isAdmin;
   const manager = typeof isManager !== 'undefined' && isManager;
-  const links = [
-    { href: '/', label: 'Overview', icon: 'home', active: path === '/' },
-    { section: 'Review' },
-    { href: '/submissions', label: 'Submissions', icon: 'inbox', active: path.startsWith('/submissions'), count: nc.pending, countLabel: 'pending' },
-    { href: '/tickets', label: 'Tickets', icon: 'ticket', active: path.startsWith('/tickets') && !path.startsWith('/ticket-types'), count: nc.open_tickets, countLabel: 'open' },
-    { section: 'Staff' },
-    { href: '/staff', label: 'Activity', icon: 'chart', active: path.startsWith('/staff') },
-    { href: '/loa', label: 'Leave (LOA)', icon: 'calendar', active: path.startsWith('/loa'), count: manager ? nc.pending_loa : 0, countLabel: 'pending' },
-  ];
-  if (manager) links.push({ href: '/strikes', label: 'Strikes', icon: 'alert', active: path.startsWith('/strikes') });
-  if (admin || manager) links.push({ section: 'Community' });
-  if (admin) links.push({ href: '/welcome', label: 'Welcome', icon: 'wave', active: path.startsWith('/welcome') });
-  if (admin) links.push({ href: '/stats', label: 'Server stats', icon: 'hash', active: path.startsWith('/stats') });
-  if (admin) links.push({ href: '/role-menus', label: 'Role buttons', icon: 'check', active: path.startsWith('/role-menus') });
-  if (admin) links.push({ href: '/leveling', label: 'Leveling', icon: 'trophy', active: path.startsWith('/leveling') });
-  if (manager) links.push({ href: '/giveaways', label: 'Giveaways', icon: 'gift', active: path.startsWith('/giveaways') });
-  if (manager) links.push({ href: '/polls', label: 'Polls', icon: 'poll', active: path.startsWith('/polls') });
-  if (admin || manager) links.push({ section: 'Setup' });
-  if (admin) links.push({ href: '/applications', label: 'Applications', icon: 'list', active: path.startsWith('/applications') });
-  if (manager) links.push({ href: '/ticket-types', label: 'Ticket types', icon: 'ticket', active: path.startsWith('/ticket-types') });
-  if (admin) links.push({ href: '/settings', label: 'Settings', icon: 'settings', active: path.startsWith('/settings') });
+  const srv = typeof server !== 'undefined' && server ? server : { name: 'Server', icon: null, members: 0 };
+  const online = typeof botOnline !== 'undefined' ? botOnline : true;
+  const is = (p) => path === p || path.startsWith(p + '/');
+  // Sidebar groups. Each link: [href, label, icon, active, count, show]
+  const groups = [
+    { id: 'moderation', label: 'Moderation', links: [
+      ['/moderation', 'Moderation', 'shield', is('/moderation'), 0, manager],
+      ['/strikes', 'Strikes', 'alert', is('/strikes'), 0, manager],
+      ['/staff', 'Staff activity', 'activity', is('/staff'), 0, true],
+      ['/stats', 'Server stats', 'hash', is('/stats'), 0, admin],
+    ] },
+    { id: 'applications', label: 'Applications', links: [
+      ['/applications', 'Application builder', 'list', is('/applications'), 0, admin],
+      ['/submissions', 'Submissions', 'inbox', is('/submissions'), nc.pending, true],
+      ['/review', 'Review queue', 'queue', is('/review'), 0, true],
+    ] },
+    { id: 'support', label: 'Support', links: [
+      ['/tickets', 'Tickets', 'ticket', is('/tickets'), nc.open_tickets, true],
+      ['/ticket-types', 'Ticket settings', 'tag', is('/ticket-types'), 0, manager],
+      ['/loa', 'Leave (LOA)', 'calendar', is('/loa'), 0, true],
+    ] },
+    { id: 'community', label: 'Community', links: [
+      ['/welcome', 'Welcome & onboarding', 'wave', is('/welcome'), 0, admin],
+      ['/role-menus', 'Role buttons', 'check', is('/role-menus'), 0, admin],
+      ['/giveaways', 'Giveaways', 'gift', is('/giveaways'), 0, manager],
+      ['/polls', 'Polls', 'poll', is('/polls'), 0, manager],
+      ['/leveling', 'Leveling', 'trophy', is('/leveling'), 0, admin],
+    ] },
+    { id: 'config', label: 'Configuration', links: [
+      ['/settings', 'General settings', 'settings', is('/settings'), 0, admin],
+    ] },
+  ].map((g) => ({ ...g, links: g.links.filter((l) => l[5]) })).filter((g) => g.links.length);
+  const bellItems = [
+    nc.pending ? { href: '/review', icon: 'inbox', text: `${nc.pending} application${nc.pending == 1 ? '' : 's'} to review` } : null,
+    nc.open_tickets ? { href: '/tickets?status=open', icon: 'ticket', text: `${nc.open_tickets} open ticket${nc.open_tickets == 1 ? '' : 's'}` } : null,
+  ].filter(Boolean);
+  const bellCount = (nc.pending || 0) + (nc.open_tickets || 0);
 %>
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
   <a class="brand" href="/">
     <img class="brand-logo" src="/static/orbit-logo.png" alt="" width="40" height="40">
     <span class="brand-text">
       <span class="brand-name">Orbit</span>
-      <span class="brand-sub">BloxVerse Staff Hub</span>
+      <span class="brand-sub">All-in-one staff bot</span>
     </span>
   </a>
   <nav class="side-nav" aria-label="Main">
-    <% links.forEach(l => { if (l.section) { %>
-      <div class="side-section"><%= l.section %></div>
-    <% } else { %>
-      <a href="<%= l.href %>" class="side-link <%= l.active ? 'active' : '' %>" <%= l.active ? 'aria-current=page' : '' %>>
-        <%- include('icon', { name: l.icon }) %>
-        <span class="side-label"><%= l.label %></span>
-        <% if (l.count) { %><span class="side-count" title="<%= l.count %> <%= l.countLabel %>"><%= l.count %><span class="sr"> <%= l.countLabel %></span></span><% } %>
-      </a>
-    <% } }) %>
+    <a href="/" class="side-link side-home <%= path === '/' ? 'active' : '' %>" <%= path === '/' ? 'aria-current=page' : '' %>>
+      <%- include('icon', { name: 'home' }) %><span class="side-label">Overview</span>
+    </a>
+    <% groups.forEach(g => { const hasActive = g.links.some(l => l[3]); %>
+      <details class="side-group" data-group="<%= g.id %>" open>
+        <summary class="side-section"><span><%= g.label %></span><%- include('icon', { name: 'chevronDown', size: 14 }) %></summary>
+        <% g.links.forEach(([href, label, icon, active, count]) => { %>
+          <a href="<%= href %>" class="side-link <%= active ? 'active' : '' %>" <%= active ? 'aria-current=page' : '' %>>
+            <%- include('icon', { name: icon }) %>
+            <span class="side-label"><%= label %></span>
+            <% if (count) { %><span class="side-count"><%= count %></span><% } %>
+          </a>
+        <% }) %>
+      </details>
+    <% }) %>
   </nav>
-  <div class="side-user">
-    <% if (user.avatar) { %><img src="<%= user.avatar %>" alt="" width="32" height="32"><% } else { %><span class="avatar-fallback" aria-hidden="true"><%= (user.name || '?').slice(0, 1).toUpperCase() %></span><% } %>
-    <span class="side-user-text">
-      <span class="side-user-name"><%= user.name %></span>
-      <span class="side-user-role"><%= admin ? 'Admin' : manager ? 'Manager' : 'Staff' %></span>
-    </span>
-    <form method="post" action="/logout">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <button class="icon-btn" type="submit" aria-label="Sign out" title="Sign out"><%- include('icon', { name: 'logout' }) %></button>
-    </form>
+  <div class="side-foot">
+    <img src="/static/orbit-logo.png" alt="" width="34" height="34">
+    <span><strong>Orbit</strong><span class="muted small">v3.0</span></span>
   </div>
 </aside>
+<div class="sidebar-scrim" data-close-sidebar hidden></div>
+
+<header class="topbar">
+  <button class="icon-btn topbar-menu" type="button" data-open-sidebar aria-label="Open menu" aria-controls="sidebar"><%- include('icon', { name: 'list' }) %></button>
+  <div class="server-pill">
+    <% if (srv.icon) { %><img src="<%= srv.icon %>" alt="" width="26" height="26"><% } else { %><span class="server-fallback"><%= srv.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 1) || 'S' %></span><% } %>
+    <span class="server-name"><%= srv.name %></span>
+  </div>
+  <span class="status-pill <%= online ? 'on' : 'off' %>"><span class="dot"></span><%= online ? 'Online' : 'Offline' %></span>
+  <div class="topbar-right">
+    <details class="menu bell">
+      <summary class="icon-btn" aria-label="Notifications"><%- include('icon', { name: 'bell' }) %><% if (bellCount) { %><span class="bell-count"><%= bellCount > 99 ? '99+' : bellCount %></span><% } %></summary>
+      <div class="menu-pop">
+        <div class="menu-head">Needs attention</div>
+        <% if (!bellItems.length) { %><p class="muted small" style="margin: 6px 12px 10px;">All caught up! 🎉</p><% } %>
+        <% bellItems.forEach(b => { %><a class="pop-item" href="<%= b.href %>"><%- include('icon', { name: b.icon, size: 16 }) %><span><%= b.text %></span></a><% }) %>
+      </div>
+    </details>
+    <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch light or dark mode" title="Light / dark">
+      <span class="theme-dark"><%- include('icon', { name: 'moon' }) %></span><span class="theme-light"><%- include('icon', { name: 'sun' }) %></span>
+    </button>
+    <details class="menu user-menu">
+      <summary class="user-chip">
+        <% if (user.avatar) { %><img src="<%= user.avatar %>" alt="" width="34" height="34"><% } else { %><span class="avatar-fallback"><%= (user.name || '?').slice(0, 1).toUpperCase() %></span><% } %>
+        <span class="user-chip-text"><strong><%= user.name %></strong><span><%= admin ? 'Admin' : manager ? 'Manager' : 'Staff' %></span></span>
+        <%- include('icon', { name: 'chevronDown', size: 16 }) %>
+      </summary>
+      <div class="menu-pop">
+        <% if (admin) { %><a class="pop-item" href="/settings"><%- include('icon', { name: 'settings', size: 16 }) %><span>Settings</span></a><% } %>
+        <a class="pop-item" href="/loa"><%- include('icon', { name: 'calendar', size: 16 }) %><span>My leave (LOA)</span></a>
+        <form method="post" action="/logout">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button class="pop-item" type="submit"><%- include('icon', { name: 'logout', size: 16 }) %><span>Sign out</span></button>
+        </form>
+      </div>
+    </details>
+  </div>
+</header>
 <% } %>
 <main class="page">
 <% if (flash) { %>

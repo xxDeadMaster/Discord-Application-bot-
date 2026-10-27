@@ -2,7 +2,8 @@
 // Light on purpose: counts come from the member list the bot already keeps, the counter list is kept in memory,
 // and a channel is only renamed when its number changed (Discord allows 2 renames per channel every 10 minutes).
 import { ChannelType } from 'discord.js';
-import { getSettings, listCounters } from '../db.js';
+import { getSettings, listCounters, saveSnapshot } from '../db.js';
+import { tzParts } from '../schedule.js';
 import { getGuild } from './client.js';
 
 export const COUNTER_KINDS = {
@@ -106,4 +107,38 @@ export function detectCounters(guild) {
   }
   const order = ['members', 'humans', 'bots', 'channels', 'boosts'];
   return out.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+}
+
+/* ---------- Daily snapshot for the dashboard chart (one row per day) ---------- */
+
+let lastSnapshotDay = null;
+
+/** The numbers shown in the dashboard's Server Overview. */
+export function serverNumbers(guild) {
+  return {
+    members: countFor('members', guild),
+    humans: countFor('humans', guild),
+    bots: countFor('bots', guild),
+    channels: countFor('channels', guild),
+    roles: Math.max(0, (guild.roles?.cache?.size || 1) - 1),
+    boosts: countFor('boosts', guild),
+  };
+}
+
+/** Saves today's numbers once a day (checked hourly). */
+export async function snapshotTick(now = new Date()) {
+  const guild = await getGuild().catch(() => null);
+  if (!guild) return false;
+  const tz = (await getSettings()).timezone || 'America/New_York';
+  const p = tzParts(now, tz);
+  const day = `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`;
+  if (day === lastSnapshotDay) return false;
+  await saveSnapshot(day, serverNumbers(guild));
+  lastSnapshotDay = day;
+  return true;
+}
+
+export function startSnapshots() {
+  snapshotTick().catch((e) => console.warn('[snapshot] failed:', e.message));
+  return setInterval(() => snapshotTick().catch((e) => console.warn('[snapshot] failed:', e.message)), 60 * 60 * 1000);
 }

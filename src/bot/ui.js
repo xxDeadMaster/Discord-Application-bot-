@@ -79,7 +79,11 @@ export const BOT_PERMISSIONS =
   PermissionFlagsBits.ReadMessageHistory |
   PermissionFlagsBits.ManageMessages |
   PermissionFlagsBits.ManageChannels |
-  PermissionFlagsBits.ManageRoles;
+  PermissionFlagsBits.ManageRoles |
+  PermissionFlagsBits.ModerateMembers |
+  PermissionFlagsBits.KickMembers |
+  PermissionFlagsBits.BanMembers |
+  PermissionFlagsBits.MentionEveryone;
 
 export function inviteUrl() {
   return `https://discord.com/oauth2/authorize?client_id=${config.clientId}&scope=bot%20applications.commands&permissions=${BOT_PERMISSIONS.toString()}&guild_id=${config.guildId}`;

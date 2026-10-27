@@ -316,3 +316,44 @@ document.querySelectorAll('[data-menu-items]').forEach((list) => {
   });
   sync();
 });
+
+/* ---------- v3 shell: theme toggle, phone menu, remembered sidebar groups, one open menu at a time ---------- */
+(() => {
+  const root = document.documentElement;
+  document.querySelectorAll('[data-theme-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('orbit-theme', next); } catch { /* private mode */ }
+    });
+  });
+  const sidebar = document.getElementById('sidebar');
+  const scrim = document.querySelector('[data-close-sidebar]');
+  const setOpen = (open) => { sidebar?.classList.toggle('open', open); if (scrim) scrim.hidden = !open; };
+  document.querySelectorAll('[data-open-sidebar]').forEach((b) => b.addEventListener('click', () => setOpen(true)));
+  scrim?.addEventListener('click', () => setOpen(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+  // Sidebar groups remember open/closed (the group with the current page always opens)
+  document.querySelectorAll('.side-group').forEach((g) => {
+    const key = `orbit-group:${g.dataset.group}`;
+    let saved = null;
+    try { saved = localStorage.getItem(key); } catch { /* ignore */ }
+    if (saved === 'closed' && !g.querySelector('.side-link.active')) g.open = false;
+    g.addEventListener('toggle', () => { try { localStorage.setItem(key, g.open ? 'open' : 'closed'); } catch { /* ignore */ } });
+  });
+  // Close dropdown menus when clicking elsewhere
+  document.addEventListener('click', (e) => {
+    document.querySelectorAll('details.menu[open]').forEach((d) => { if (!d.contains(e.target)) d.open = false; });
+  });
+})();
+
+/* ---------- Overview: filter the activity feed ---------- */
+document.querySelectorAll('[data-activity-filter]').forEach((group) => {
+  const list = document.querySelector('[data-activity-list]');
+  group.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-filter]');
+    if (!btn || !list) return;
+    group.querySelectorAll('[data-filter]').forEach((b) => b.classList.toggle('active', b === btn));
+    list.querySelectorAll('[data-kind]').forEach((li) => { li.hidden = btn.dataset.filter !== 'all' && li.dataset.kind !== btn.dataset.filter; });
+  });
+});
