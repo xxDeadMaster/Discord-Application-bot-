@@ -7,6 +7,7 @@ import { client } from './client.js';
 import { syncProfile } from './profile.js';
 import { handleInterviewChannelDelete, handleVoiceState, loadActiveInterviews } from './interviews.js';
 import { startPanelScheduler } from './panels.js';
+import { handleTrapMessage, loadTrap } from './spamTrap.js';
 import { handleCommand, handleLoaButton, handleLoaModal, loadLoaSchedule, registerCommands } from './staff.js';
 import {
   handleChannelDelete, handleClaimButton, handleCloseButton, handleCloseCancel, handleCloseConfirm, handleKeepOpen,
@@ -53,6 +54,11 @@ function route(interaction) {
     if (id.startsWith('gw:enter:')) return handleGiveawayButton(interaction);
     if (id.startsWith('poll:vote:')) return handlePollButton(interaction);
     if (id.startsWith('rm:')) return handleRoleMenuButton(interaction);
+    if (id.startsWith('apply:open:')) {
+      // A category's own panel: same flow as picking it from the main panel's menu
+      interaction.values = [id.split(':')[2]];
+      return handleCategorySelect(interaction);
+    }
   }
   if (interaction.isModalSubmit()) {
     if (id.startsWith('sub:denymodal:')) return handleDenyModal(interaction);
@@ -85,6 +91,7 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
     if (message.guildId === config.guildId) {
+      if (await handleTrapMessage(message)) return;
       await recordTicketMessage(message);
       await handleLevelMessage(message);
     }
@@ -159,6 +166,7 @@ client.once(Events.ClientReady, async (c) => {
   startSnapshots();
   await loadLevels().catch((err) => console.error('[levels] load failed:', err));
   startLeveling();
+  await loadTrap().catch((err) => console.error('[trap] load failed:', err));
 });
 
 client.on(Events.Error, (err) => console.error('[discord]', err));

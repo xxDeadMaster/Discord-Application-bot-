@@ -111,6 +111,17 @@ function caseEmbed(c) {
   return embed;
 }
 
+/** Records a case done by Orbit itself (for example the spam trap) and posts it to the mod log. */
+export async function recordAutoCase({ user, action, reason }) {
+  const settings = await getSettings();
+  const c = await addModCase({
+    userId: user.id, userTag: user.tag || user.username || user.id, modId: client.user?.id || null, modTag: client.user?.tag || 'Orbit',
+    action, reason, durationMinutes: null,
+  });
+  await logCase(c, settings);
+  return c;
+}
+
 async function logCase(c, settings) {
   if (!settings.mod_log_channel_id) return;
   const ch = await client.channels.fetch(settings.mod_log_channel_id).catch(() => null);

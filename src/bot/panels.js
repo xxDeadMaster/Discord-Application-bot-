@@ -2,7 +2,7 @@ import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, StringSelectMenuBuilder,
 } from 'discord.js';
 import {
-  getSettings, listCategories, listRoles, listTicketTypes, updateSettings,
+  getCategory, getSettings, listCategories, listRoles, listTicketTypes, query, updateSettings,
 } from '../db.js';
 import { client } from './client.js';
 import { isCategoryOpen, scheduleState } from '../schedule.js';
@@ -18,6 +18,7 @@ export async function usableCategories(settings) {
   const cats = (await listCategories({ enabledOnly: true })).filter((c) => isCategoryOpen(c, tz));
   const out = [];
   for (const c of cats) {
+    if (c.panel_channel_id) continue; // has its own panel in its own channel
     const roles = (await listRoles(c.id, { enabledOnly: true })).filter((r) => r.question_count > 0);
     if (roles.length) out.push(c);
   }
@@ -70,6 +71,57 @@ export async function buildApplyPanel(settings) {
     }));
 
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select)], files, attachments: [] };
+}
+
+/* ---------- A category's own panel (for example Content Creator applications in their own channel) ---------- */
+
+export async function buildCategoryPanel(cat, settings) {
+  const tz = settings.timezone;
+  const roles = (await listRoles(cat.id, { enabledOnly: true })).filter((r) => r.question_count > 0);
+  const open = cat.enabled && isCategoryOpen(cat, tz) && roles.length > 0;
+  const { embed, files } = panelBase(withEmoji(cat.emoji, cat.name), cat.panel_text || cat.description || 'Press the button below to apply.', BRAND, 'category-panel.png');
+  if (roles.length > 1) {
+    embed.addFields({ name: 'Roles', value: truncate(roles.slice(0, 15).map((r) => `${r.emoji || '•'} **${r.name}**${r.description ? ` · ${r.description}` : ''}`).join('\n'), 1024) });
+  }
+  if (open) {
+    embed.addFields(
+      { name: 'Status', value: openLine(cat, tz) },
+      { name: 'How it works', value: `1️⃣ Press **Start application**\n2️⃣ ${roles.length > 1 ? 'Choose the role you want' : 'Check the role'}\n3️⃣ Answer the questions in your DMs` },
+    );
+  } else {
+    embed.setColor(COLORS.muted).addFields({ name: '🔒 Closed', value: 'Applications are closed right now. Check back later!' });
+  }
+  const button = new ButtonBuilder().setCustomId(`apply:open:${cat.id}`).setLabel('Start application').setStyle(ButtonStyle.Primary).setEmoji('📝').setDisabled(!open);
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(button)], files, attachments: [] };
+}
+
+/** Posts (or edits) a category's own panel. Throws an Error with a readable message. */
+export async function publishCategoryPanel(categoryId) {
+  const cat = await getCategory(categoryId);
+  if (!cat) throw new Error('That application no longer exists.');
+  if (!cat.panel_channel_id) throw new Error('Pick a panel channel for this application first.');
+  const channel = await client.channels.fetch(cat.panel_channel_id).catch(() => null);
+  if (!channel || ![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type)) throw new Error('The bot cannot find that panel channel.');
+  const payload = await buildCategoryPanel(cat, await getSettings());
+  if (cat.panel_message_id) {
+    const existing = await channel.messages.fetch(cat.panel_message_id).catch(() => null);
+    if (existing) { await existing.edit(payload); return { updated: true }; }
+  }
+  try {
+    const msg = await channel.send(payload);
+    await query('UPDATE app_categories SET panel_message_id = $2 WHERE id = $1', [cat.id, msg.id]);
+    return { updated: false };
+  } catch (err) {
+    throw new Error(`The bot could not post there (${err.message}). Give it View Channel, Send Messages and Embed Links.`);
+  }
+}
+
+/** Refreshes every category panel that is already posted. */
+export async function refreshCategoryPanelsQuietly() {
+  for (const c of await listCategories()) {
+    if (!c.panel_channel_id || !c.panel_message_id) continue;
+    await publishCategoryPanel(c.id).catch((err) => console.warn(`[panels] could not refresh panel for ${c.name}:`, err.message));
+  }
 }
 
 /** Old default text that mentions a button; replaced when the panel shows a dropdown. */
@@ -178,6 +230,7 @@ export async function refreshApplyPanelQuietly() {
   } catch (err) {
     console.warn('[panels] could not refresh application panel:', err.message);
   }
+  await refreshCategoryPanelsQuietly();
 }
 
 /*
@@ -205,17 +258,20 @@ async function loadCache() {
 function signatureFrom({ settings, cats }) {
   const tz = settings.timezone;
   const open = cats.filter((c) => isCategoryOpen(c, tz) && c.roles.some((r) => r.question_count > 0)).slice(0, 25);
-  return JSON.stringify(open.map((c) => [c.id, c.name, c.description, c.emoji]));
+  return JSON.stringify(open.map((c) => [c.id, c.name, c.description, c.emoji, c.panel_channel_id]));
 }
 
 export function startPanelScheduler() {
   const tick = async () => {
     try {
       const data = await loadCache();
-      if (!data.settings.apply_channel_id || !data.settings.apply_panel_message_id) return;
+      const hasMain = data.settings.apply_channel_id && data.settings.apply_panel_message_id;
+      const hasOwn = data.cats.some((c) => c.panel_channel_id && c.panel_message_id);
+      if (!hasMain && !hasOwn) return;
       const signature = signatureFrom(data);
       if (lastSignature !== null && signature !== lastSignature) {
-        await publishPanel('apply');
+        if (hasMain) await publishPanel('apply');
+        if (hasOwn) await refreshCategoryPanelsQuietly();
         console.log('[panels] schedule changed, application panel refreshed');
       }
       lastSignature = signature;

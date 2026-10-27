@@ -44,6 +44,18 @@
     </form>
   </section>
   <section class="card">
+    <h2>Spam trap</h2>
+    <p class="muted small">A channel nobody should post in. Spam bots post everywhere, so anyone who isn't staff posting there is removed and their last hour of messages deleted.<% if (trap.channelId) { %> Caught so far: <strong><%= trap.caught %></strong>.<% } %></p>
+    <form method="post" action="/moderation/spam-trap" class="mod-log-form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <select name="trap_channel_id" aria-label="Spam trap channel">
+        <option value="">Off</option>
+        <% channels.forEach(c => { %><option value="<%= c.id %>" <%= c.id === trap.channelId ? 'selected' : '' %>><%= c.name %><%= c.parent ? ` · ${c.parent}` : '' %></option><% }) %>
+      </select>
+      <button class="btn btn-primary" type="submit">Save and post warning</button>
+    </form>
+  </section>
+  <section class="card">
     <h2>Commands</h2>
     <ul class="cmd-list">
       <li><code>/warn member reason</code><span>DM + case</span></li>

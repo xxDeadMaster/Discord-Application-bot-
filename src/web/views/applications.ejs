@@ -55,6 +55,26 @@
         <input id="cat-pos-<%= c.id %>" name="position" type="number" value="<%= c.position %>">
       </div>
     </div>
+    <fieldset class="own-panel">
+      <legend>Where members apply</legend>
+      <div class="grid-2">
+        <div class="field">
+          <label for="cat-panel-<%= c.id %>">Panel channel</label>
+          <select id="cat-panel-<%= c.id %>" name="panel_channel_id">
+            <option value="">Main applications panel (with the others)</option>
+            <% textChannels.forEach(ch => { %><option value="<%= ch.id %>" <%= ch.id === c.panel_channel_id ? 'selected' : '' %>><%= ch.name %><%= ch.parent ? `  (${ch.parent})` : '' %></option><% }) %>
+          </select>
+          <p class="help">Pick a channel to give this application <strong>its own panel</strong> there (for example Content Creator applications in #creator-applications). It is then left off the main panel.</p>
+        </div>
+        <div class="field">
+          <label for="cat-panel-text-<%= c.id %>">Panel text <span class="muted small">(own panel only)</span></label>
+          <textarea id="cat-panel-text-<%= c.id %>" name="panel_text" rows="4" maxlength="2000" placeholder="Requirements, what we look for, where to read more…"><%= c.panel_text || '' %></textarea>
+        </div>
+      </div>
+      <% if (c.panel_channel_id) { %>
+        <p class="help"><%= c.panel_message_id ? '✅ Its panel is posted. Saving updates it.' : '⚠️ Not posted yet. Use "Save and post own panel".' %> Each role's submissions go to the channel picked on that role (or the default in Settings).</p>
+      <% } %>
+    </fieldset>
     <fieldset class="schedule" data-schedule>
       <legend>When is this application open?</legend>
       <p class="help">Times use <strong><%= tz.replace(/_/g, ' ') %></strong> (change it in Settings). When it's closed, it disappears from the panel and opens again by itself.</p>
@@ -102,7 +122,10 @@
     </fieldset>
     <div class="actions" style="justify-content: space-between;">
       <label class="toggle"><input type="checkbox" name="enabled" <%= c.enabled ? 'checked' : '' %>> Switched on</label>
-      <button class="btn btn-primary btn-sm" type="submit">Save</button>
+      <span class="actions">
+        <button class="btn btn-sm" type="submit" name="then_post" value="panel" title="Only does something when a panel channel is picked">Save and post own panel</button>
+        <button class="btn btn-primary btn-sm" type="submit">Save</button>
+      </span>
     </div>
   </form>
 

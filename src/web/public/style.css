@@ -984,3 +984,6 @@ a.ov-feed-row:hover, .ov-list-row:hover { background: var(--hover); text-decorat
 .so-head { gap: 8px; }
 .so-head h2 { white-space: nowrap; font-size: 16px; }
 .so-hero .so-range { margin-left: auto; align-self: center; }
+.mod-top { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
+.own-panel { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px 4px; margin: 6px 0 14px; }
+.own-panel legend { font-weight: 700; padding: 0 6px; }

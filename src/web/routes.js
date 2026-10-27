@@ -3,7 +3,10 @@ import express from 'express';
 import { castVote, decideSubmission, removeReviewMessages } from '../bot/applications.js';
 import { startInterview } from '../bot/interviews.js';
 import { prettyDate, todayIn } from '../bot/staff.js';
-import { invalidatePanelCache, publishPanel, refreshApplyPanelQuietly } from '../bot/panels.js';
+import {
+  invalidatePanelCache, publishCategoryPanel, publishPanel, refreshApplyPanelQuietly,
+} from '../bot/panels.js';
+import { loadTrap } from '../bot/spamTrap.js';
 import { closeTicketFromDashboard, setTicketSettings, transcriptText } from '../bot/tickets.js';
 import { MAX_QUESTIONS, cleanEmoji, inviteUrl } from '../bot/ui.js';
 import { config } from '../config.js';
@@ -189,6 +192,7 @@ routes.post('/settings', requireAdmin, async (req, res) => {
 
   setTicketSettings(await updateSettings(patch));
   loadCounters().catch(() => {}); // the staff counter follows the staff role
+  loadTrap().catch(() => {}); // staff are never caught by the spam trap
 
   // "Save and post panel" buttons: save first, then post or update that panel with the new text
   const post = b.then_post === 'apply' || b.then_post === 'ticket' ? b.then_post : null;
@@ -232,7 +236,7 @@ routes.get('/applications', requireAdmin, async (req, res) => {
       days: WEEK_ORDER.map((d) => ({ d, name: DAY_NAMES[d], on: Boolean(wh[d]), start: wh[d]?.start.text || '', end: wh[d]?.end.text || '' })),
     };
   }
-  res.render('applications', { title: 'Applications', cats, days: DAYS, tz });
+  res.render('applications', { title: 'Applications', cats, days: DAYS, tz, textChannels: guildOptions(res.locals.guild).textChannels });
 });
 
 routes.post('/applications/categories', requireAdmin, async (req, res) => {
@@ -280,14 +284,38 @@ routes.post('/applications/categories/:id', requireAdmin, async (req, res) => {
     days = Object.keys(hours).map(Number);
   }
 
+  // Own panel: '' = shown on the main applications panel; a channel = its own panel there
+  const panelChannel = pickId(b.panel_channel_id, guildOptions(res.locals.guild).textChannels);
+  if (panelChannel === undefined) { flash(req, 'error', 'Pick a panel channel from the list.'); return res.redirect('/applications'); }
+  const movedPanel = (panelChannel || null) !== (cat.panel_channel_id || null);
+  if (movedPanel && cat.panel_channel_id && cat.panel_message_id) {
+    // Remove the old own panel so it doesn't linger in the old channel
+    const old = await res.locals.guild.channels.fetch(cat.panel_channel_id).catch(() => null);
+    const oldMsg = await old?.messages?.fetch(cat.panel_message_id).catch(() => null);
+    await oldMsg?.delete().catch(() => {});
+  }
   await query(
     `UPDATE app_categories SET name = $2, description = $3, enabled = $4, position = $5,
-       schedule_mode = $6, open_at = $7, close_at = $8, weekly_days = $9, weekly_start = $10, weekly_end = $11, weekly_hours = $12, emoji = $13 WHERE id = $1`,
+       schedule_mode = $6, open_at = $7, close_at = $8, weekly_days = $9, weekly_start = $10, weekly_end = $11, weekly_hours = $12, emoji = $13,
+       panel_channel_id = $14, panel_text = $15, panel_message_id = CASE WHEN $16 THEN NULL ELSE panel_message_id END WHERE id = $1`,
     [id, name, clean(b.description, LIMITS.description), b.enabled === 'on', Number.isFinite(position) ? position : cat.position,
-      mode, openAt, closeAt, [...new Set(days)].sort(), start, end, JSON.stringify(hours), formEmoji(b.emoji, cat.emoji)],
+      mode, openAt, closeAt, [...new Set(days)].sort(), start, end, JSON.stringify(hours), formEmoji(b.emoji, cat.emoji),
+      panelChannel, clean(b.panel_text, 2000), movedPanel],
   );
   const saved = await getCategory(id);
-  flash(req, 'success', `Saved "${name}". ${isCategoryOpen(saved, tz) ? 'It is open now.' : `It is closed now: ${describeSchedule(saved, tz).text}.`}`);
+  let note = '';
+  if (b.then_post === 'panel' && !saved.panel_channel_id) note = ' (No panel channel picked, so nothing was posted. It stays on the main panel.)';
+  if (b.then_post === 'panel' && saved.panel_channel_id) {
+    try {
+      const r = await publishCategoryPanel(id);
+      note = r.updated ? ' Its panel was updated.' : ' Its panel was posted.';
+    } catch (err) {
+      flash(req, 'error', `Saved, but the panel couldn't be posted: ${err.message}`);
+      await refreshApplyPanelQuietly();
+      return res.redirect('/applications');
+    }
+  }
+  flash(req, 'success', `Saved "${name}". ${isCategoryOpen(saved, tz) ? 'It is open now.' : `It is closed now: ${describeSchedule(saved, tz).text}.`}${note}`);
   await refreshApplyPanelQuietly();
   res.redirect('/applications');
 });

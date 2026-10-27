@@ -400,3 +400,13 @@ CREATE TABLE IF NOT EXISTS server_snapshots (
 ALTER TABLE server_snapshots ADD COLUMN IF NOT EXISTS humans INTEGER;
 ALTER TABLE server_snapshots ADD COLUMN IF NOT EXISTS joins INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE server_snapshots ADD COLUMN IF NOT EXISTS leaves INTEGER NOT NULL DEFAULT 0;
+
+-- Own application panels (e.g. creator applications in their own channel)
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS panel_channel_id TEXT;
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS panel_message_id TEXT;
+ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS panel_text TEXT NOT NULL DEFAULT '';
+
+-- Spam trap: anyone who posts in this channel is removed (spam bots post everywhere)
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS trap_channel_id TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS trap_message_id TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS trap_caught INTEGER NOT NULL DEFAULT 0;

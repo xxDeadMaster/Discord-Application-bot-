@@ -43,7 +43,7 @@ const SETTINGS_FIELDS = [
   'apply_panel_title', 'apply_panel_description', 'ticket_panel_title', 'ticket_panel_description',
   'apply_cooldown_days', 'blocked_role_ids', 'interview_category_id', 'timezone',
   'auto_close_hours', 'manager_role_id', 'strike_role_ids', 'strike_log_channel_id', 'loa_role_id', 'loa_channel_id',
-  'giveaway_ping_role_id', 'mod_log_channel_id',
+  'giveaway_ping_role_id', 'mod_log_channel_id', 'trap_channel_id', 'trap_message_id', 'trap_caught',
 ];
 
 export async function updateSettings(patch, guildId = config.guildId) {
