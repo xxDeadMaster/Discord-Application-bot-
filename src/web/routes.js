@@ -135,32 +135,6 @@ routes.get('/', async (req, res) => {
   });
 });
 
-/**
- * TEMPORARY bulk role tool (one-time rename/recolor). Body: data = JSON [{ old, name, color }].
- * Matches roles by their current name, skips bot-managed roles, edits name + color only.
- */
-routes.post('/tools/roles', requireAdmin, async (req, res) => {
-  let list;
-  try { list = JSON.parse(String(req.body.data || '[]')); } catch { return res.status(400).json({ error: 'bad json' }); }
-  const guild = res.locals.guild;
-  await guild.roles.fetch();
-  const norm = (t) => String(t).normalize('NFKC').replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
-  const results = [];
-  for (const item of Array.isArray(list) ? list.slice(0, 120) : []) {
-    const role = guild.roles.cache.find((r) => r.name === item.old) || guild.roles.cache.find((r) => norm(r.name) === norm(item.old));
-    if (!role) { results.push({ old: item.old, ok: false, error: 'not found' }); continue; }
-    if (role.managed || role.id === guild.id) { results.push({ old: item.old, ok: false, error: 'managed' }); continue; }
-    try {
-      const color = item.color ? Number.parseInt(String(item.color).replace('#', ''), 16) : 0;
-      await role.edit({ name: String(item.name).slice(0, 100), color, reason: `Role cleanup by ${res.locals.user.username}` });
-      results.push({ old: item.old, id: role.id, name: role.name, color: role.hexColor, ok: true });
-    } catch (err) {
-      results.push({ old: item.old, ok: false, error: err.message });
-    }
-  }
-  res.json({ done: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok), results });
-});
-
 /** Review queue: jumps straight to the oldest application still waiting. */
 routes.get('/review', async (req, res) => {
   const { rows: [next] } = await query(
