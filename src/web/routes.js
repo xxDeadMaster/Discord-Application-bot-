@@ -105,7 +105,7 @@ routes.get('/', async (req, res) => {
      UNION ALL (SELECT 'poll', created_at, coalesce(host_tag, ''), question, '/polls', status FROM polls WHERE guild_id = $1 ORDER BY created_at DESC LIMIT 4)
      UNION ALL (SELECT 'loa', created_at, user_tag, to_char(start_date, 'Mon DD') || ' – ' || to_char(end_date, 'Mon DD'), '/loa', status FROM loa_requests WHERE guild_id = $1 ORDER BY created_at DESC LIMIT 4)
      UNION ALL (SELECT 'strike', created_at, user_tag, reason, '/strikes', issued_by_tag FROM strikes WHERE guild_id = $1 ORDER BY created_at DESC LIMIT 4)
-     ORDER BY at DESC LIMIT 12`,
+     ORDER BY at DESC LIMIT 20`,
     [config.guildId],
   );
   // Members chart: daily snapshots once there are a few, otherwise daily activity for the last 14 days
@@ -127,7 +127,9 @@ routes.get('/', async (req, res) => {
   const weekAgo = snapshots.length ? snapshots[Math.max(0, snapshots.length - 8)] : null;
   res.render('overview', {
     title: 'Overview', counts, checklist, inviteUrl: inviteUrl(), todo, activity, chart, numbers,
-    memberChange: weekAgo && snapshots.length > 1 ? numbers.members - weekAgo.members : null,
+    // Week-ago numbers for the little up/down arrows (only once there are at least two days saved)
+    weekAgo: weekAgo && snapshots.length > 1 ? weekAgo : null,
+    setupLeft: checklist.filter((c) => !c.done).length, setupTotal: checklist.length,
     myLoa: myLoa ? { ...myLoa, from: prettyDate(myLoa.start_date), until: prettyDate(myLoa.end_date), started: myLoa.start_date <= todayIn(settings.timezone) } : null,
   });
 });

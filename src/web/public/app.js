@@ -347,13 +347,17 @@ document.querySelectorAll('[data-menu-items]').forEach((list) => {
   });
 })();
 
-/* ---------- Overview: filter the activity feed ---------- */
-document.querySelectorAll('[data-activity-filter]').forEach((group) => {
+/* ---------- Overview: filter the activity feed (shows the newest few that match) ---------- */
+document.querySelectorAll('[data-activity-filter]').forEach((select) => {
   const list = document.querySelector('[data-activity-list]');
-  group.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-filter]');
-    if (!btn || !list) return;
-    group.querySelectorAll('[data-filter]').forEach((b) => b.classList.toggle('active', b === btn));
-    list.querySelectorAll('[data-kind]').forEach((li) => { li.hidden = btn.dataset.filter !== 'all' && li.dataset.kind !== btn.dataset.filter; });
+  if (!list) return;
+  const show = Number(list.dataset.show) || 7;
+  select.addEventListener('change', () => {
+    let shown = 0;
+    list.querySelectorAll('[data-kind]').forEach((li) => {
+      const match = select.value === 'all' || li.dataset.kind === select.value;
+      li.hidden = !(match && shown < show);
+      if (match) shown++;
+    });
   });
 });
