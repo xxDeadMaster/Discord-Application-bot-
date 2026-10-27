@@ -659,3 +659,47 @@ export async function setRoleMenuMessage(id, channelId, messageId) {
 export async function deleteRoleMenu(id) {
   await query('DELETE FROM role_menus WHERE id = $1 AND guild_id = $2', [id, config.guildId]);
 }
+
+/* ---------- Leveling ---------- */
+
+const LEVELING_FIELDS = [
+  'enabled', 'announce_channel_id', 'announce_message', 'message_xp', 'message_cooldown', 'voice_xp', 'voice_minutes',
+  'daily_xp', 'qotd_channel_id', 'qotd_xp', 'boost_xp', 'no_xp_channel_ids', 'no_xp_role_ids', 'rewards',
+];
+
+export async function getLevelingConfig() {
+  await query('INSERT INTO leveling_config (guild_id) VALUES ($1) ON CONFLICT DO NOTHING', [config.guildId]);
+  const { rows } = await query('SELECT * FROM leveling_config WHERE guild_id = $1', [config.guildId]);
+  return rows[0];
+}
+
+export async function updateLevelingConfig(patch) {
+  const keys = Object.keys(patch).filter((k) => LEVELING_FIELDS.includes(k));
+  await getLevelingConfig();
+  if (!keys.length) return getLevelingConfig();
+  const values = keys.map((k) => (k === 'rewards' ? JSON.stringify(patch[k]) : patch[k]));
+  const { rows } = await query(
+    `UPDATE leveling_config SET ${keys.map((k, i) => `${k} = $${i + 2}`).join(', ')}, updated_at = now() WHERE guild_id = $1 RETURNING *`,
+    [config.guildId, ...values],
+  );
+  return rows[0];
+}
+
+export async function loadAllLevels() {
+  const { rows } = await query('SELECT user_id, user_tag, xp, last_daily, last_qotd FROM member_levels WHERE guild_id = $1', [config.guildId]);
+  return rows;
+}
+
+/** Saves many members at once in a single query: [{ userId, tag, xp, lastDaily, lastQotd }]. */
+export async function saveLevels(list) {
+  if (!list.length) return;
+  await query(
+    `INSERT INTO member_levels (guild_id, user_id, user_tag, xp, last_daily, last_qotd, updated_at)
+     SELECT $1, u.user_id, u.user_tag, u.xp, u.last_daily, u.last_qotd, now()
+       FROM unnest($2::text[], $3::text[], $4::int[], $5::text[], $6::text[]) AS u(user_id, user_tag, xp, last_daily, last_qotd)
+     ON CONFLICT (guild_id, user_id) DO UPDATE SET user_tag = EXCLUDED.user_tag, xp = EXCLUDED.xp,
+       last_daily = EXCLUDED.last_daily, last_qotd = EXCLUDED.last_qotd, updated_at = now()`,
+    [config.guildId, list.map((l) => l.userId), list.map((l) => l.tag || ''), list.map((l) => l.xp),
+      list.map((l) => l.lastDaily || null), list.map((l) => l.lastQotd || null)],
+  );
+}

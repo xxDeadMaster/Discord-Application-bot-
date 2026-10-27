@@ -339,3 +339,33 @@ CREATE TABLE IF NOT EXISTS role_menus (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS giveaway_ping_role_id TEXT;
+
+/* ---------- Leveling ---------- */
+CREATE TABLE IF NOT EXISTS member_levels (
+  guild_id    TEXT NOT NULL,
+  user_id     TEXT NOT NULL,
+  user_tag    TEXT NOT NULL DEFAULT '',
+  xp          INTEGER NOT NULL DEFAULT 0,
+  last_daily  TEXT,        -- YYYY-MM-DD of the last daily bonus
+  last_qotd   TEXT,        -- YYYY-MM-DD of the last QOTD bonus
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (guild_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS leveling_config (
+  guild_id            TEXT PRIMARY KEY,
+  enabled             BOOLEAN NOT NULL DEFAULT false,
+  announce_channel_id TEXT,
+  announce_message    TEXT NOT NULL DEFAULT '🎉 {mention} just reached **level {level}**! Keep it up!',
+  message_xp          INTEGER NOT NULL DEFAULT 1,
+  message_cooldown    INTEGER NOT NULL DEFAULT 60,   -- seconds
+  voice_xp            INTEGER NOT NULL DEFAULT 1,
+  voice_minutes       INTEGER NOT NULL DEFAULT 3,
+  daily_xp            INTEGER NOT NULL DEFAULT 5,
+  qotd_channel_id     TEXT,
+  qotd_xp             INTEGER NOT NULL DEFAULT 3,
+  boost_xp            INTEGER NOT NULL DEFAULT 50,
+  no_xp_channel_ids   TEXT[] NOT NULL DEFAULT '{}',
+  no_xp_role_ids      TEXT[] NOT NULL DEFAULT '{}',
+  rewards             JSONB NOT NULL DEFAULT '[]',   -- [{ level, role_id }]
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);

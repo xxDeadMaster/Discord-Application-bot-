@@ -565,3 +565,24 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .menu-item { display: grid; grid-template-columns: 70px 1.2fr 1fr auto; gap: 10px; align-items: center; }
 .menu-item .emoji-input { max-width: none; }
 @media (max-width: 700px) { .menu-item { grid-template-columns: 60px 1fr auto; } .menu-item input[name=item_label] { grid-column: 1 / 3; } }
+
+/* ---------- Leveling ---------- */
+.xp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); gap: 4px 18px; }
+.reward-item { grid-template-columns: 110px 1fr auto; }
+.lb { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.lb li { display: grid; grid-template-columns: 40px 1fr 200px; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--field); border: 1px solid var(--border); }
+.lb-rank { font-weight: 800; text-align: center; color: var(--muted); }
+.lb-name { display: flex; flex-direction: column; min-width: 0; }
+.lb-bar { margin: 0; }
+@media (max-width: 600px) { .lb li { grid-template-columns: 34px 1fr; } .lb-bar { grid-column: 1 / -1; } }
+/* More pages in the menu: keep every link visible on laptop-height screens */
+@media (max-height: 880px) {
+  .side-link { min-height: 30px; font-size: 14px; }
+  .side-section { padding: 7px 10px 2px; font-size: 10.5px; }
+  .brand { padding-bottom: 6px; }
+}
+@media (max-height: 760px) {
+  .side-link { min-height: 28px; }
+  .side-section { padding-top: 5px; }
+  .sidebar { padding-top: 6px; padding-bottom: 6px; }
+}

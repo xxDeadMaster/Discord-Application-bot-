@@ -18,13 +18,16 @@ import {
 } from './welcome.js';
 import { loadCounters, startCounters } from './counters.js';
 import { handleRoleMenuButton } from './roleMenus.js';
+import {
+  handleLevelBoost, handleLevelMessage, loadLevels, startLeveling,
+} from './levels.js';
 import { handleCommunityAutocomplete, handleCommunityCommand } from './communityCommands.js';
 import { handleGiveawayButton, handlePollButton, loadCommunity, startCommunityLoop } from './giveaways.js';
 
 function route(interaction) {
   if (interaction.isAutocomplete()) return handleCommunityAutocomplete(interaction);
   if (interaction.isChatInputCommand()) {
-    if (['giveaway', 'poll'].includes(interaction.commandName)) return handleCommunityCommand(interaction);
+    if (['giveaway', 'poll', 'rank', 'leaderboard', 'xp'].includes(interaction.commandName)) return handleCommunityCommand(interaction);
     return handleCommand(interaction);
   }
   const id = interaction.customId;
@@ -79,7 +82,10 @@ client.on(Events.MessageCreate, async (message) => {
       if (!message.author.bot) await handleDirectMessage(message);
       return;
     }
-    if (message.guildId === config.guildId) await recordTicketMessage(message);
+    if (message.guildId === config.guildId) {
+      await recordTicketMessage(message);
+      await handleLevelMessage(message);
+    }
   } catch (err) {
     console.error('[messageCreate]', err);
   }
@@ -118,6 +124,7 @@ client.on(Events.GuildMemberRemove, (member) => {
 client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
   if (newMember.guild.id !== config.guildId) return;
   handleMemberUpdate(oldMember, newMember).catch((err) => console.error('[memberUpdate]', err));
+  handleLevelBoost(oldMember, newMember).catch((err) => console.error('[levels boost]', err));
 });
 
 client.on(Events.VoiceStateUpdate, (oldState, newState) => {
@@ -145,6 +152,8 @@ client.once(Events.ClientReady, async (c) => {
   startCommunityLoop();
   await loadCounters().catch((err) => console.error('[counters] load failed:', err));
   startCounters();
+  await loadLevels().catch((err) => console.error('[levels] load failed:', err));
+  startLeveling();
 });
 
 client.on(Events.Error, (err) => console.error('[discord]', err));

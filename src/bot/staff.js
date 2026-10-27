@@ -7,7 +7,7 @@ import {
   revokeStrike, updateLoa,
 } from '../db.js';
 import { tzParts } from '../schedule.js';
-import { communityCommandData } from './communityCommands.js';
+import { communityCommandData, levelCommandData } from './communityCommands.js';
 import { client, getGuild } from './client.js';
 import {
   COLORS, ephemeral, footer, isStaff, notice, truncate, unix,
@@ -382,7 +382,7 @@ export const commandData = [
 
 export async function registerCommands(guild) {
   try {
-    await guild.commands.set([...commandData, ...communityCommandData]);
+    await guild.commands.set([...commandData, ...communityCommandData, ...levelCommandData]);
     console.log('[staff] slash commands registered');
   } catch (err) {
     console.warn('[staff] could not register slash commands:', err.message);

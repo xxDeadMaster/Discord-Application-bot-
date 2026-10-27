@@ -5,7 +5,12 @@ import { getSettings, listGiveaways, listPolls } from '../db.js';
 import {
   MAX_POLL_OPTIONS, cancelGiveaway, endGiveaway, endPoll, rerollGiveaway, startGiveaway, startPoll,
 } from './giveaways.js';
-import { ephemeral, notice, truncate } from './ui.js';
+import { ephemeral, notice, truncate, COLORS, footer, progressBar } from './ui.js';
+import {
+  addXp, getXp, leaderboard, levelingConfig, progress, rankOf,
+} from './levels.js';
+import { EmbedBuilder } from 'discord.js';
+import { client } from './client.js';
 
 const T = ApplicationCommandOptionType;
 const TEXT_CHANNELS = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
@@ -14,6 +19,32 @@ const durationOption = (required, description) => ({
   type: T.String, name: 'duration', description, required, max_length: 30,
 });
 const idOption = (description) => ({ type: T.Integer, name: 'id', description, required: true, autocomplete: true, min_value: 1 });
+
+export const levelCommandData = [
+  {
+    name: 'rank',
+    description: 'See your level and XP (or someone else\'s)',
+    options: [{ type: T.User, name: 'member', description: 'Whose rank (you, if left empty)' }],
+  },
+  { name: 'leaderboard', description: 'Top 10 members by XP' },
+  {
+    name: 'xp',
+    description: 'Give or take XP (managers)',
+    options: [
+      { type: T.Subcommand, name: 'give', description: 'Give XP, e.g. for winning an event',
+        options: [
+          { type: T.User, name: 'member', description: 'Who gets it', required: true },
+          { type: T.Integer, name: 'amount', description: 'How much XP', required: true, min_value: 1, max_value: 10000 },
+          { type: T.String, name: 'reason', description: 'Why (shown to them)', max_length: 200 },
+        ] },
+      { type: T.Subcommand, name: 'remove', description: 'Take XP away',
+        options: [
+          { type: T.User, name: 'member', description: 'From who', required: true },
+          { type: T.Integer, name: 'amount', description: 'How much XP', required: true, min_value: 1, max_value: 100000 },
+        ] },
+    ],
+  },
+];
 
 export const communityCommandData = [
   {
@@ -97,8 +128,60 @@ const reply = (interaction, text, kind) => (interaction.deferred
 
 const jump = (guildId, channelId, messageId) => (messageId ? ` [Jump to it](https://discord.com/channels/${guildId}/${channelId}/${messageId})` : '');
 
+/** /rank, /leaderboard, /xp */
+async function handleLevelCommand(interaction, settings) {
+  const cfg = levelingConfig();
+  if (!cfg?.enabled) return reply(interaction, 'Leveling is turned off right now.', 'info');
+
+  if (interaction.commandName === 'rank') {
+    const user = interaction.options.getUser('member') || interaction.user;
+    if (user.bot) return reply(interaction, 'Bots don\'t earn XP.', 'info');
+    const p = progress(getXp(user.id));
+    const rank = rankOf(user.id);
+    const embed = new EmbedBuilder()
+      .setColor(COLORS.brand)
+      .setAuthor({ name: '📈 Rank' })
+      .setTitle(truncate(user.globalName || user.username, 256))
+      .setDescription([
+        `**Level ${p.level}** · ${p.xp.toLocaleString('en-US')} XP${rank ? ` · #${rank} on the server` : ''}`,
+        `\`${progressBar(p.into, p.needed, 16)}\``,
+        `${(p.needed - p.into).toLocaleString('en-US')} XP to level ${p.level + 1}`,
+      ].join('\n'))
+      .setFooter(footer('Chat and hang out in voice to earn XP', client));
+    const avatar = user.displayAvatarURL?.({ size: 128 });
+    if (avatar) embed.setThumbnail(avatar);
+    return interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+  }
+
+  if (interaction.commandName === 'leaderboard') {
+    const top = leaderboard(10);
+    const medals = ['🥇', '🥈', '🥉'];
+    const lines = top.map((t, i) => `${medals[i] || `**${i + 1}.**`} <@${t.userId}> · Level **${t.level}** · ${t.xp.toLocaleString('en-US')} XP`);
+    const embed = new EmbedBuilder()
+      .setColor(COLORS.brand)
+      .setAuthor({ name: '🏆 Leaderboard' })
+      .setDescription(lines.join('\n') || 'Nobody has XP yet. Start chatting!')
+      .setFooter(footer('Top 10 by XP', client));
+    return interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+  }
+
+  // /xp give | remove (managers)
+  if (!canManage(interaction.member, settings)) return reply(interaction, 'Only managers can give or take XP.', 'blocked');
+  const sub = interaction.options.getSubcommand();
+  const user = interaction.options.getUser('member');
+  if (user.bot) return reply(interaction, 'Bots don\'t earn XP.', 'error');
+  const amount = interaction.options.getInteger('amount');
+  const member = await interaction.guild?.members.fetch(user.id).catch(() => null);
+  const r = await addXp(member || user, sub === 'give' ? amount : -amount);
+  const reason = interaction.options.getString('reason');
+  return reply(interaction, sub === 'give'
+    ? `Gave <@${user.id}> **${amount} XP**${reason ? ` for ${reason}` : ''}. They're now level **${r.after}** (${r.xp.toLocaleString('en-US')} XP).`
+    : `Took **${amount} XP** from <@${user.id}>. They're now level **${r.after}** (${r.xp.toLocaleString('en-US')} XP).`, 'success');
+}
+
 export async function handleCommunityCommand(interaction) {
   const settings = await getSettings();
+  if (['rank', 'leaderboard', 'xp'].includes(interaction.commandName)) return handleLevelCommand(interaction, settings);
   if (!canManage(interaction.member, settings)) {
     return reply(interaction, `Only managers can run ${interaction.commandName === 'poll' ? 'polls' : 'giveaways'}.`, 'blocked');
   }

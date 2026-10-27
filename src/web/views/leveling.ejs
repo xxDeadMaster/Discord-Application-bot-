@@ -1,0 +1,137 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Leveling</h1>
+    <p>Members earn XP for chatting, voice, and coming back every day. XP is saved about once an hour to keep the bot free to run.</p>
+  </div>
+</div>
+
+<%
+const sel = (o) => include('partials/select', o);
+const tabsList = [
+  { id: 'settings', label: '⚙️ Settings' },
+  { id: 'rewards', label: `🏅 Rewards (${(cfg.rewards || []).length})` },
+  { id: 'leaderboard', label: '🏆 Leaderboard' },
+];
+%>
+<div class="ptabs" role="tablist" aria-label="Leveling sections" data-tabs="leveling">
+  <% tabsList.forEach(t => { %>
+    <button type="button" class="ptab" role="tab" id="tabbtn-<%= t.id %>" data-tab="<%= t.id %>" aria-controls="tab-<%= t.id %>" aria-selected="false"><%= t.label %></button>
+  <% }) %>
+</div>
+
+<form method="post" action="/leveling" class="stack">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+
+  <!-- ===== Settings ===== -->
+  <div id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" data-tab-panel class="stack">
+    <section class="card">
+      <div class="card-head">
+        <h2>Level-up message</h2>
+        <label class="toggle"><input type="checkbox" name="enabled" <%= cfg.enabled ? 'checked' : '' %>> Leveling on</label>
+      </div>
+      <div class="grid-2">
+        <%- sel({ name: 'announce_channel_id', label: 'Level-up channel', list: opts.textChannels, value: cfg.announce_channel_id, emptyLabel: 'No level-up messages',
+            help: 'Where "@member just reached level 5!" is posted.' }) %>
+        <div class="field">
+          <label for="announce_message">Message</label>
+          <input id="announce_message" name="announce_message" maxlength="500" value="<%= cfg.announce_message %>">
+          <p class="help">Fill-ins: <code>{mention}</code> <code>{name}</code> <code>{level}</code></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>How members earn XP</h2>
+      <div class="xp-grid">
+        <div class="field"><label for="message_xp">💬 XP per message</label><input id="message_xp" name="message_xp" type="number" min="0" max="100" value="<%= cfg.message_xp %>"></div>
+        <div class="field"><label for="message_cooldown">⏱️ Cooldown (seconds)</label><input id="message_cooldown" name="message_cooldown" type="number" min="0" max="3600" value="<%= cfg.message_cooldown %>"><p class="help">Only 1 message counts per cooldown.</p></div>
+        <div class="field"><label for="voice_xp">🎙️ Voice XP</label><input id="voice_xp" name="voice_xp" type="number" min="0" max="100" value="<%= cfg.voice_xp %>"></div>
+        <div class="field"><label for="voice_minutes">… every this many minutes</label><input id="voice_minutes" name="voice_minutes" type="number" min="1" max="60" value="<%= cfg.voice_minutes %>"><p class="help">Only with 2+ people, not deafened.</p></div>
+        <div class="field"><label for="daily_xp">☀️ First message of the day</label><input id="daily_xp" name="daily_xp" type="number" min="0" max="1000" value="<%= cfg.daily_xp %>"></div>
+        <div class="field"><label for="boost_xp">💎 Boosting the server</label><input id="boost_xp" name="boost_xp" type="number" min="0" max="10000" value="<%= cfg.boost_xp %>"></div>
+        <div class="field"><label for="qotd_xp">❓ First QOTD answer each day</label><input id="qotd_xp" name="qotd_xp" type="number" min="0" max="1000" value="<%= cfg.qotd_xp %>"></div>
+        <%- sel({ name: 'qotd_channel_id', label: 'QOTD channel', list: opts.textChannels, value: cfg.qotd_channel_id, emptyLabel: 'No QOTD bonus' }) %>
+      </div>
+      <p class="help">Staff can also give XP for events with <code>/xp give</code>. Set anything to 0 to turn it off.</p>
+    </section>
+
+    <section class="card">
+      <h2>Where XP doesn't count</h2>
+      <div class="grid-2 align-start">
+        <div>
+          <h3>Channels</h3>
+          <div class="search" style="max-width: none; margin-bottom: 8px;"><%- include('partials/icon', { name: 'search', size: 16 }) %><label class="sr" for="nx-ch-filter">Filter channels</label><input id="nx-ch-filter" placeholder="Filter channels" data-filter-target="nx-channels"></div>
+          <div class="check-list check-list-short" id="nx-channels">
+            <% const nxc = cfg.no_xp_channel_ids || []; opts.textChannels.slice().sort((a, b) => nxc.includes(b.id) - nxc.includes(a.id)).forEach(c => { %>
+              <label class="check-item" data-filter-text="<%= c.name.toLowerCase() %>"><input type="checkbox" name="no_xp_channel_ids" value="<%= c.id %>" <%= nxc.includes(c.id) ? 'checked' : '' %>><span><%= c.name %></span></label>
+            <% }) %>
+          </div>
+        </div>
+        <div>
+          <h3>Roles</h3>
+          <div class="search" style="max-width: none; margin-bottom: 8px;"><%- include('partials/icon', { name: 'search', size: 16 }) %><label class="sr" for="nx-role-filter">Filter roles</label><input id="nx-role-filter" placeholder="Filter roles" data-filter-target="nx-roles"></div>
+          <div class="check-list check-list-short" id="nx-roles">
+            <% const nxr = cfg.no_xp_role_ids || []; opts.roles.slice().sort((a, b) => nxr.includes(b.id) - nxr.includes(a.id)).forEach(r => { %>
+              <label class="check-item" data-filter-text="<%= r.name.toLowerCase() %>"><input type="checkbox" name="no_xp_role_ids" value="<%= r.id %>" <%= nxr.includes(r.id) ? 'checked' : '' %>><span><%= r.name %></span></label>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== Rewards ===== -->
+  <div id="tab-rewards" role="tabpanel" aria-labelledby="tabbtn-rewards" data-tab-panel class="stack">
+    <section class="card">
+      <h2>Role rewards</h2>
+      <p class="muted small">Orbit gives the role when a member reaches the level. They keep earlier reward roles too. The bot's role must be above these roles.</p>
+      <div class="menu-items" data-menu-items data-max="25">
+        <% const rw = (cfg.rewards && cfg.rewards.length) ? cfg.rewards : [{ level: '', role_id: '' }]; rw.forEach(r => { %>
+          <div class="menu-item reward-item" data-menu-item>
+            <input name="reward_level" type="number" min="1" max="500" value="<%= r.level %>" placeholder="Level" aria-label="Level">
+            <select name="reward_role" aria-label="Role to give">
+              <option value="">Pick a role</option>
+              <% opts.roles.forEach(o => { %><option value="<%= o.id %>" <%= o.id === r.role_id ? 'selected' : '' %>><%= o.name %></option><% }) %>
+            </select>
+            <button type="button" class="icon-btn danger" data-remove-item aria-label="Remove this reward" title="Remove"><%- include('partials/icon', { name: 'trash', size: 16 }) %></button>
+          </div>
+        <% }) %>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" data-add-item><%- include('partials/icon', { name: 'plus', size: 15 }) %> Add reward</button>
+    </section>
+    <section class="card">
+      <h2>XP needed</h2>
+      <div class="count-chips">
+        <% curve.forEach(c => { %><span class="count-chip">Level <b><%= c.level %></b> · <%= c.xp.toLocaleString('en-US') %> XP</span><% }) %>
+      </div>
+      <p class="help" style="margin-top: 10px;">20 XP for level 1, then 10 more for each level after. An active member earns about 50 XP a day.</p>
+    </section>
+  </div>
+
+  <!-- ===== Leaderboard ===== -->
+  <div id="tab-leaderboard" role="tabpanel" aria-labelledby="tabbtn-leaderboard" data-tab-panel class="stack">
+    <section class="card">
+      <div class="card-head"><h2>Top 25</h2><span class="muted small">Live</span></div>
+      <% if (!top.length) { %>
+        <p class="muted" style="margin: 0;">Nobody has XP yet. Turn leveling on and start chatting.</p>
+      <% } else { %>
+        <ol class="lb">
+          <% top.forEach((t, i) => { %>
+            <li>
+              <span class="lb-rank"><%= ['🥇', '🥈', '🥉'][i] || (i + 1) %></span>
+              <span class="lb-name"><strong><%= t.tag || t.userId %></strong><span class="muted small">Level <%= t.level %> · <%= t.xp.toLocaleString('en-US') %> XP</span></span>
+              <span class="poll-bar lb-bar"><span style="width: <%= Math.round(t.into / t.needed * 100) %>%"></span></span>
+            </li>
+          <% }) %>
+        </ol>
+      <% } %>
+    </section>
+  </div>
+
+  <div class="actions sticky-actions">
+    <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'check', size: 16 }) %> Save leveling</button>
+    <span class="muted small">Saves every tab.</span>
+  </div>
+</form>
+<%- include('partials/foot') %>

@@ -21,6 +21,10 @@ import {
   MAX_MENU_ITEMS, publishRoleMenu, unpublishRoleMenu,
 } from '../bot/roleMenus.js';
 import { cleanEmoji } from '../bot/ui.js';
+import {
+  leaderboard as levelLeaderboard, progress as levelProgress, setLevelingConfig, xpForLevel,
+} from '../bot/levels.js';
+import { getLevelingConfig, updateLevelingConfig } from '../db.js';
 
 export const communityRoutes = express.Router();
 
@@ -358,4 +362,52 @@ communityRoutes.post('/role-menus/:id/delete', requireAdmin, async (req, res) =>
     flash(req, 'success', `Deleted "${menu.title}" and removed its message from Discord.`);
   }
   res.redirect('/role-menus');
+});
+
+
+/* ---------- Leveling ---------- */
+
+communityRoutes.get('/leveling', requireAdmin, async (req, res) => {
+  const cfg = await getLevelingConfig();
+  const top = levelLeaderboard(25).map((t) => ({ ...t, ...levelProgress(t.xp) }));
+  const curve = [1, 5, 10, 20, 30, 50].map((l) => ({ level: l, xp: xpForLevel(l) }));
+  res.render('leveling', { title: 'Leveling', cfg, opts: res.locals.guildOpts(), top, curve });
+});
+
+communityRoutes.post('/leveling', requireAdmin, async (req, res) => {
+  const b = req.body;
+  const opts = res.locals.guildOpts();
+  const num = (v, min, max, fallback) => { const n = Number.parseInt(v, 10); return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback; };
+  const current = await getLevelingConfig();
+  // Reward rows: level + role
+  const lvls = toArray(b.reward_level);
+  const rids = toArray(b.reward_role);
+  const rewards = [];
+  rids.forEach((rid, i) => {
+    const level = num(lvls[i], 1, 500, null);
+    if (!level || !opts.roles.some((r) => r.id === rid) || rewards.some((r) => r.level === level && r.role_id === rid)) return;
+    rewards.push({ level, role_id: rid });
+  });
+  rewards.sort((a, z) => a.level - z.level);
+  const patch = {
+    enabled: b.enabled === 'on',
+    announce_channel_id: pick(b.announce_channel_id, opts.textChannels),
+    announce_message: clean(b.announce_message, 500) || current.announce_message,
+    message_xp: num(b.message_xp, 0, 100, 1),
+    message_cooldown: num(b.message_cooldown, 0, 3600, 60),
+    voice_xp: num(b.voice_xp, 0, 100, 1),
+    voice_minutes: num(b.voice_minutes, 1, 60, 3),
+    daily_xp: num(b.daily_xp, 0, 1000, 5),
+    qotd_channel_id: pick(b.qotd_channel_id, opts.textChannels),
+    qotd_xp: num(b.qotd_xp, 0, 1000, 3),
+    boost_xp: num(b.boost_xp, 0, 10000, 50),
+    no_xp_channel_ids: toArray(b.no_xp_channel_ids).filter((id) => opts.textChannels.some((c) => c.id === id) || res.locals.guild.channels.cache.has(id)).slice(0, 50),
+    no_xp_role_ids: toArray(b.no_xp_role_ids).filter((id) => opts.roles.some((r) => r.id === id)).slice(0, 50),
+    rewards: rewards.slice(0, 25),
+  };
+  const saved = await updateLevelingConfig(patch);
+  setLevelingConfig(saved);
+  const warn = patch.enabled && !patch.announce_channel_id ? ' Pick a level-up channel so members see their level-ups.' : '';
+  flash(req, warn ? 'error' : 'success', `Leveling ${patch.enabled ? 'is on' : 'is off'}. Settings saved.${warn}`);
+  res.redirect('/leveling');
 });
