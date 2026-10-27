@@ -749,12 +749,14 @@ export async function modCounts(since) {
 
 /* ---------- Server snapshots (one row per day) ---------- */
 
+/** Saves a day's totals. joins/leaves are ADDED to what's already saved for that day. */
 export async function saveSnapshot(day, s) {
   await query(
-    `INSERT INTO server_snapshots (guild_id, day, members, bots, channels, roles, boosts) VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (guild_id, day) DO UPDATE SET members = EXCLUDED.members, bots = EXCLUDED.bots, channels = EXCLUDED.channels,
-       roles = EXCLUDED.roles, boosts = EXCLUDED.boosts`,
-    [config.guildId, day, s.members, s.bots, s.channels, s.roles, s.boosts],
+    `INSERT INTO server_snapshots (guild_id, day, members, humans, bots, channels, roles, boosts, joins, leaves) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (guild_id, day) DO UPDATE SET members = EXCLUDED.members, humans = EXCLUDED.humans, bots = EXCLUDED.bots, channels = EXCLUDED.channels,
+       roles = EXCLUDED.roles, boosts = EXCLUDED.boosts,
+       joins = server_snapshots.joins + EXCLUDED.joins, leaves = server_snapshots.leaves + EXCLUDED.leaves`,
+    [config.guildId, day, s.members, s.humans ?? null, s.bots, s.channels, s.roles, s.boosts, s.joins || 0, s.leaves || 0],
   );
 }
 

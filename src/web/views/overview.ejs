@@ -47,32 +47,20 @@
     !isManager && { href: '/loa', icon: 'calendar', tone: 'orange', title: myLoa ? 'My leave' : 'Request leave', sub: 'Going away for a while?' },
   ].filter(Boolean).slice(0, 5);
   const delta = (now, prev) => (prev == null ? null : now - prev);
-  const srvRows = [
-    { icon: 'users', label: 'Total members', n: numbers.members, d: delta(numbers.members, weekAgo?.members) },
-    { icon: 'bolt', label: 'Bots', n: numbers.bots, d: delta(numbers.bots, weekAgo?.bots) },
-    { icon: 'hash', label: 'Channels', n: numbers.channels, d: delta(numbers.channels, weekAgo?.channels) },
-    { icon: 'tag', label: 'Roles', n: numbers.roles, d: delta(numbers.roles, weekAgo?.roles) },
-    { icon: 'trophy', label: 'Boosts', n: numbers.boosts, d: delta(numbers.boosts, weekAgo?.boosts) },
-  ];
   const statCards = [
     { n: counts.pending, label: 'Pending applications', href: '/review', icon: 'inbox', tone: 'blue', d: delta(todo.apps_week, todo.apps_prev), hint: 'new this week vs last' },
     { n: counts.open_tickets, label: 'Open tickets', href: '/tickets?status=open', icon: 'ticket', tone: 'green', d: delta(todo.tickets_week, todo.tickets_prev), hint: 'opened this week vs last' },
     { n: todo.mod_week, label: 'Mod actions (7 days)', href: isManager ? '/moderation' : '/staff', icon: 'shield', tone: 'red', d: delta(todo.mod_week, todo.mod_prev), hint: 'vs the week before' },
     { n: numbers.members, label: 'Total members', href: isAdmin ? '/stats' : '/', icon: 'users', tone: 'purple', d: delta(numbers.members, weekAgo?.members), hint: 'this week' },
   ];
-  // Chart: inline SVG, smooth line, no libraries
-  const pts = chart.points.map((p) => Number(p.value) || 0);
-  const W = 300, H = 110, pad = 4;
-  const max = Math.max(1, ...pts), min = chart.kind === 'members' ? Math.min(...pts) : 0;
-  const span = Math.max(1, max - min);
-  const xy = pts.map((v, i) => [pad + (pts.length > 1 ? i * (W - pad * 2) / (pts.length - 1) : (W - pad * 2) / 2), H - pad - ((v - min) / span) * (H - pad * 2 - 8)]);
-  let path = '';
-  xy.forEach(([x, y], i) => {
-    if (!i) { path = `M${x.toFixed(1)},${y.toFixed(1)}`; return; }
-    const [px, py] = xy[i - 1]; const cx = (px + x) / 2;
-    path += ` C${cx.toFixed(1)},${py.toFixed(1)} ${cx.toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const area = xy.length ? `${path} L${xy[xy.length - 1][0].toFixed(1)},${H} L${xy[0][0].toFixed(1)},${H} Z` : '';
+  // Server overview tiles (the chart itself is drawn in the browser from the same data)
+  const METRICS = [
+    ['members', 'Members', '#3D8BFF'], ['humans', 'People', '#9B6DFF'], ['bots', 'Bots', '#FF9F43'],
+    ['channels', 'Channels', '#55D98A'], ['roles', 'Roles', '#FF6FAE'], ['boosts', 'Boosts', '#FFD447'],
+  ];
+  const s7 = series.slice(-7);
+  const firstOf7 = s7[0], lastPt = series[series.length - 1];
+  const memDelta = s7.length > 1 ? lastPt.members - firstOf7.members : null;
   const arrow = (d) => (d > 0 ? '↑' : d < 0 ? '↓' : '');
 %>
 <div class="ov">
@@ -190,31 +178,36 @@
       </ul>
     </section>
 
-    <section class="ov-card">
-      <div class="ov-card-head">
+    <section class="ov-card so" data-server-overview>
+      <div class="ov-card-head so-head">
         <span class="ov-head-icon accent"><%- include('partials/icon', { name: 'activity', size: 22 }) %></span>
-        <div><h2>Server overview</h2><p>Live server numbers.</p></div>
+        <div><h2>Server overview</h2></div>
       </div>
-      <ul class="ov-srv">
-        <% srvRows.forEach(r => { %>
-          <li>
-            <%- include('partials/icon', { name: r.icon, size: 16 }) %>
-            <span class="ov-srv-label"><%= r.label %></span>
-            <span class="ov-srv-num"><%= fmt(r.n) %></span>
-            <span class="ov-delta small <%= r.d > 0 ? 'up' : r.d < 0 ? 'down' : 'flat' %>"><%= r.d ? `${arrow(r.d)} ${fmt(Math.abs(r.d))}` : '—' %></span>
-          </li>
+      <div class="so-hero">
+        <span class="so-big" data-so-big><%= fmt(lastPt.members) %></span>
+        <span class="so-chg <%= memDelta > 0 ? 'up' : memDelta < 0 ? 'down' : 'flat' %>" data-so-chg><%= memDelta ? `${arrow(memDelta)} ${fmt(Math.abs(memDelta))}` : '' %></span>
+        <div class="so-range" role="group" aria-label="Chart range">
+          <button type="button" class="on" data-range="7">7d</button>
+          <button type="button" data-range="30">30d</button>
+        </div>
+      </div>
+      <div class="so-sub" data-so-sub>Members<%= memDelta == null ? '' : ` · ${memDelta > 0 ? '+' : ''}${memDelta || 'no change'} in the last 7 days` %></div>
+      <div class="so-chart" data-so-chart>
+        <svg preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="so-tip" role="status"></div>
+        <% if (series.length < 2) { %><p class="so-wait">Collecting data. The chart fills in as Orbit saves a point each day, so check back in a few days.</p><% } %>
+      </div>
+      <div class="so-axis"><span data-so-from></span><span data-so-to></span></div>
+      <div class="so-tiles">
+        <% METRICS.forEach(([key, label, color], i) => { const d = s7.length > 1 ? lastPt[key] - firstOf7[key] : 0; %>
+          <button type="button" class="so-tile <%= i === 0 ? 'on' : '' %>" data-metric="<%= key %>" style="--c: <%= color %>" aria-pressed="<%= i === 0 %>">
+            <span class="so-t"><i></i><%= label %></span>
+            <span class="so-n"><%= fmt(lastPt[key]) %></span>
+            <span class="so-d <%= d > 0 ? 'up' : d < 0 ? 'down' : 'flat' %>"><%= d ? `${arrow(d)} ${fmt(Math.abs(d))}` : '—' %></span>
+          </button>
         <% }) %>
-      </ul>
-      <figure class="ov-chart">
-        <figcaption><%= chart.kind === 'members' ? `Members · last ${chart.points.length} days` : 'Activity per day · last 14 days' %></figcaption>
-        <svg viewBox="0 0 <%= W %> <%= H %>" preserveAspectRatio="none" role="img" aria-label="<%= chart.label %> chart">
-          <defs><linearGradient id="ovfill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#1F6FEB" stop-opacity="0.45"/><stop offset="1" stop-color="#1F6FEB" stop-opacity="0"/></linearGradient></defs>
-          <% if (xy.length) { %>
-            <path d="<%= area %>" fill="url(#ovfill)"/>
-            <path d="<%= path %>" class="chart-line" vector-effect="non-scaling-stroke"/>
-          <% } %>
-        </svg>
-      </figure>
+      </div>
+      <script type="application/json" data-so-data><%- JSON.stringify(series).replace(/</g, '\\u003c') %></script>
     </section>
   </aside>
 </div>

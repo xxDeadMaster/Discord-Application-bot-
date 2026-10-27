@@ -14,7 +14,7 @@ import {
   dashboardCounts, deleteClosedTickets, findOpenLoa, listVotes, voteTally, deleteSubmissions, getCategory, getRole, getSettings, getSubmission, getTicket, listCategories, listQuestions,
   listRoles, listSnapshots, listSubmissions, listTicketMessages, listTickets, query, replaceQuestions, updateSettings,
 } from '../db.js';
-import { serverNumbers } from '../bot/counters.js';
+import { serverNumbers, unsavedTally } from '../bot/counters.js';
 import { requireAdmin } from './auth.js';
 
 export const routes = express.Router();
@@ -108,27 +108,25 @@ routes.get('/', async (req, res) => {
      ORDER BY at DESC LIMIT 20`,
     [config.guildId],
   );
-  // Members chart: daily snapshots once there are a few, otherwise daily activity for the last 14 days
-  let chart;
-  if (snapshots.length >= 3) {
-    chart = { kind: 'members', label: 'Members', points: snapshots.map((s) => ({ day: s.day, value: s.members })) };
-  } else {
-    const { rows } = await query(
-      `SELECT to_char(d, 'YYYY-MM-DD') AS day,
-         (SELECT count(*)::int FROM submissions WHERE guild_id = $1 AND created_at::date = d)
-         + (SELECT count(*)::int FROM tickets WHERE guild_id = $1 AND created_at::date = d)
-         + (SELECT count(*)::int FROM mod_cases WHERE guild_id = $1 AND created_at::date = d) AS value
-       FROM generate_series(current_date - 13, current_date, interval '1 day') AS d`,
-      [config.guildId],
-    );
-    chart = { kind: 'activity', label: 'Applications, tickets and mod actions per day', points: rows };
-  }
+  // Server overview: one point per day (saved snapshots) plus today's live numbers
   const numbers = serverNumbers(guild);
-  const weekAgo = snapshots.length ? snapshots[Math.max(0, snapshots.length - 8)] : null;
+  const series = snapshots.map((r) => ({
+    day: r.day, members: r.members, humans: r.humans ?? Math.max(0, r.members - r.bots), bots: r.bots,
+    channels: r.channels, roles: r.roles, boosts: r.boosts, joins: r.joins || 0, leaves: r.leaves || 0,
+  }));
+  const today = todayIn(settings.timezone);
+  const unsaved = unsavedTally();
+  const extra = unsaved.day === today ? { joins: unsaved.joins, leaves: unsaved.leaves } : { joins: 0, leaves: 0 };
+  const live = { day: today, ...numbers };
+  delete live.staff;
+  const last = series[series.length - 1];
+  if (last?.day === today) Object.assign(last, live, { joins: last.joins + extra.joins, leaves: last.leaves + extra.leaves });
+  else series.push({ ...live, ...extra });
+  const weekAgo = series.length > 1 ? series[Math.max(0, series.length - 8)] : null;
   res.render('overview', {
-    title: 'Overview', counts, checklist, inviteUrl: inviteUrl(), todo, activity, chart, numbers,
+    title: 'Overview', counts, checklist, inviteUrl: inviteUrl(), todo, activity, numbers, series: series.slice(-30),
     // Week-ago numbers for the little up/down arrows (only once there are at least two days saved)
-    weekAgo: weekAgo && snapshots.length > 1 ? weekAgo : null,
+    weekAgo,
     setupLeft: checklist.filter((c) => !c.done).length, setupTotal: checklist.length,
     myLoa: myLoa ? { ...myLoa, from: prettyDate(myLoa.start_date), until: prettyDate(myLoa.end_date), started: myLoa.start_date <= todayIn(settings.timezone) } : null,
   });

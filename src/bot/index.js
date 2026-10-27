@@ -16,7 +16,7 @@ import { ephemeral } from './ui.js';
 import {
   handleMemberJoin, handleMemberLeave, handleMemberUpdate, handleVerifyButton, handleVerifyModal, loadWelcomeConfig,
 } from './welcome.js';
-import { loadCounters, startCounters, startSnapshots } from './counters.js';
+import { countMemberChange, loadCounters, startCounters, startSnapshots } from './counters.js';
 import { handleRoleMenuButton } from './roleMenus.js';
 import { MOD_COMMANDS, handleModCommand } from './moderation.js';
 import {
@@ -115,11 +115,13 @@ client.on(Events.GuildCreate, (guild) => {
 
 client.on(Events.GuildMemberAdd, (member) => {
   if (member.guild.id !== config.guildId) return;
+  countMemberChange('join');
   handleMemberJoin(member).catch((err) => console.error('[memberAdd]', err));
 });
 
 client.on(Events.GuildMemberRemove, (member) => {
   if (member.guild.id !== config.guildId) return;
+  countMemberChange('leave');
   handleMemberLeave(member).catch((err) => console.error('[memberRemove]', err));
 });
 

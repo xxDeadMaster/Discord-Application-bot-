@@ -3,6 +3,7 @@ import { getOrCreateSecret, migrate, pool } from './db.js';
 import { startBot } from './bot/index.js';
 import { client } from './bot/client.js';
 import { startWeb } from './web/server.js';
+import { flushSnapshot } from './bot/counters.js';
 import { flushLevels } from './bot/levels.js';
 
 async function main() {
@@ -18,6 +19,7 @@ async function shutdown(signal) {
   console.log(`[app] ${signal} received, shutting down`);
   // Save XP that hasn't been written yet (it is otherwise saved once an hour)
   await flushLevels().then((n) => n && console.log(`[levels] saved ${n} member(s) before shutdown`)).catch((err) => console.warn('[levels] save on shutdown failed:', err.message));
+  await flushSnapshot().catch((err) => console.warn('[snapshot] save on shutdown failed:', err.message));
   await client.destroy().catch(() => {});
   await pool.end().catch(() => {});
   process.exit(0);

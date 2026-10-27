@@ -361,3 +361,119 @@ document.querySelectorAll('[data-activity-filter]').forEach((select) => {
     });
   });
 });
+
+/* ---------- Server overview: hover chart, metric tiles, 7d / 30d ---------- */
+document.querySelectorAll('[data-server-overview]').forEach((card) => {
+  let days = [];
+  try { days = JSON.parse(card.querySelector('[data-so-data]')?.textContent || '[]'); } catch { days = []; }
+  const LABEL = { members: 'Members', humans: 'People', bots: 'Bots', channels: 'Channels', roles: 'Roles', boosts: 'Boosts' };
+  const chart = card.querySelector('[data-so-chart]');
+  const svg = chart.querySelector('svg');
+  const tip = chart.querySelector('.so-tip');
+  const tiles = [...card.querySelectorAll('[data-metric]')];
+  const nf = (n) => Number(n || 0).toLocaleString('en-US');
+  const sign = (n) => (n > 0 ? `+${nf(n)}` : n < 0 ? `−${nf(-n)}` : 'no change');
+  const cls = (n) => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat');
+  const arrow = (n) => (n > 0 ? `↑ ${nf(n)}` : n < 0 ? `↓ ${nf(-n)}` : '');
+  const asDate = (d) => new Date(`${d}T12:00:00Z`);
+  const longDay = (d) => asDate(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const shortDay = (d) => asDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  let metric = 'members';
+  let range = 7;
+  let points = [];
+  let data = [];
+
+  function draw() {
+    data = days.slice(-range);
+    const color = getComputedStyle(tiles.find((t) => t.dataset.metric === metric)).getPropertyValue('--c').trim() || '#3D8BFF';
+    // Header + tiles for this range
+    const first = data[0];
+    const last = data[data.length - 1];
+    if (!last) return;
+    const diff = data.length > 1 ? last[metric] - first[metric] : null;
+    card.querySelector('[data-so-big]').textContent = nf(last[metric]);
+    const chg = card.querySelector('[data-so-chg]');
+    chg.textContent = diff ? arrow(diff) : '';
+    chg.className = `so-chg ${cls(diff)}`;
+    card.querySelector('[data-so-sub]').textContent = diff == null ? LABEL[metric] : `${LABEL[metric]} · ${sign(diff)} in the last ${range} days`;
+    tiles.forEach((t) => {
+      const k = t.dataset.metric;
+      const d = data.length > 1 ? last[k] - first[k] : 0;
+      t.classList.toggle('on', k === metric);
+      t.setAttribute('aria-pressed', String(k === metric));
+      const el = t.querySelector('.so-d');
+      el.textContent = d ? arrow(d) : '—';
+      el.className = `so-d ${cls(d)}`;
+    });
+    card.querySelector('[data-so-from]').textContent = data.length > 1 ? shortDay(first.day) : '';
+    card.querySelector('[data-so-to]').textContent = data.length > 1 ? shortDay(last.day) : '';
+    // Chart
+    if (data.length < 2) { svg.innerHTML = ''; points = []; return; }
+    const W = chart.clientWidth;
+    const H = chart.clientHeight;
+    const pad = 6;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const vals = data.map((r) => Number(r[metric]) || 0);
+    let mn = Math.min(...vals);
+    let mx = Math.max(...vals);
+    if (mx === mn) { mx += 1; mn -= 1; }
+    points = vals.map((v, i) => [pad + (i * (W - pad * 2)) / (vals.length - 1), pad + 10 + (1 - (v - mn) / (mx - mn)) * (H - pad * 2 - 16)]);
+    let d = `M${points[0][0]},${points[0][1]}`;
+    for (let i = 1; i < points.length; i++) {
+      const cx = (points[i - 1][0] + points[i][0]) / 2;
+      d += ` C${cx},${points[i - 1][1]} ${cx},${points[i][1]} ${points[i][0]},${points[i][1]}`;
+    }
+    svg.innerHTML = `<defs><linearGradient id="so-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+      <path d="${d} L${points[points.length - 1][0]},${H} L${points[0][0]},${H} Z" fill="url(#so-fill)"/>
+      <path class="so-line" d="${d}" stroke="${color}"/>
+      <line class="so-cross" y1="0" y2="${H}" style="display:none"/>
+      <circle r="5" fill="${color}" stroke="var(--card)" stroke-width="2" style="display:none"/>`;
+  }
+
+  function show(x) {
+    if (!points.length) return;
+    const W = chart.clientWidth;
+    const step = (W - 12) / (points.length - 1);
+    const i = Math.max(0, Math.min(points.length - 1, Math.round((x - 6) / step)));
+    const [px, py] = points[i];
+    const row = data[i];
+    const prevRow = i ? data[i - 1] : days[days.length - data.length - 1];
+    const line = svg.querySelector('.so-cross');
+    const dot = svg.querySelector('circle');
+    line.setAttribute('x1', px); line.setAttribute('x2', px); line.style.display = '';
+    dot.setAttribute('cx', px); dot.setAttribute('cy', py); dot.style.display = '';
+    if (metric === 'members') {
+      const net = row.joins - row.leaves;
+      tip.innerHTML = `<b>${longDay(row.day)}</b><div class="v">${nf(row.members)} members</div>
+        <div class="r"><span>Joined</span><span class="up">+${nf(row.joins)}</span></div>
+        <div class="r"><span>Left</span><span class="down">−${nf(row.leaves)}</span></div>
+        <div class="r"><span>Net</span><span class="${cls(net)}">${sign(net)}</span></div>`;
+    } else {
+      const ch = prevRow ? row[metric] - prevRow[metric] : 0;
+      tip.innerHTML = `<b>${longDay(row.day)}</b><div class="v">${nf(row[metric])} ${LABEL[metric].toLowerCase()}</div>
+        <div class="r"><span>vs day before</span><span class="${cls(ch)}">${prevRow ? sign(ch) : '—'}</span></div>`;
+    }
+    tip.classList.add('show');
+    const tw = tip.offsetWidth;
+    tip.style.left = `${px + 14 + tw <= W ? px + 14 : Math.max(0, px - 14 - tw)}px`;
+  }
+  function hide() {
+    tip.classList.remove('show');
+    svg.querySelectorAll('.so-cross, circle').forEach((el) => { el.style.display = 'none'; });
+  }
+
+  chart.addEventListener('mousemove', (e) => show(e.clientX - chart.getBoundingClientRect().left));
+  chart.addEventListener('mouseleave', hide);
+  chart.addEventListener('touchstart', (e) => show(e.touches[0].clientX - chart.getBoundingClientRect().left), { passive: true });
+  chart.addEventListener('touchmove', (e) => show(e.touches[0].clientX - chart.getBoundingClientRect().left), { passive: true });
+  chart.addEventListener('touchend', () => setTimeout(hide, 1500));
+  tiles.forEach((t) => t.addEventListener('click', () => { metric = t.dataset.metric; hide(); draw(); }));
+  card.querySelectorAll('[data-range]').forEach((b) => b.addEventListener('click', () => {
+    range = Number(b.dataset.range);
+    card.querySelectorAll('[data-range]').forEach((x) => x.classList.toggle('on', x === b));
+    hide(); draw();
+  }));
+  let resizeTimer;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(draw, 100); });
+  draw();
+});

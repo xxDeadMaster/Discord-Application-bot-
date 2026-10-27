@@ -112,6 +112,25 @@ export function detectCounters(guild) {
 /* ---------- Daily snapshot for the dashboard chart (one row per day) ---------- */
 
 let lastSnapshotDay = null;
+// Joins and leaves are counted in memory and only written with the daily snapshot (no extra database wake-ups)
+const tally = { day: null, joins: 0, leaves: 0 };
+let snapshotTz = 'America/New_York';
+
+function dayIn(tz, now = new Date()) {
+  const p = tzParts(now, tz);
+  return `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`;
+}
+
+/** Called from the member join/leave events. */
+export function countMemberChange(kind, now = new Date()) {
+  const day = dayIn(snapshotTz, now);
+  if (tally.day !== day) { tally.day = day; tally.joins = 0; tally.leaves = 0; }
+  tally[kind === 'join' ? 'joins' : 'leaves'] += 1;
+}
+
+/** Today's joins/leaves not saved yet (the dashboard adds these to today's row). */
+export const unsavedTally = () => ({ ...tally });
+export const snapshotTimezone = () => snapshotTz;
 
 /** The numbers shown in the dashboard's Server Overview. */
 export function serverNumbers(guild) {
@@ -125,16 +144,41 @@ export function serverNumbers(guild) {
   };
 }
 
-/** Saves today's numbers once a day (checked hourly). */
+/** Writes the counted joins/leaves (and current totals) for the tally's day, then resets the tally. */
+async function saveTally(guild, day) {
+  const { joins, leaves } = tally.day === day ? tally : { joins: 0, leaves: 0 };
+  tally.joins = 0; tally.leaves = 0;
+  try {
+    await saveSnapshot(day, { ...serverNumbers(guild), joins, leaves });
+  } catch (err) {
+    if (tally.day === day) { tally.joins += joins; tally.leaves += leaves; } // keep them for next time
+    throw err;
+  }
+}
+
+/**
+ * Checked hourly. Writes at most once a day: when the day changes it saves the day that just ended
+ * (with its joins/leaves) and starts today's row.
+ */
 export async function snapshotTick(now = new Date()) {
   const guild = await getGuild().catch(() => null);
   if (!guild) return false;
-  const tz = (await getSettings()).timezone || 'America/New_York';
-  const p = tzParts(now, tz);
-  const day = `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`;
+  snapshotTz = (await getSettings()).timezone || snapshotTz;
+  const day = dayIn(snapshotTz, now);
   if (day === lastSnapshotDay) return false;
-  await saveSnapshot(day, serverNumbers(guild));
+  if (tally.day && tally.day !== day && (tally.joins || tally.leaves)) await saveTally(guild, tally.day);
+  if (tally.day !== day) { tally.day = day; tally.joins = 0; tally.leaves = 0; }
+  await saveTally(guild, day);
   lastSnapshotDay = day;
+  return true;
+}
+
+/** On shutdown/deploy: save today's joins/leaves so they aren't lost. */
+export async function flushSnapshot() {
+  if (!tally.day || (!tally.joins && !tally.leaves)) return false;
+  const guild = await getGuild().catch(() => null);
+  if (!guild) return false;
+  await saveTally(guild, tally.day);
   return true;
 }
 
