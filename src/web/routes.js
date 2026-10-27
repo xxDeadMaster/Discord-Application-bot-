@@ -14,7 +14,7 @@ import {
   dashboardCounts, deleteClosedTickets, findOpenLoa, listVotes, voteTally, deleteSubmissions, getCategory, getRole, getSettings, getSubmission, getTicket, listCategories, listQuestions,
   listRoles, listSnapshots, listSubmissions, listTicketMessages, listTickets, query, replaceQuestions, updateSettings,
 } from '../db.js';
-import { serverNumbers, unsavedTally } from '../bot/counters.js';
+import { loadCounters, serverNumbers, unsavedTally } from '../bot/counters.js';
 import { requireAdmin } from './auth.js';
 
 export const routes = express.Router();
@@ -188,6 +188,7 @@ routes.post('/settings', requireAdmin, async (req, res) => {
   patch.apply_cooldown_days = Number.isFinite(cooldown) ? Math.min(Math.max(cooldown, 0), 365) : 7;
 
   setTicketSettings(await updateSettings(patch));
+  loadCounters().catch(() => {}); // the staff counter follows the staff role
 
   // "Save and post panel" buttons: save first, then post or update that panel with the new text
   const post = b.then_post === 'apply' || b.then_post === 'ticket' ? b.then_post : null;

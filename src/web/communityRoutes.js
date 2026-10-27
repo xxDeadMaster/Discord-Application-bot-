@@ -12,7 +12,7 @@ import {
 import { requireAdmin } from './auth.js';
 import { ChannelType } from 'discord.js';
 import {
-  COUNTER_KINDS, countFor, counterName, detectCounters, normalizeName, setCounters, updateCounters,
+  COUNTER_KINDS, countFor, counterName, detectCounters, normalizeName, loadCounters, setCounters, updateCounters,
 } from '../bot/counters.js';
 import {
   deleteRoleMenu, getRoleMenu, getSettings, listCounters, listRoleMenus, replaceCounters, saveRoleMenu, updateSettings,
@@ -274,7 +274,7 @@ communityRoutes.post('/stats', requireAdmin, async (req, res) => {
     list.push({ channelId: id, kind, template });
   });
   const saved = await replaceCounters(list.slice(0, 10));
-  setCounters(saved);
+  await loadCounters(); // also re-reads the staff role for the staff counter
   const renamed = await updateCounters({ force: true });
   flash(req, 'success', saved.length
     ? `Saved ${saved.length} counter${saved.length === 1 ? '' : 's'}. ${renamed ? `${renamed} channel${renamed === 1 ? ' was' : 's were'} updated now.` : 'Names were already up to date.'} They update every 10 minutes from now on.`
