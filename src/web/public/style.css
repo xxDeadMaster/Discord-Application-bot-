@@ -797,3 +797,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 .mod-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .mod-pager { display: flex; justify-content: center; align-items: center; gap: 14px; padding: 14px; border-top: 1px solid var(--border); }
 @media (max-height: 960px) { .side-foot { display: none; } }
+/* Narrow phones: the server name shrinks (with …) so the menus always fit */
+.server-pill { min-width: 0; flex: 0 1 auto; }
+.topbar-right { flex: none; }
+@media (max-width: 380px) { .topbar { gap: 6px; padding: 0 8px; } .topbar-right { gap: 2px; } }
