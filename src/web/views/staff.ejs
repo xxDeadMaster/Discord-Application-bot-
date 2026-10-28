@@ -15,7 +15,7 @@
 <% if (!presenceOn) { %>
   <div class="flash flash-info"><%- include('partials/icon', { name: 'alert' }) %><span>Online status is hidden. Turn on <strong>Presence Intent</strong> in the Discord Developer Portal (Orbit → Bot), then restart the bot.</span></div>
 <% } else if (staffCount) { %>
-  <p class="presence-summary"><span class="presence-dot is-online" aria-hidden="true"></span><strong><%= onlineCount %></strong> of <%= staffCount %> staff online right now</p>
+  <p class="presence-summary"><span class="presence-dot is-<%= onlineCount ? 'online' : 'offline' %>" aria-hidden="true"></span><strong><%= onlineCount %></strong> of <%= staffCount %> staff online right now</p>
 <% } %>
 <% if (noStaffRole) { %>
   <div class="flash flash-error"><%- include('partials/icon', { name: 'alert' }) %><span>No staff role is set, so only people with recorded activity are listed. Pick one in Settings.</span></div>

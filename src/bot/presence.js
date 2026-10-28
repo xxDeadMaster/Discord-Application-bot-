@@ -45,7 +45,7 @@ export async function handlePresenceUpdate(oldPresence, newPresence) {
   }
 }
 
-const LABELS = { online: '🟢 Online', idle: '🌙 Idle', dnd: '⛔ Do Not Disturb', offline: '⚫ Offline' };
+const LABELS = { online: 'Online', idle: 'Idle', dnd: 'Do Not Disturb', offline: 'Offline' };
 
 /** { status, label, lastSeen } for one member, for the dashboard. */
 export function staffStatus(member) {

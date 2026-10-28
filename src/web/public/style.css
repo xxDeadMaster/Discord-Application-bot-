@@ -1000,4 +1000,3 @@ a.ov-feed-row:hover, .ov-list-row:hover { background: var(--hover); text-decorat
 .presence-dot.is-offline { background: #8592A8; }
 .presence-summary { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; color: var(--muted); }
 .presence-summary strong { color: var(--text); }
-.presence-text { white-space: nowrap; }
