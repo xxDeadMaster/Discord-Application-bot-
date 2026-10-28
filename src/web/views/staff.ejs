@@ -11,6 +11,12 @@
   </div>
 </div>
 
+<% const onlineCount = table.filter(r => r.online && r.online.status !== 'offline').length; const staffCount = table.filter(r => r.online).length; %>
+<% if (!presenceOn) { %>
+  <div class="flash flash-info"><%- include('partials/icon', { name: 'alert' }) %><span>Online status is hidden. Turn on <strong>Presence Intent</strong> in the Discord Developer Portal (Orbit → Bot), then restart the bot.</span></div>
+<% } else if (staffCount) { %>
+  <p class="presence-summary"><span class="presence-dot is-online" aria-hidden="true"></span><strong><%= onlineCount %></strong> of <%= staffCount %> staff online right now</p>
+<% } %>
 <% if (noStaffRole) { %>
   <div class="flash flash-error"><%- include('partials/icon', { name: 'alert' }) %><span>No staff role is set, so only people with recorded activity are listed. Pick one in Settings.</span></div>
 <% } else if (!membersLoaded) { %>
@@ -38,8 +44,11 @@
         <% table.forEach(r => { %>
           <tr>
             <td>
-              <span class="row-main"><span class="role-icon"><%= (r.name || '?').slice(0, 1).toUpperCase() %></span>
-                <span><strong><%= r.name %></strong><% if (!r.isStaffMember) { %><br><span class="muted small">No longer staff</span><% } %></span></span>
+              <span class="row-main"><span class="role-icon presence-wrap"><%= (r.name || '?').slice(0, 1).toUpperCase() %><% if (presenceOn && r.online) { %><span class="presence-dot is-<%= r.online.status %>" title="<%= r.online.label %>"></span><% } %></span>
+                <span><strong><%= r.name %></strong>
+                  <% if (!r.isStaffMember) { %><br><span class="muted small">No longer staff</span>
+                  <% } else if (presenceOn && r.online) { %><br><span class="muted small presence-text"><%= r.online.label %><% if (r.online.lastSeen) { %> · last seen <time datetime="<%= r.online.lastSeen.toISOString() %>"></time><% } %></span><% } %>
+                </span></span>
             </td>
             <td class="num"><%= r.reviews %><% if (r.reviews) { %> <span class="muted small">(<%= r.accepted %>✓ <%= r.denied %>✗)</span><% } %></td>
             <td class="num"><%= r.votes %></td>

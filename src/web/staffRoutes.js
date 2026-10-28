@@ -10,6 +10,7 @@ import {
 } from '../db.js';
 import { ACTIONS, prettyMinutes } from '../bot/moderation.js';
 import { loadTrap, publishTrap } from '../bot/spamTrap.js';
+import { presenceTracking, staffStatus } from '../bot/presence.js';
 import { guildOptions } from './routes.js';
 import { activityScore, staffActivity } from '../stats.js';
 
@@ -119,6 +120,7 @@ staffRoutes.get('/staff', async (req, res) => {
     const loa = isOnLoa(m.id);
     return {
       ...m, ...a,
+      online: m.isStaffMember ? staffStatus(res.locals.guild.members.cache.get(m.id)) : null,
       avgRating: a.ratings ? (a.ratingSum / a.ratings).toFixed(1) : null,
       score: activityScore(a),
       loa: loa ? (loa.onLeaveNow || (loa.start_date <= today && today <= loa.end_date) ? `On LOA until ${prettyDate(loa.end_date)}` : `LOA from ${prettyDate(loa.start_date)}`) : null,
@@ -128,6 +130,7 @@ staffRoutes.get('/staff', async (req, res) => {
   res.render('staff', {
     title: 'Staff activity', table, period, totals, noStaffRole: !settings.staff_role_id,
     membersLoaded: res.locals.guild.members.cache.size > 1,
+    presenceOn: presenceTracking(),
   });
 });
 

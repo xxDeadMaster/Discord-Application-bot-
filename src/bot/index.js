@@ -1,4 +1,4 @@
-import { Events } from 'discord.js';
+import { Events, GatewayIntentBits, Routes } from 'discord.js';
 import { config } from '../config.js';
 import {
   handleCategorySelect, handleDenyModal, handleDirectMessage, handleDmButton, handleReviewButton, handleRoleSelect,
@@ -8,6 +8,7 @@ import { syncProfile } from './profile.js';
 import { handleInterviewChannelDelete, handleVoiceState, loadActiveInterviews } from './interviews.js';
 import { startPanelScheduler } from './panels.js';
 import { handleTrapMessage, loadTrap } from './spamTrap.js';
+import { handlePresenceUpdate, loadPresence, setPresenceTracking } from './presence.js';
 import { handleCommand, handleLoaButton, handleLoaModal, loadLoaSchedule, registerCommands } from './staff.js';
 import {
   handleChannelDelete, handleClaimButton, handleCloseButton, handleCloseCancel, handleCloseConfirm, handleKeepOpen,
@@ -138,6 +139,10 @@ client.on(Events.GuildMemberUpdate, (oldMember, newMember) => {
   handleLevelBoost(oldMember, newMember).catch((err) => console.error('[levels boost]', err));
 });
 
+client.on(Events.PresenceUpdate, (oldPresence, newPresence) => {
+  handlePresenceUpdate(oldPresence, newPresence).catch((err) => console.warn('[presence]', err.message));
+});
+
 client.on(Events.VoiceStateUpdate, (oldState, newState) => {
   if ((newState.guild?.id || oldState.guild?.id) !== config.guildId) return;
   handleVoiceState(oldState, newState).catch((err) => console.error('[voiceState]', err));
@@ -167,11 +172,32 @@ client.once(Events.ClientReady, async (c) => {
   await loadLevels().catch((err) => console.error('[levels] load failed:', err));
   startLeveling();
   await loadTrap().catch((err) => console.error('[trap] load failed:', err));
+  await loadPresence().catch((err) => console.error('[presence] load failed:', err));
 });
 
 client.on(Events.Error, (err) => console.error('[discord]', err));
 
+// Presence Intent flags on the application (enabled, or enabled for bots under 100 servers)
+const PRESENCE_FLAGS = (1 << 12) | (1 << 13);
+
+/** Asks for online/offline updates only if Presence Intent is on, so the bot never fails to log in over it. */
+async function enablePresenceIfAllowed() {
+  try {
+    client.rest.setToken(config.token);
+    const app = await client.rest.get(Routes.currentApplication());
+    if (!(app.flags & PRESENCE_FLAGS)) {
+      console.warn('[presence] Presence Intent is off in the Developer Portal: staff online status is hidden');
+      return;
+    }
+    client.options.intents = client.options.intents.add(GatewayIntentBits.GuildPresences);
+    setPresenceTracking(true);
+  } catch (err) {
+    console.warn('[presence] could not check Presence Intent, leaving it off:', err.message);
+  }
+}
+
 export async function startBot() {
+  await enablePresenceIfAllowed();
   await client.login(config.token);
   return client;
 }

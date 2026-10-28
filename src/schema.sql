@@ -410,3 +410,11 @@ ALTER TABLE app_categories ADD COLUMN IF NOT EXISTS panel_text TEXT NOT NULL DEF
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS trap_channel_id TEXT;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS trap_message_id TEXT;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS trap_caught INTEGER NOT NULL DEFAULT 0;
+
+-- Staff online/offline: when each staff member was last online (Presence Intent)
+CREATE TABLE IF NOT EXISTS staff_presence (
+  guild_id    TEXT NOT NULL,
+  user_id     TEXT NOT NULL,
+  last_online TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (guild_id, user_id)
+);

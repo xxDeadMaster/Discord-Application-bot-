@@ -7,6 +7,7 @@ import {
   invalidatePanelCache, publishCategoryPanel, publishPanel, refreshApplyPanelQuietly,
 } from '../bot/panels.js';
 import { loadTrap } from '../bot/spamTrap.js';
+import { loadPresence } from '../bot/presence.js';
 import { closeTicketFromDashboard, setTicketSettings, transcriptText } from '../bot/tickets.js';
 import { MAX_QUESTIONS, cleanEmoji, inviteUrl } from '../bot/ui.js';
 import { config } from '../config.js';
@@ -193,6 +194,7 @@ routes.post('/settings', requireAdmin, async (req, res) => {
   setTicketSettings(await updateSettings(patch));
   loadCounters().catch(() => {}); // the staff counter follows the staff role
   loadTrap().catch(() => {}); // staff are never caught by the spam trap
+  loadPresence().catch(() => {}); // online status follows the staff role
 
   // "Save and post panel" buttons: save first, then post or update that panel with the new text
   const post = b.then_post === 'apply' || b.then_post === 'ticket' ? b.then_post : null;

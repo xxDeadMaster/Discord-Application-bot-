@@ -987,3 +987,17 @@ a.ov-feed-row:hover, .ov-list-row:hover { background: var(--hover); text-decorat
 .mod-top { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
 .own-panel { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px 4px; margin: 6px 0 14px; }
 .own-panel legend { font-weight: 700; padding: 0 6px; }
+
+/* Staff online status (Staff activity page) */
+.flash-info { background: rgba(57, 189, 248, 0.12); border-color: #2a6a8a; color: #c4ebff; }
+:root[data-theme="light"] .flash-info { background: #EAF7FE; border-color: #A9DDF6; color: #18577A; }
+.presence-wrap { position: relative; }
+.presence-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: var(--muted); box-shadow: 0 0 0 2px var(--card); }
+.presence-wrap .presence-dot { position: absolute; right: -2px; bottom: -2px; }
+.presence-dot.is-online { background: #55D98A; }
+.presence-dot.is-idle { background: #FFD447; }
+.presence-dot.is-dnd { background: #E5484D; }
+.presence-dot.is-offline { background: #8592A8; }
+.presence-summary { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; color: var(--muted); }
+.presence-summary strong { color: var(--text); }
+.presence-text { white-space: nowrap; }
