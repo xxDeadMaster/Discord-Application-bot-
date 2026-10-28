@@ -45,7 +45,7 @@
           <tr>
             <td>
               <span class="row-main"><span class="role-icon presence-wrap"><%= (((r.name || '').match(/[\p{L}\p{N}]/u) || ['?'])[0]).toUpperCase() %><% if (presenceOn && r.online) { %><span class="presence-dot is-<%= r.online.status %>" title="<%= r.online.label %>"></span><% } %></span>
-                <span><strong><%= r.name %></strong>
+                <span><strong><%= r.name %></strong><% if (r.isOwner) { %> <span class="owner-tag">Owner</span><% } %>
                   <% if (!r.isStaffMember) { %><br><span class="muted small">No longer staff</span>
                   <% } else if (presenceOn && r.online) { %><br><span class="muted small presence-text"><%= r.online.label %><% if (r.online.lastSeen) { %> · last seen <time datetime="<%= r.online.lastSeen.toISOString() %>"></time><% } %></span><% } %>
                 </span></span>

@@ -23,6 +23,7 @@
   const nc = typeof navCounts !== 'undefined' && navCounts ? navCounts : {};
   const admin = typeof isAdmin !== 'undefined' && isAdmin;
   const manager = typeof isManager !== 'undefined' && isManager;
+  const owner = typeof isOwner !== 'undefined' && isOwner;
   const srv = typeof server !== 'undefined' && server ? server : { name: 'Server', icon: null, members: 0 };
   const online = typeof botOnline !== 'undefined' ? botOnline : true;
   const is = (p) => path === p || path.startsWith(p + '/');
@@ -115,7 +116,7 @@
     <details class="menu user-menu">
       <summary class="user-chip">
         <% if (user.avatar) { %><img src="<%= user.avatar %>" alt="" width="34" height="34"><% } else { %><span class="avatar-fallback"><%= (user.name || '?').slice(0, 1).toUpperCase() %></span><% } %>
-        <span class="user-chip-text"><strong><%= user.name %></strong><span><%= admin ? 'Admin' : manager ? 'Manager' : 'Staff' %></span></span>
+        <span class="user-chip-text"><strong><%= user.name %></strong><span><%= owner ? 'Owner' : admin ? 'Admin' : manager ? 'Manager' : 'Staff' %></span></span>
         <%- include('icon', { name: 'chevronDown', size: 16 }) %>
       </summary>
       <div class="menu-pop">

@@ -45,6 +45,9 @@ function staffMembers(guild, settings) {
       if (!m.user.bot) map.set(m.id, { id: m.id, name: m.displayName || m.user.username, tag: m.user.tag || m.user.username });
     }
   }
+  // The server owner is always listed as staff, even without the staff role
+  const owner = guild.members.cache.get(guild.ownerId);
+  if (owner && !owner.user.bot) map.set(owner.id, { id: owner.id, name: owner.displayName || owner.user.username, tag: owner.user.tag || owner.user.username, isOwner: true });
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
