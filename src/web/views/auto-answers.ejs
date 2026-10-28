@@ -1,0 +1,73 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Auto-answers</h1>
+    <p>When a member's message contains one of the question phrases, Orbit replies with the answer. It never answers staff, and repeats an answer at most once every 10 minutes per channel.</p>
+  </div>
+</div>
+
+<%
+const editor = (a, action, isNew) => { %>
+  <form method="post" action="<%= action %>" class="stack" style="gap: 12px;">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="grid-2 align-start">
+      <div class="field">
+        <label for="tr-<%= a.id || 'new' %>">Question phrases</label>
+        <textarea id="tr-<%= a.id || 'new' %>" name="triggers" rows="4" maxlength="1500" placeholder="how do i apply&#10;how to apply&#10;where do i apply" required><%= a.triggers || '' %></textarea>
+        <p class="help">One per line. Orbit answers if a message contains any of them (capitals and punctuation don't matter).</p>
+      </div>
+      <div class="field">
+        <label for="an-<%= a.id || 'new' %>">Answer</label>
+        <textarea id="an-<%= a.id || 'new' %>" name="answer" rows="4" maxlength="1800" placeholder="Go to #applications and pick the role you want." required><%= a.answer || '' %></textarea>
+        <p class="help">Markdown works. Link a channel with <code>&lt;#channel id&gt;</code>.</p>
+      </div>
+    </div>
+    <div class="tab-actions">
+      <label class="toggle"><input type="checkbox" name="enabled" <%= a.enabled === false ? '' : 'checked' %>> On</label>
+      <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: isNew ? 'plus' : 'check', size: 16 }) %> <%= isNew ? 'Add answer' : 'Save' %></button>
+    </div>
+  </form>
+<% } %>
+
+<section class="card">
+  <div class="card-head"><h2>Where Orbit answers</h2><span class="muted small"><%= channelIds.length %> channel<%= channelIds.length === 1 ? '' : 's' %></span></div>
+  <form method="post" action="/auto-answers/channels" class="stack" style="gap: 12px;">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div>
+    <div class="search" style="max-width: none; margin-bottom: 8px;"><%- include('partials/icon', { name: 'search', size: 16 }) %><label class="sr" for="aa-filter">Filter channels</label><input id="aa-filter" placeholder="Filter channels" data-filter-target="aa-channels"></div>
+    <div class="check-list check-list-short" id="aa-channels">
+      <% opts.textChannels.slice().sort((x, y) => channelIds.includes(y.id) - channelIds.includes(x.id)).forEach(c => { %>
+        <label class="check-item" data-filter-text="<%= (c.name + ' ' + c.parent).toLowerCase() %>"><input type="checkbox" name="channel_ids" value="<%= c.id %>" <%= channelIds.includes(c.id) ? 'checked' : '' %>><span><%= c.name %><% if (c.parent) { %> <span class="muted small"><%= c.parent %></span><% } %></span></label>
+      <% }) %>
+    </div>
+    </div>
+    <div class="tab-actions"><button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'check', size: 16 }) %> Save channels</button><span class="muted small">Pick member channels only, not staff, log or ticket channels.</span></div>
+  </form>
+</section>
+
+<% answers.forEach(a => { %>
+<section class="card" id="answer-<%= a.id %>">
+  <div class="card-head">
+    <div>
+      <h2 style="margin: 0;"><%= (a.triggers.split('\n')[0] || 'Answer') %></h2>
+      <span class="muted small"><%= a.triggers.split('\n').filter(Boolean).length %> phrase<%= a.triggers.split('\n').filter(Boolean).length === 1 ? '' : 's' %> · used <%= a.uses %> time<%= a.uses === 1 ? '' : 's' %></span>
+    </div>
+    <div class="row-actions">
+      <% if (a.enabled) { %><span class="pill pill-open">On</span><% } else { %><span class="pill pill-off">Off</span><% } %>
+      <form method="post" action="/auto-answers/<%= a.id %>/delete" data-confirm="Delete this answer?">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <button class="icon-btn danger" type="submit" aria-label="Delete this answer" title="Delete"><%- include('partials/icon', { name: 'trash', size: 16 }) %></button>
+      </form>
+    </div>
+  </div>
+  <% editor(a, `/auto-answers/${a.id}`, false) %>
+</section>
+<% }) %>
+
+<% if (answers.length < maxAnswers) { %>
+<section class="card">
+  <h2><%= answers.length ? 'Add another answer' : 'Add your first answer' %></h2>
+  <% editor({}, '/auto-answers', true) %>
+</section>
+<% } %>
+<%- include('partials/foot') %>

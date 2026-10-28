@@ -65,4 +65,34 @@
   </div>
   <% } %>
 </section>
+<% if (isManager) { const hourLabel = (h) => `${((h + 11) % 12) + 1}:00 ${h < 12 ? 'AM' : 'PM'}`; %>
+<section class="card" id="report">
+  <div class="card-head">
+    <div>
+      <h2 style="margin: 0;">Weekly staff report</h2>
+      <span class="muted small">Posts each person's applications, tickets, mod actions<%= presenceOn ? ' and time online' : '' %> for the last 7 days, and flags anyone inactive who isn't on leave.</span>
+    </div>
+    <% if (report.last) { %><span class="muted small">Last posted <%= report.last %></span><% } %>
+  </div>
+  <form method="post" action="/staff/report" class="stack" style="gap: 12px;">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="report-grid">
+      <%- include('partials/select', { name: 'staff_report_channel_id', label: 'Channel', list: textChannels, value: report.channelId, emptyLabel: 'Off (no report)' }) %>
+      <div class="field">
+        <label for="staff_report_day">Day</label>
+        <select id="staff_report_day" name="staff_report_day"><% dayNames.forEach((d, i) => { %><option value="<%= i %>" <%= i === report.day ? 'selected' : '' %>><%= d %></option><% }) %></select>
+      </div>
+      <div class="field">
+        <label for="staff_report_hour">Time</label>
+        <select id="staff_report_hour" name="staff_report_hour"><% for (let h = 0; h < 24; h++) { %><option value="<%= h %>" <%= h === report.hour ? 'selected' : '' %>><%= hourLabel(h) %></option><% } %></select>
+        <p class="help"><%= timezone %></p>
+      </div>
+    </div>
+    <div class="tab-actions">
+      <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'check', size: 16 }) %> Save</button>
+      <button class="btn" type="submit" formaction="/staff/report/send" <%= report.channelId ? '' : 'disabled' %>><%- include('partials/icon', { name: 'send', size: 16 }) %> Post a report now</button>
+    </div>
+  </form>
+</section>
+<% } %>
 <%- include('partials/foot') %>

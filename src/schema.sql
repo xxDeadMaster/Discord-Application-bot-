@@ -418,3 +418,43 @@ CREATE TABLE IF NOT EXISTS staff_presence (
   last_online TIMESTAMPTZ NOT NULL,
   PRIMARY KEY (guild_id, user_id)
 );
+
+-- Roblox account links (/link): one Roblox account per member
+CREATE TABLE IF NOT EXISTS roblox_links (
+  guild_id     TEXT NOT NULL,
+  user_id      TEXT NOT NULL,
+  user_tag     TEXT NOT NULL DEFAULT '',
+  roblox_id    TEXT NOT NULL,
+  roblox_name  TEXT NOT NULL,
+  display_name TEXT NOT NULL DEFAULT '',
+  linked_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (guild_id, user_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS roblox_links_roblox ON roblox_links (guild_id, roblox_id);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS roblox_role_id TEXT;
+
+-- Auto-answers: replies to common questions in member channels
+CREATE TABLE IF NOT EXISTS auto_answers (
+  id         SERIAL PRIMARY KEY,
+  guild_id   TEXT NOT NULL,
+  triggers   TEXT NOT NULL DEFAULT '',   -- one phrase per line
+  answer     TEXT NOT NULL DEFAULT '',
+  enabled    BOOLEAN NOT NULL DEFAULT true,
+  uses       INTEGER NOT NULL DEFAULT 0,
+  position   INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS auto_answer_channel_ids TEXT[] NOT NULL DEFAULT '{}';
+
+-- Weekly staff report + online time per staff member per day
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS staff_report_channel_id TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS staff_report_day INTEGER NOT NULL DEFAULT 0;   -- 0 = Sunday
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS staff_report_hour INTEGER NOT NULL DEFAULT 18;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS staff_report_last TEXT;                        -- YYYY-MM-DD it last posted
+CREATE TABLE IF NOT EXISTS staff_online_time (
+  guild_id TEXT NOT NULL,
+  user_id  TEXT NOT NULL,
+  day      TEXT NOT NULL,                -- YYYY-MM-DD in the server time zone
+  minutes  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, user_id, day)
+);

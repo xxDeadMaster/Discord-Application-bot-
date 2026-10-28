@@ -1,0 +1,75 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Roblox links</h1>
+    <p>Members link their Roblox account in Discord with <code>/link</code>: they put a short code in their Roblox bio to prove it's theirs. Anyone can look someone up with <code>/roblox</code>.</p>
+  </div>
+</div>
+
+<div class="ov-grid ov-grid-b mod-top">
+  <section class="card">
+    <h2>Linked accounts</h2>
+    <p class="stat-num" style="margin: 4px 0 2px;"><%= total %></p>
+    <p class="muted small" style="margin: 0;">members have linked a Roblox account</p>
+  </section>
+  <section class="card">
+    <h2>Linked role</h2>
+    <p class="muted small">Members get this role when they link, and lose it when they unlink.</p>
+    <% if (isAdmin) { %>
+    <form method="post" action="/roblox/settings" class="mod-log-form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <select name="roblox_role_id" aria-label="Linked role">
+        <option value="">No role</option>
+        <% opts.roles.forEach(r => { %><option value="<%= r.id %>" <%= r.id === roleId ? 'selected' : '' %>><%= r.name %></option><% }) %>
+      </select>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </form>
+    <% } else { %>
+    <p><strong><%= (opts.roles.find(r => r.id === roleId) || {}).name || 'No role' %></strong></p>
+    <% } %>
+  </section>
+  <section class="card">
+    <h2>Commands</h2>
+    <ul class="cmd-list">
+      <li><code>/link username</code><span>Link your account</span></li>
+      <li><code>/roblox member</code><span>See someone's account</span></li>
+      <li><code>/unlink</code><span>Remove your link</span></li>
+    </ul>
+  </section>
+</div>
+
+<section class="card flush">
+  <form class="bulk-bar mod-filter" method="get" action="/roblox">
+    <input type="search" name="q" value="<%= search || '' %>" placeholder="Search Discord or Roblox name" aria-label="Search links">
+  </form>
+  <% if (!links.length) { %>
+    <p class="muted pad"><%= search ? 'Nobody matches that search.' : 'Nobody has linked yet. Members can start with /link in Discord.' %></p>
+  <% } else { %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Member</th><th>Roblox account</th><th>Linked</th><% if (isManager) { %><th></th><% } %></tr></thead>
+      <tbody>
+        <% links.forEach(l => { %>
+          <tr>
+            <td><strong><%= l.user_tag || 'Unknown' %></strong><br><span class="muted small"><%= l.user_id %></span></td>
+            <td>
+              <a href="<%= profileUrl(l.roblox_id) %>" target="_blank" rel="noopener noreferrer"><strong><%= l.display_name || l.roblox_name %></strong></a>
+              <br><span class="muted small">@<%= l.roblox_name %> · ID <%= l.roblox_id %></span>
+            </td>
+            <td class="muted"><time datetime="<%= new Date(l.linked_at).toISOString() %>"></time></td>
+            <% if (isManager) { %>
+            <td>
+              <form method="post" action="/roblox/<%= l.user_id %>/unlink" data-confirm="Unlink @<%= l.roblox_name %> from <%= l.user_tag %>? They can link again with /link.">
+                <input type="hidden" name="_csrf" value="<%= csrf %>">
+                <button class="btn btn-ghost btn-sm" type="submit">Unlink</button>
+              </form>
+            </td>
+            <% } %>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</section>
+<%- include('partials/foot') %>

@@ -8,7 +8,10 @@ import { syncProfile } from './profile.js';
 import { handleInterviewChannelDelete, handleVoiceState, loadActiveInterviews } from './interviews.js';
 import { startPanelScheduler } from './panels.js';
 import { handleTrapMessage, loadTrap } from './spamTrap.js';
-import { handlePresenceUpdate, loadPresence, setPresenceTracking } from './presence.js';
+import { handlePresenceUpdate, loadPresence, setPresenceTracking, startPresenceSaver } from './presence.js';
+import { ROBLOX_COMMANDS, handleRobloxButton, handleRobloxCommand, handleRobloxJoin } from './roblox.js';
+import { handleAutoAnswer, loadAutoAnswers } from './autoAnswers.js';
+import { startStaffReport } from './staffReport.js';
 import { handleCommand, handleLoaButton, handleLoaModal, loadLoaSchedule, registerCommands } from './staff.js';
 import {
   handleChannelDelete, handleClaimButton, handleCloseButton, handleCloseCancel, handleCloseConfirm, handleKeepOpen,
@@ -31,6 +34,7 @@ function route(interaction) {
   if (interaction.isAutocomplete()) return handleCommunityAutocomplete(interaction);
   if (interaction.isChatInputCommand()) {
     if (MOD_COMMANDS.includes(interaction.commandName)) return handleModCommand(interaction);
+    if (ROBLOX_COMMANDS.includes(interaction.commandName)) return handleRobloxCommand(interaction);
     if (['giveaway', 'poll', 'rank', 'leaderboard', 'xp'].includes(interaction.commandName)) return handleCommunityCommand(interaction);
     return handleCommand(interaction);
   }
@@ -55,6 +59,7 @@ function route(interaction) {
     if (id.startsWith('gw:enter:')) return handleGiveawayButton(interaction);
     if (id.startsWith('poll:vote:')) return handlePollButton(interaction);
     if (id.startsWith('rm:')) return handleRoleMenuButton(interaction);
+    if (id === 'roblox:check') return handleRobloxButton(interaction);
     if (id.startsWith('apply:open:')) {
       // A category's own panel: same flow as picking it from the main panel's menu
       interaction.values = [id.split(':')[2]];
@@ -95,6 +100,7 @@ client.on(Events.MessageCreate, async (message) => {
       if (await handleTrapMessage(message)) return;
       await recordTicketMessage(message);
       await handleLevelMessage(message);
+      await handleAutoAnswer(message).catch((err) => console.warn('[auto-answer]', err.message));
     }
   } catch (err) {
     console.error('[messageCreate]', err);
@@ -125,6 +131,7 @@ client.on(Events.GuildMemberAdd, (member) => {
   if (member.guild.id !== config.guildId) return;
   countMemberChange('join');
   handleMemberJoin(member).catch((err) => console.error('[memberAdd]', err));
+  handleRobloxJoin(member).catch((err) => console.warn('[roblox join]', err.message));
 });
 
 client.on(Events.GuildMemberRemove, (member) => {
@@ -173,6 +180,9 @@ client.once(Events.ClientReady, async (c) => {
   startLeveling();
   await loadTrap().catch((err) => console.error('[trap] load failed:', err));
   await loadPresence().catch((err) => console.error('[presence] load failed:', err));
+  startPresenceSaver();
+  await loadAutoAnswers().catch((err) => console.error('[auto-answers] load failed:', err));
+  startStaffReport();
 });
 
 client.on(Events.Error, (err) => console.error('[discord]', err));

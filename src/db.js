@@ -44,6 +44,8 @@ const SETTINGS_FIELDS = [
   'apply_cooldown_days', 'blocked_role_ids', 'interview_category_id', 'timezone',
   'auto_close_hours', 'manager_role_id', 'strike_role_ids', 'strike_log_channel_id', 'loa_role_id', 'loa_channel_id',
   'giveaway_ping_role_id', 'mod_log_channel_id', 'trap_channel_id', 'trap_message_id', 'trap_caught',
+  'roblox_role_id', 'auto_answer_channel_ids',
+  'staff_report_channel_id', 'staff_report_day', 'staff_report_hour', 'staff_report_last',
 ];
 
 export async function updateSettings(patch, guildId = config.guildId) {

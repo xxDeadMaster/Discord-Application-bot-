@@ -11,6 +11,7 @@ import {
 import { ACTIONS, prettyMinutes } from '../bot/moderation.js';
 import { loadTrap, publishTrap } from '../bot/spamTrap.js';
 import { presenceTracking, staffStatus } from '../bot/presence.js';
+import { DAY_NAMES, staffMembers } from '../bot/staffReport.js';
 import { guildOptions } from './routes.js';
 import { activityScore, staffActivity } from '../stats.js';
 
@@ -34,21 +35,6 @@ const toArray = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 function requireManager(req, res, next) {
   if (res.locals.isManager) return next();
   res.status(403).render('error', { title: 'Managers only', message: 'Only managers (Manage Server, or the manager role in Settings) can do this.', user: res.locals.user });
-}
-
-/** Staff members known to the bot: everyone with the staff or manager role, by display name. */
-function staffMembers(guild, settings) {
-  const map = new Map();
-  for (const roleId of [settings.staff_role_id, settings.manager_role_id].filter(Boolean)) {
-    const role = guild.roles.cache.get(roleId);
-    for (const m of role?.members?.values() || []) {
-      if (!m.user.bot) map.set(m.id, { id: m.id, name: m.displayName || m.user.username, tag: m.user.tag || m.user.username });
-    }
-  }
-  // The server owner is always listed as staff, even without the staff role
-  const owner = guild.members.cache.get(guild.ownerId);
-  if (owner && !owner.user.bot) map.set(owner.id, { id: owner.id, name: owner.displayName || owner.user.username, tag: owner.user.tag || owner.user.username, isOwner: true });
-  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /* ---------- Moderation (case history from /warn /timeout /kick /ban) ---------- */
@@ -134,6 +120,8 @@ staffRoutes.get('/staff', async (req, res) => {
     title: 'Staff activity', table, period, totals, noStaffRole: !settings.staff_role_id,
     membersLoaded: res.locals.guild.members.cache.size > 1,
     presenceOn: presenceTracking(),
+    report: { channelId: settings.staff_report_channel_id, day: settings.staff_report_day, hour: settings.staff_report_hour, last: settings.staff_report_last },
+    dayNames: DAY_NAMES, textChannels: res.locals.guildOpts().textChannels, timezone: settings.timezone,
   });
 });
 
