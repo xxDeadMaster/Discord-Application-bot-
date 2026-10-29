@@ -55,6 +55,22 @@
       <button class="btn btn-primary" type="submit">Save and post warning</button>
     </form>
   </section>
+  <section class="card" id="gifs">
+    <div class="card-head"><h2>GIF blocker</h2><% if (gif.enabled) { %><span class="pill pill-open">On</span><% } else { %><span class="pill pill-off">Off</span><% } %></div>
+    <p class="muted small">Deletes GIFs (GIF picker, Giphy, .gif links and uploads) and shows a short notice. Only the server owner is skipped.</p>
+    <form method="post" action="/moderation/gifs" class="stack" style="gap: 10px;">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label class="toggle"><input type="checkbox" name="gif_block_enabled" <%= gif.enabled ? 'checked' : '' %>> Block GIFs</label>
+      <div class="field">
+        <label for="gif_allowed">Still allowed in</label>
+        <select id="gif_allowed" name="gif_allowed_channel_ids" multiple size="4" aria-describedby="gif_allowed_help">
+          <% channels.forEach(c => { %><option value="<%= c.id %>" <%= gif.allowed.includes(c.id) ? 'selected' : '' %>><%= c.name %><%= c.parent ? ` · ${c.parent}` : '' %></option><% }) %>
+        </select>
+        <p class="help" id="gif_allowed_help">Ctrl/⌘-click to pick more than one, or none.</p>
+      </div>
+      <div><button class="btn btn-primary" type="submit">Save</button></div>
+    </form>
+  </section>
   <section class="card">
     <h2>Commands</h2>
     <ul class="cmd-list">

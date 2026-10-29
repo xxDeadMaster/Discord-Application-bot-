@@ -46,6 +46,7 @@ const SETTINGS_FIELDS = [
   'giveaway_ping_role_id', 'mod_log_channel_id', 'trap_channel_id', 'trap_message_id', 'trap_caught',
   'roblox_role_id', 'auto_answer_channel_ids',
   'staff_report_channel_id', 'staff_report_day', 'staff_report_hour', 'staff_report_last',
+  'gif_block_enabled', 'gif_allowed_channel_ids',
 ];
 
 export async function updateSettings(patch, guildId = config.guildId) {

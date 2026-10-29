@@ -10,6 +10,7 @@ import {
 } from '../db.js';
 import { ACTIONS, prettyMinutes } from '../bot/moderation.js';
 import { loadTrap, publishTrap } from '../bot/spamTrap.js';
+import { loadGifBlock } from '../bot/gifBlock.js';
 import { presenceTracking, staffStatus } from '../bot/presence.js';
 import { DAY_NAMES, staffMembers } from '../bot/staffReport.js';
 import { guildOptions } from './routes.js';
@@ -52,6 +53,7 @@ staffRoutes.get('/moderation', requireManager, async (req, res) => {
     title: 'Moderation', cases: cases.slice(0, MOD_PAGE), hasMore: cases.length > MOD_PAGE, page, action, search, week,
     actions: ACTIONS, prettyMinutes, channels: guildOptions(res.locals.guild).textChannels, logChannelId: settings.mod_log_channel_id,
     trap: { channelId: settings.trap_channel_id, posted: Boolean(settings.trap_message_id), caught: settings.trap_caught || 0 },
+    gif: { enabled: settings.gif_block_enabled, allowed: settings.gif_allowed_channel_ids || [] },
   });
 });
 
@@ -62,6 +64,17 @@ staffRoutes.post('/moderation/log-channel', requireManager, async (req, res) => 
   await updateSettings({ mod_log_channel_id: id || null });
   flash(req, 'success', id ? 'Mod log channel saved. Every /warn, /timeout, /kick and /ban will be posted there.' : 'Mod log turned off. Cases are still saved here.');
   res.redirect('/moderation');
+});
+
+staffRoutes.post('/moderation/gifs', requireManager, async (req, res) => {
+  const channels = guildOptions(res.locals.guild).textChannels;
+  const raw = req.body.gif_allowed_channel_ids;
+  const ids = (raw === undefined ? [] : Array.isArray(raw) ? raw : [raw]).filter((id) => channels.some((c) => c.id === id));
+  const enabled = req.body.gif_block_enabled === 'on';
+  await updateSettings({ gif_block_enabled: enabled, gif_allowed_channel_ids: [...new Set(ids)] });
+  await loadGifBlock();
+  flash(req, 'success', enabled ? `GIF blocker is on.${ids.length ? ` GIFs are still allowed in ${ids.length} channel${ids.length === 1 ? '' : 's'}.` : ''}` : 'GIF blocker is off.');
+  res.redirect('/moderation#gifs');
 });
 
 staffRoutes.post('/moderation/spam-trap', requireManager, async (req, res) => {

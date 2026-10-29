@@ -12,6 +12,7 @@ import { handlePresenceUpdate, loadPresence, setPresenceTracking, startPresenceS
 import { ROBLOX_COMMANDS, handleRobloxButton, handleRobloxCommand, handleRobloxJoin } from './roblox.js';
 import { handleAutoAnswer, loadAutoAnswers } from './autoAnswers.js';
 import { startStaffReport } from './staffReport.js';
+import { gifBlockState, handleGifMessage, loadGifBlock } from './gifBlock.js';
 import { handleCommand, handleLoaButton, handleLoaModal, loadLoaSchedule, registerCommands } from './staff.js';
 import {
   handleChannelDelete, handleClaimButton, handleCloseButton, handleCloseCancel, handleCloseConfirm, handleKeepOpen,
@@ -98,12 +99,23 @@ client.on(Events.MessageCreate, async (message) => {
     }
     if (message.guildId === config.guildId) {
       if (await handleTrapMessage(message)) return;
+      if (await handleGifMessage(message)) return;
       await recordTicketMessage(message);
       await handleLevelMessage(message);
       await handleAutoAnswer(message).catch((err) => console.warn('[auto-answer]', err.message));
     }
   } catch (err) {
     console.error('[messageCreate]', err);
+  }
+});
+
+client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
+  if (newMessage.guildId !== config.guildId || !gifBlockState().enabled) return;
+  try {
+    const msg = newMessage.partial ? await newMessage.fetch().catch(() => null) : newMessage;
+    if (msg && !msg.author?.bot) await handleGifMessage(msg);
+  } catch (err) {
+    console.warn('[gif block edit]', err.message);
   }
 });
 
@@ -183,6 +195,7 @@ client.once(Events.ClientReady, async (c) => {
   startPresenceSaver();
   await loadAutoAnswers().catch((err) => console.error('[auto-answers] load failed:', err));
   startStaffReport();
+  await loadGifBlock().catch((err) => console.error('[gif block] load failed:', err));
 });
 
 client.on(Events.Error, (err) => console.error('[discord]', err));

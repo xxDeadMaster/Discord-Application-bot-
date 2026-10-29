@@ -458,3 +458,7 @@ CREATE TABLE IF NOT EXISTS staff_online_time (
   minutes  INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (guild_id, user_id, day)
 );
+
+-- GIF blocker: delete GIFs outside the allowed channels
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS gif_block_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS gif_allowed_channel_ids TEXT[] NOT NULL DEFAULT '{}';
