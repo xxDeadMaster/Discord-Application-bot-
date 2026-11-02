@@ -8,7 +8,7 @@ import { client } from '../bot/client.js';
 import { startHeartbeat } from '../bot/heartbeat.js';
 import { postOffline, postOnline } from '../bot/statusPosts.js';
 import { gifBlockState, handleGifMessage } from '../bot/gifBlock.js';
-import { handleTrapMessage } from '../bot/spamTrap.js';
+import { handleTrapMessage, publishTrap } from '../bot/spamTrap.js';
 import { handleAuditEntry } from './antiNuke.js';
 import { SENTINEL_COMMANDS, handleSentinelCommand } from './commands.js';
 import { handleJoin } from './raid.js';
@@ -96,6 +96,10 @@ function localHandlers(guild) {
       return b.on ? lockdownOn({ guild, by: by(b), reason: b.reason || 'Started from the dashboard' }) : lockdownOff({ guild, by: by(b) });
     },
     async reload() { await settings({ force: true }); return { ok: true }; },
+    async publishTrap() {
+      await settings({ force: true });
+      try { return { ok: true, ...(await publishTrap()) }; } catch (err) { return { ok: false, error: err.message }; }
+    },
     async restore(b) {
       const { rows } = await query("SELECT * FROM sentinel_events WHERE id = $1 AND kind = 'nuke'", [b.eventId]);
       const ev = rows[0];

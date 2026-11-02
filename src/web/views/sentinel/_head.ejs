@@ -29,8 +29,8 @@
     </div>
     <a class="side-link <%= active === 'overview' ? 'active' : '' %>" href="/sentinel" <%= active === 'overview' ? 'aria-current=page' : '' %>><%- icon('home') %>Security overview<span class="side-count" id="attnSide" hidden></span></a>
     <a class="side-link <%= active === 'log' ? 'active' : '' %>" href="/sentinel/log" <%= active === 'log' ? 'aria-current=page' : '' %>><%- icon('log') %>Security log</a>
-    <div class="side-label">Settings</div>
-    <a class="side-link" href="/moderation"><%- icon('shield') %>Spam trap &amp; GIFs<span class="side-count" style="background: var(--orbit);">Orbit</span></a>
+    <div class="side-label">Protection</div>
+    <a class="side-link <%= active === 'filters' ? 'active' : '' %>" href="/sentinel/filters" <%= active === 'filters' ? 'aria-current=page' : '' %>><%- icon('shield') %>Spam trap &amp; GIFs</a>
     <div class="side-foot"><%- icon('lock', 14) %>Only you can see Sentinel</div>
   </aside>
 
@@ -49,6 +49,7 @@
     <nav class="mobile-nav" aria-label="Sentinel pages">
       <a href="/sentinel" class="<%= active === 'overview' ? 'active' : '' %>">Overview</a>
       <a href="/sentinel/log" class="<%= active === 'log' ? 'active' : '' %>">Security log</a>
-      <a href="/moderation">Spam trap &amp; GIFs</a>
+      <a href="/sentinel/filters" class="<%= active === 'filters' ? 'active' : '' %>">Spam trap &amp; GIFs</a>
     </nav>
     <main class="page">
+    <% if (typeof flash !== 'undefined' && flash) { %><div class="flash-msg <%= flash.type === 'success' ? 'ok' : 'bad' %>" role="status"><%= flash.text %></div><% } %>

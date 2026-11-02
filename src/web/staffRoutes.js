@@ -9,8 +9,6 @@ import {
   deleteModCase, getLoa, getModCase, getSettings, getTicketType, listLoas, listModCases, listStrikes, listTicketTypes, modCounts, query, updateSettings,
 } from '../db.js';
 import { ACTIONS, prettyMinutes } from '../bot/moderation.js';
-import { loadTrap, publishTrap } from '../bot/spamTrap.js';
-import { loadGifBlock } from '../bot/gifBlock.js';
 import { presenceTracking, staffStatus } from '../bot/presence.js';
 import { DAY_NAMES, staffMembers } from '../bot/staffReport.js';
 import { guildOptions } from './routes.js';
@@ -52,9 +50,6 @@ staffRoutes.get('/moderation', requireManager, async (req, res) => {
   res.render('moderation', {
     title: 'Moderation', cases: cases.slice(0, MOD_PAGE), hasMore: cases.length > MOD_PAGE, page, action, search, week,
     actions: ACTIONS, prettyMinutes, channels: guildOptions(res.locals.guild).textChannels, logChannelId: settings.mod_log_channel_id,
-    trap: { channelId: settings.trap_channel_id, posted: Boolean(settings.trap_message_id), caught: settings.trap_caught || 0 },
-    gif: { enabled: settings.gif_block_enabled, allowed: settings.gif_allowed_channel_ids || [] },
-    protectionBot: settings.protection_bot || 'orbit',
   });
 });
 
@@ -64,47 +59,6 @@ staffRoutes.post('/moderation/log-channel', requireManager, async (req, res) => 
   if (id && !channels.some((c) => c.id === id)) { flash(req, 'error', 'Pick a channel from the list.'); return res.redirect('/moderation'); }
   await updateSettings({ mod_log_channel_id: id || null });
   flash(req, 'success', id ? 'Mod log channel saved. Every /warn, /timeout, /kick and /ban will be posted there.' : 'Mod log turned off. Cases are still saved here.');
-  res.redirect('/moderation');
-});
-
-staffRoutes.post('/moderation/gifs', requireManager, async (req, res) => {
-  const channels = guildOptions(res.locals.guild).textChannels;
-  const raw = req.body.gif_allowed_channel_ids;
-  const ids = (raw === undefined ? [] : Array.isArray(raw) ? raw : [raw]).filter((id) => channels.some((c) => c.id === id));
-  const enabled = req.body.gif_block_enabled === 'on';
-  await updateSettings({ gif_block_enabled: enabled, gif_allowed_channel_ids: [...new Set(ids)] });
-  await loadGifBlock();
-  flash(req, 'success', enabled ? `GIF blocker is on.${ids.length ? ` GIFs are still allowed in ${ids.length} channel${ids.length === 1 ? '' : 's'}.` : ''}` : 'GIF blocker is off.');
-  res.redirect('/moderation#gifs');
-});
-
-// Which bot runs the spam trap + GIF blocker. Orbit switches right away; Sentinel picks it up within 2 minutes.
-staffRoutes.post('/moderation/protection-bot', requireManager, async (req, res) => {
-  if (!res.locals.isAdmin) { flash(req, 'error', 'Only admins can change this.'); return res.redirect('/moderation'); }
-  const bot = req.body.protection_bot === 'sentinel' ? 'sentinel' : 'orbit';
-  await updateSettings({ protection_bot: bot });
-  await Promise.all([loadTrap(), loadGifBlock()]);
-  flash(req, 'success', bot === 'sentinel'
-    ? 'The spam trap and GIF blocker now run on Sentinel (it picks this up within 2 minutes). Orbit has stopped running them.'
-    : 'The spam trap and GIF blocker now run on Orbit.');
-  res.redirect('/moderation');
-});
-
-staffRoutes.post('/moderation/spam-trap', requireManager, async (req, res) => {
-  const id = String(req.body.trap_channel_id || '').trim();
-  const channels = guildOptions(res.locals.guild).textChannels;
-  if (id && !channels.some((c) => c.id === id)) { flash(req, 'error', 'Pick a channel from the list.'); return res.redirect('/moderation'); }
-  const settings = await getSettings();
-  const moved = (id || null) !== (settings.trap_channel_id || null);
-  await updateSettings({ trap_channel_id: id || null, ...(moved ? { trap_message_id: null } : {}) });
-  await loadTrap();
-  if (!id) { flash(req, 'success', 'Spam trap turned off.'); return res.redirect('/moderation'); }
-  try {
-    const r = await publishTrap();
-    flash(req, 'success', `Spam trap is on. ${r.updated ? 'The warning message was updated.' : 'The warning message was posted.'} Anyone who isn't staff and posts there is removed.`);
-  } catch (err) {
-    flash(req, 'error', `Saved, but the warning couldn't be posted: ${err.message}`);
-  }
   res.redirect('/moderation');
 });
 

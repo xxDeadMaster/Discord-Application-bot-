@@ -1,0 +1,48 @@
+<%- include('_head') %>
+<div class="head"><div><h1>Spam trap &amp; GIFs</h1><p class="sub">Message filters that run automatically. Only you can change these.</p></div></div>
+
+<div class="filters-grid">
+  <section class="card" id="trap">
+    <div class="card-head"><h3>Spam trap</h3><span class="pill <%= trap.channelId ? 'on' : '' %>"><%= trap.channelId ? 'On' : 'Off' %></span></div>
+    <p class="note-text">A channel nobody should post in. Spam bots post everywhere, so anyone who isn't staff posting there is removed and their last hour of messages deleted.<% if (trap.channelId) { %> Caught so far: <strong><%= trap.caught %></strong>.<% } %></p>
+    <form method="post" action="/sentinel/filters/trap" class="stack-form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label class="lbl" for="trap_channel_id">Trap channel</label>
+      <select id="trap_channel_id" name="trap_channel_id">
+        <option value="">Off</option>
+        <% channels.forEach(c => { %><option value="<%= c.id %>" <%= c.id === trap.channelId ? 'selected' : '' %>><%= c.name %><%= c.parent ? ` · ${c.parent}` : '' %></option><% }) %>
+      </select>
+      <div><button class="btn btn-red" type="submit">Save and post warning</button></div>
+    </form>
+  </section>
+
+  <section class="card" id="gifs">
+    <div class="card-head"><h3>GIF blocker</h3><span class="pill <%= gif.enabled ? 'on' : '' %>"><%= gif.enabled ? 'On' : 'Off' %></span></div>
+    <p class="note-text">Deletes GIFs (GIF picker, Giphy, .gif links and uploads) and shows a short notice. Only you are skipped.</p>
+    <form method="post" action="/sentinel/filters/gifs" class="stack-form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label class="check"><input type="checkbox" name="gif_block_enabled" <%= gif.enabled ? 'checked' : '' %>> Block GIFs</label>
+      <label class="lbl" for="gif_allowed">Still allowed in</label>
+      <select id="gif_allowed" name="gif_allowed_channel_ids" multiple size="6" aria-describedby="gif_help">
+        <% channels.forEach(c => { %><option value="<%= c.id %>" <%= gif.allowed.includes(c.id) ? 'selected' : '' %>><%= c.name %><%= c.parent ? ` · ${c.parent}` : '' %></option><% }) %>
+      </select>
+      <p class="help" id="gif_help">Ctrl/⌘-click to pick more than one, or none.</p>
+      <div><button class="btn btn-red" type="submit">Save</button></div>
+    </form>
+  </section>
+
+  <section class="card" id="runner">
+    <div class="card-head"><h3>Which bot runs them</h3><span class="pill <%= runner === 'sentinel' ? 'on' : '' %>"><%= runner === 'sentinel' ? 'Sentinel' : 'Orbit (fallback)' %></span></div>
+    <p class="note-text">Sentinel runs both filters. If Sentinel is going to be offline for a long time, switch to Orbit so the filters keep working, then switch back.</p>
+    <form method="post" action="/sentinel/filters/runner" class="stack-form">
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label class="lbl" for="protection_bot">Run by</label>
+      <select id="protection_bot" name="protection_bot">
+        <option value="sentinel" <%= runner === 'sentinel' ? 'selected' : '' %>>Sentinel</option>
+        <option value="orbit" <%= runner === 'orbit' ? 'selected' : '' %>>Orbit (fallback)</option>
+      </select>
+      <div><button class="btn" type="submit">Save</button></div>
+    </form>
+  </section>
+</div>
+<%- include('_foot') %>

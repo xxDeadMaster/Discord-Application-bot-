@@ -4,7 +4,8 @@ import express from 'express';
 import { config } from '../config.js';
 import { getOrCreateSecret, getSettings, query, updateSettings } from '../db.js';
 import { loadGifBlock } from '../bot/gifBlock.js';
-import { loadTrap } from '../bot/spamTrap.js';
+import { loadTrap, publishTrap } from '../bot/spamTrap.js';
+import { guildOptions } from './routes.js';
 import { staffStatus } from '../bot/presence.js';
 import { staffMembers } from '../bot/staffReport.js';
 
@@ -184,4 +185,77 @@ sentinelRoutes.get('/sentinel/log', async (req, res) => {
     [config.guildId, LOG_PAGE + 1, (page - 1) * LOG_PAGE, ...(kind ? [kind] : [])],
   );
   res.render('sentinel/log', { title: 'Security log', active: 'log', events: rows.slice(0, LOG_PAGE), hasMore: rows.length > LOG_PAGE, page, kind });
+});
+
+/* ---------- Spam trap & GIF blocker (moved here from Orbit's Moderation page) ---------- */
+
+const flash = (req, type, text) => { req.session.flash = { type, text }; };
+
+sentinelRoutes.get('/sentinel/filters', async (req, res) => {
+  const s = await getSettings();
+  res.render('sentinel/filters', {
+    title: 'Spam trap & GIFs', active: 'filters',
+    channels: guildOptions(res.locals.guild).textChannels,
+    trap: { channelId: s.trap_channel_id, posted: Boolean(s.trap_message_id), caught: s.trap_caught || 0 },
+    gif: { enabled: s.gif_block_enabled, allowed: s.gif_allowed_channel_ids || [] },
+    runner: s.protection_bot === 'orbit' ? 'orbit' : 'sentinel',
+  });
+});
+
+/** Posts (or refreshes) the trap warning from whichever bot runs the trap. */
+async function postTrapWarning(runner) {
+  if (runner === 'sentinel') {
+    const r = await sentinelLocal('/publishTrap', {});
+    if (!r) throw new Error('Sentinel is not reachable right now, so the warning was not posted. Try again when it is online.');
+    if (!r.ok) throw new Error(r.error || 'Sentinel could not post the warning.');
+    return r;
+  }
+  return publishTrap();
+}
+
+sentinelRoutes.post('/sentinel/filters/trap', async (req, res) => {
+  const id = String(req.body.trap_channel_id || '').trim();
+  const channels = guildOptions(res.locals.guild).textChannels;
+  if (id && !channels.some((c) => c.id === id)) { flash(req, 'error', 'Pick a channel from the list.'); return res.redirect('/sentinel/filters'); }
+  const s = await getSettings();
+  const moved = (id || null) !== (s.trap_channel_id || null);
+  await updateSettings({ trap_channel_id: id || null, ...(moved ? { trap_message_id: null } : {}) });
+  await loadTrap();
+  await sentinelLocal('/reload', {});
+  if (!id) { flash(req, 'success', 'Spam trap turned off.'); return res.redirect('/sentinel/filters'); }
+  try {
+    const r = await postTrapWarning(s.protection_bot === 'orbit' ? 'orbit' : 'sentinel');
+    flash(req, 'success', `Spam trap is on. ${r.updated ? 'The warning message was updated.' : 'The warning message was posted.'} Anyone who isn't staff and posts there is removed.`);
+  } catch (err) {
+    flash(req, 'error', `Saved, but ${err.message.charAt(0).toLowerCase()}${err.message.slice(1)}`);
+  }
+  res.redirect('/sentinel/filters');
+});
+
+sentinelRoutes.post('/sentinel/filters/gifs', async (req, res) => {
+  const channels = guildOptions(res.locals.guild).textChannels;
+  const raw = req.body.gif_allowed_channel_ids;
+  const ids = (raw === undefined ? [] : Array.isArray(raw) ? raw : [raw]).filter((x) => channels.some((c) => c.id === x));
+  const enabled = req.body.gif_block_enabled === 'on';
+  await updateSettings({ gif_block_enabled: enabled, gif_allowed_channel_ids: [...new Set(ids)] });
+  await loadGifBlock();
+  await sentinelLocal('/reload', {});
+  flash(req, 'success', enabled ? `GIF blocker is on.${ids.length ? ` GIFs are still allowed in ${ids.length} channel${ids.length === 1 ? '' : 's'}.` : ''}` : 'GIF blocker is off.');
+  res.redirect('/sentinel/filters#gifs');
+});
+
+/** Fallback switch: which bot runs the trap + GIF blocker (Sentinel normally; Orbit if Sentinel is down for a while). */
+sentinelRoutes.post('/sentinel/filters/runner', async (req, res) => {
+  const runner = req.body.protection_bot === 'orbit' ? 'orbit' : 'sentinel';
+  await updateSettings({ protection_bot: runner });
+  await Promise.all([loadTrap(), loadGifBlock()]);
+  await sentinelLocal('/reload', {});
+  let note = '';
+  if ((await getSettings()).trap_channel_id) {
+    try { await postTrapWarning(runner); } catch (err) { note = ` (${err.message})`; }
+  }
+  flash(req, note ? 'error' : 'success', runner === 'sentinel'
+    ? `Sentinel now runs the spam trap and GIF blocker. Orbit has stopped running them.${note}`
+    : `Orbit now runs the spam trap and GIF blocker (fallback).${note}`);
+  res.redirect('/sentinel/filters#runner');
 });

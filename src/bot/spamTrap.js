@@ -45,7 +45,8 @@ export async function publishTrap() {
   if (!channel?.isTextBased?.()) throw new Error('The bot cannot find that channel.');
   if (trap.messageId) {
     const existing = await channel.messages.fetch(trap.messageId).catch(() => null);
-    if (existing) { await existing.edit(trapMessage()); return { updated: true }; }
+    if (existing && existing.author?.id === client.user?.id) { await existing.edit(trapMessage()); return { updated: true }; }
+    if (existing) await existing.delete().catch(() => {}); // posted by the other bot (Orbit/Sentinel hand-off): replace it
   }
   const msg = await channel.send(trapMessage());
   await updateSettings({ trap_message_id: msg.id });

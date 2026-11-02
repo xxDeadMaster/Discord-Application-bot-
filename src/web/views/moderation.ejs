@@ -44,45 +44,6 @@
     </form>
   </section>
   <section class="card">
-    <h2>Spam trap</h2>
-    <p class="muted small">A channel nobody should post in. Spam bots post everywhere, so anyone who isn't staff posting there is removed and their last hour of messages deleted.<% if (trap.channelId) { %> Caught so far: <strong><%= trap.caught %></strong>.<% } %></p>
-    <form method="post" action="/moderation/spam-trap" class="mod-log-form">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <select name="trap_channel_id" aria-label="Spam trap channel">
-        <option value="">Off</option>
-        <% channels.forEach(c => { %><option value="<%= c.id %>" <%= c.id === trap.channelId ? 'selected' : '' %>><%= c.name %><%= c.parent ? ` · ${c.parent}` : '' %></option><% }) %>
-      </select>
-      <button class="btn btn-primary" type="submit">Save and post warning</button>
-    </form>
-    <% if (isAdmin) { %>
-    <form method="post" action="/moderation/protection-bot" class="mod-log-form" style="margin-top: 12px;">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <label class="muted small" for="protection_bot" style="align-self: center; white-space: nowrap;">Trap + GIF blocker run on</label>
-      <select id="protection_bot" name="protection_bot">
-        <option value="orbit" <%= protectionBot === 'orbit' ? 'selected' : '' %>>Orbit</option>
-        <option value="sentinel" <%= protectionBot === 'sentinel' ? 'selected' : '' %>>Sentinel</option>
-      </select>
-      <button class="btn btn-ghost" type="submit">Save</button>
-    </form>
-    <% } %>
-  </section>
-  <section class="card" id="gifs">
-    <div class="card-head"><h2>GIF blocker</h2><% if (gif.enabled) { %><span class="pill pill-open">On</span><% } else { %><span class="pill pill-off">Off</span><% } %></div>
-    <p class="muted small">Deletes GIFs (GIF picker, Giphy, .gif links and uploads) and shows a short notice. Only the server owner is skipped. Run by <strong><%= protectionBot === 'sentinel' ? 'Sentinel' : 'Orbit' %></strong>.</p>
-    <form method="post" action="/moderation/gifs" class="stack" style="gap: 10px;">
-      <input type="hidden" name="_csrf" value="<%= csrf %>">
-      <label class="toggle"><input type="checkbox" name="gif_block_enabled" <%= gif.enabled ? 'checked' : '' %>> Block GIFs</label>
-      <div class="field">
-        <label for="gif_allowed">Still allowed in</label>
-        <select id="gif_allowed" name="gif_allowed_channel_ids" multiple size="4" aria-describedby="gif_allowed_help">
-          <% channels.forEach(c => { %><option value="<%= c.id %>" <%= gif.allowed.includes(c.id) ? 'selected' : '' %>><%= c.name %><%= c.parent ? ` · ${c.parent}` : '' %></option><% }) %>
-        </select>
-        <p class="help" id="gif_allowed_help">Ctrl/⌘-click to pick more than one, or none.</p>
-      </div>
-      <div><button class="btn btn-primary" type="submit">Save</button></div>
-    </form>
-  </section>
-  <section class="card">
     <h2>Commands</h2>
     <ul class="cmd-list">
       <li><code>/warn member reason</code><span>DM + case</span></li>

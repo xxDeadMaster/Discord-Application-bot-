@@ -240,3 +240,20 @@ a { color: var(--red-hot); }
 .btn[disabled] { opacity: .45; cursor: not-allowed; box-shadow: none; }
 .staff .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .staff .role { flex: none; max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Spam trap & GIFs page */
+.filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.note-text { color: var(--text-2); font-size: 13px; margin: 0 0 14px; }
+.stack-form { display: flex; flex-direction: column; gap: 8px; }
+.stack-form .lbl { font-size: 12px; font-weight: 800; color: var(--muted); }
+.stack-form select { width: 100%; background: var(--field); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text); padding: 9px 10px; font: inherit; }
+.stack-form select[multiple] { padding: 4px; }
+.stack-form select[multiple] option { padding: 5px 8px; border-radius: 6px; }
+.stack-form select:focus-visible { outline: 2px solid var(--red-hot); outline-offset: 2px; }
+.stack-form .check { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 4px; }
+.stack-form .check input { width: 17px; height: 17px; accent-color: var(--red); }
+.stack-form .help { margin: 0; color: var(--muted); font-size: 12px; }
+.stack-form > div { margin-top: 6px; }
+.flash-msg { border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 16px; font-weight: 700; border: 1px solid; }
+.flash-msg.ok { background: var(--ok-soft); border-color: rgba(63,203,126,.35); color: #BFF3D6; }
+.flash-msg.bad { background: var(--red-soft); border-color: var(--red-line); color: #FFDADB; }
+.stack-form select[multiple] option:checked { background: linear-gradient(var(--red-deep), var(--red-deep)); color: #fff; }

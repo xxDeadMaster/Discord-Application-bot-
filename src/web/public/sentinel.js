@@ -204,13 +204,13 @@
     const rows = [
       { key: 'antinuke', name: 'Anti-nuke', on: m.antinuke.on, sub: `3+ fast deletes/bans → remove roles${m.antinuke.trusted ? ` · ${m.antinuke.trusted} trusted` : ''}`, tog: true },
       { key: 'raid', name: 'Raid alarm', on: m.raid.on, sub: `${m.raid.joins} joins in ${m.raid.seconds}s → alert${m.raid.auto ? ' + lockdown' : ''}`, tog: true },
-      { key: 'trap', name: 'Spam trap', on: m.trap.on, sub: m.trap.on ? `#${m.trap.channel || 'unknown'} · run by ${m.trap.bot === 'sentinel' ? 'Sentinel' : 'Orbit'}` : 'Off · pick a channel in Orbit', tog: false },
+      { key: 'trap', name: 'Spam trap', on: m.trap.on, sub: m.trap.on ? `#${m.trap.channel || 'unknown'} · run by ${m.trap.bot === 'sentinel' ? 'Sentinel' : 'Orbit'}` : 'Off · pick a trap channel', tog: false },
       { key: 'gif', name: 'GIF blocker', on: m.gif.on, sub: `${m.gif.allowed.length ? `Allowed in ${m.gif.allowed.map((c) => `#${c}`).join(', ')}` : 'Blocked everywhere'} · run by ${m.gif.bot === 'sentinel' ? 'Sentinel' : 'Orbit'}`, tog: true },
     ];
     $('modCount').textContent = `${rows.filter((r) => r.on).length} / ${rows.length} on`;
     $('mods').innerHTML = rows.map((r) => `<li class="${r.on ? '' : 'is-off'}"><span><span class="n">${esc(r.name)}</span><span class="s">${esc(r.sub)}</span></span>${r.tog
       ? `<button class="tog ${r.on ? '' : 'off'}" data-mod="${r.key}" data-name="${esc(r.name)}" aria-pressed="${r.on}" aria-label="${esc(r.name)}"></button>`
-      : '<a class="link" href="/moderation">Change</a>'}</li>`).join('');
+      : '<a class="link" href="/sentinel/filters">Change</a>'}</li>`).join('');
   }
   $('mods').addEventListener('click', (e) => {
     const t = e.target.closest('.tog');
