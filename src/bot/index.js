@@ -13,6 +13,7 @@ import { ROBLOX_COMMANDS, handleRobloxButton, handleRobloxCommand, handleRobloxJ
 import { handleAutoAnswer, loadAutoAnswers } from './autoAnswers.js';
 import { startStaffReport } from './staffReport.js';
 import { gifBlockState, handleGifMessage, loadGifBlock } from './gifBlock.js';
+import { startHeartbeat } from './heartbeat.js';
 import { handleCommand, handleLoaButton, handleLoaModal, loadLoaSchedule, registerCommands } from './staff.js';
 import {
   handleChannelDelete, handleClaimButton, handleCloseButton, handleCloseCancel, handleCloseConfirm, handleKeepOpen,
@@ -196,6 +197,7 @@ client.once(Events.ClientReady, async (c) => {
   await loadAutoAnswers().catch((err) => console.error('[auto-answers] load failed:', err));
   startStaffReport();
   await loadGifBlock().catch((err) => console.error('[gif block] load failed:', err));
+  startHeartbeat();
 });
 
 client.on(Events.Error, (err) => console.error('[discord]', err));
