@@ -64,6 +64,10 @@ async function send(url, embed, timeoutMs = 5000) {
   }
 }
 
+// Mission Control's #🚨│incidents channel, shown as a clickable link in "went offline" posts.
+const INCIDENTS_CHANNEL_ID = (process.env.INCIDENTS_CHANNEL_ID || '1566813720191963328').trim();
+const incidentsLink = () => (/^\d{17,20}$/.test(INCIDENTS_CHANNEL_ID) ? `<#${INCIDENTS_CHANNEL_ID}>` : '#🚨│incidents');
+
 const short = (v) => (v ? v.slice(0, 7) : 'unknown');
 const ts = (ms) => `<t:${Math.floor(ms / 1000)}:R>`;
 
@@ -83,7 +87,7 @@ export async function postOffline(reason = 'Stopped or restarting (update or mai
   return send(statusHook(), {
     color: 0x8592a8,
     title: `🔴 ${NAME} went offline`,
-    description: `${reason}. It was up for ${upMin >= 60 ? `${Math.floor(upMin / 60)}h ${upMin % 60}m` : `${upMin} min`}.\nIf it isn't back in a few minutes, check #🚨│incidents.`,
+    description: `${reason}. It was up for ${upMin >= 60 ? `${Math.floor(upMin / 60)}h ${upMin % 60}m` : `${upMin} min`}.\nIf it isn't back in a few minutes, check ${incidentsLink()}.`,
     timestamp: new Date(now).toISOString(),
   }, 2500); // short: the bot is shutting down
 }
