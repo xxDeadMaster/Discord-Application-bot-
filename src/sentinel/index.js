@@ -15,6 +15,17 @@ import { settings } from './state.js';
 
 const ours = (guildId) => guildId === config.guildId;
 
+let setUp = false;
+/** Registers commands, loads settings and starts the heartbeat. Runs at login, or when Sentinel is first invited. */
+async function setUpGuild(guild) {
+  if (setUp) return;
+  setUp = true;
+  await guild.commands.set(SENTINEL_COMMANDS).catch((err) => console.error('[sentinel] could not register commands:', err.message));
+  const s = await settings({ force: true });
+  startHeartbeat();
+  console.log(`[sentinel] ready. Anti-nuke ${s.sentinel_antinuke_enabled ? 'on' : 'off'}, raid ${s.sentinel_raid_joins}/${s.sentinel_raid_seconds}s, trap+GIFs run by ${s.protection_bot}`);
+}
+
 client.once(Events.ClientReady, async (c) => {
   console.log(`[sentinel] logged in as ${c.user.tag}`);
   for (const g of c.guilds.cache.values()) {
@@ -22,14 +33,14 @@ client.once(Events.ClientReady, async (c) => {
   }
   const guild = await c.guilds.fetch(config.guildId).catch(() => null);
   if (!guild) { console.warn('[sentinel] not in BloxVerse yet. Invite it.'); return; }
-  await guild.commands.set(SENTINEL_COMMANDS).catch((err) => console.error('[sentinel] could not register commands:', err.message));
-  await settings({ force: true }).catch((err) => console.error('[sentinel] settings failed:', err));
-  startHeartbeat();
-  const s = await settings();
-  console.log(`[sentinel] ready. Anti-nuke ${s.sentinel_antinuke_enabled ? 'on' : 'off'}, raid ${s.sentinel_raid_joins}/${s.sentinel_raid_seconds}s, trap+GIFs run by ${s.protection_bot}`);
+  await setUpGuild(guild).catch((err) => console.error('[sentinel] setup failed:', err));
 });
 
-client.on(Events.GuildCreate, (g) => { if (!ours(g.id)) g.leave().catch(() => {}); });
+client.on(Events.GuildCreate, (g) => {
+  if (!ours(g.id)) { g.leave().catch(() => {}); return; }
+  console.log('[sentinel] added to BloxVerse');
+  setUpGuild(g).catch((err) => console.error('[sentinel] setup failed:', err));
+});
 
 client.on(Events.MessageCreate, async (message) => {
   if (!ours(message.guildId) || message.author?.bot) return;
