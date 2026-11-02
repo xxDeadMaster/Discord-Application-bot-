@@ -50,7 +50,7 @@ const SHARED = [
   'src/bot/client.js', 'src/db.js', 'src/schema.sql', 'src/config.js', 'package.json', 'ecosystem.config.cjs',
 ];
 // Not news for either bot (server art and scripts for Orbit Labs / Mission Control).
-const NEITHER = [':(glob)assets/mission-control-*', ':(glob)scripts/mission-control-*'];
+const NEITHER = [':(glob)assets/mission-control-*', ':(glob)assets/orbit-labs-*', ':(glob)scripts/mission-control-*'];
 const exclude = (list) => list.map((p) => (p.startsWith(':(glob)') ? `:(exclude,glob)${p.slice(7)}` : `:(exclude)${p}`));
 export const BOT_PATHS = {
   orbit: ['.', ...exclude(SENTINEL_ONLY), ...exclude(NEITHER)],
