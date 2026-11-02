@@ -9,12 +9,17 @@ import { recordAutoCase } from './moderation.js';
 import { COLORS, footer } from './ui.js';
 
 // Kept in memory so normal messages never touch the database.
-let trap = { channelId: null, messageId: null, caught: 0, staffRoleId: null, managerRoleId: null, active: BOT === 'orbit' };
+let trap = { channelId: null, messageId: null, caught: 0, staffRoleId: null, managerRoleId: null, active: BOT === 'orbit', renameOn: false, renameTime: '04:00', renameLast: null, names: [], tz: 'America/New_York' };
 const recent = new Set(); // users being handled right now (spam bots send many messages at once)
 
 export async function loadTrap() {
   const s = await getSettings();
-  trap = { channelId: s.trap_channel_id, messageId: s.trap_message_id, caught: s.trap_caught || 0, staffRoleId: s.staff_role_id, managerRoleId: s.manager_role_id, active: (s.protection_bot || 'orbit') === BOT };
+  trap = {
+    channelId: s.trap_channel_id, messageId: s.trap_message_id, caught: s.trap_caught || 0, staffRoleId: s.staff_role_id, managerRoleId: s.manager_role_id,
+    active: (s.protection_bot || 'orbit') === BOT,
+    renameOn: Boolean(s.trap_rename_enabled), renameTime: s.trap_rename_time || '04:00', renameLast: s.trap_rename_last || null,
+    names: s.trap_rename_names || [], tz: s.timezone || 'America/New_York',
+  };
   return trap;
 }
 
@@ -96,4 +101,67 @@ export async function handleTrapMessage(message) {
     message.channel.messages.fetch(trap.messageId).then((m) => m.edit(trapMessage())).catch(() => {});
   }
   return 'caught'; // truthy like the other cases; Sentinel uses it to count catches
+}
+
+/* ---------- Daily rename ----------
+   Spam bots learn trap channel names and skip them. Renaming the trap every day to a normal-looking,
+   read-only-sounding name keeps it working. Names that invite chatting ("general") would catch real members. */
+
+export const DEFAULT_TRAP_NAMES = [
+  'summary', 'recap', 'highlights', 'daily-digest', 'info-board', 'server-notes', 'archive', 'bulletin',
+  'weekly-recap', 'spotlight', 'notices', 'status-board', 'news-feed', 'server-log', 'reference', 'overview',
+];
+
+/** Turns typed names into valid Discord text-channel names (lowercase, dashes, no spaces). */
+export function cleanTrapNames(text) {
+  return [...new Set(String(text || '').split(/\r?\n|,/)
+    .map((n) => n.trim().toLowerCase().replace(/^#/, '').replace(/\s+/g, '-').replace(/[^\p{L}\p{N}\p{Extended_Pictographic}\uFE0F\u200D│|_-]/gu, '').replace(/-{2,}/g, '-').replace(/^-|-$/g, '').slice(0, 90))
+    .filter(Boolean))].slice(0, 50);
+}
+
+const plainName = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** A different name from the list (never the current one). */
+export function pickTrapName(current, pool, rand = Math.random) {
+  const list = (pool && pool.length ? pool : DEFAULT_TRAP_NAMES).filter((n) => plainName(n) !== plainName(current));
+  const from = list.length ? list : DEFAULT_TRAP_NAMES;
+  return from[Math.floor(rand() * from.length) % from.length];
+}
+
+/** Date and HH:MM in the server's timezone. */
+export function localNow(tz, now = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(now).map((x) => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, hm: `${p.hour}:${p.minute}` };
+}
+
+/** Renames the trap channel now. Returns { from, name }. */
+export async function renameTrap(reason = 'Daily spam-trap rename', now = new Date()) {
+  if (!trap.channelId) throw new Error('Pick a trap channel first.');
+  const channel = await client.channels.fetch(trap.channelId).catch(() => null);
+  if (!channel?.setName) throw new Error('The bot cannot find the trap channel.');
+  const from = channel.name;
+  const name = pickTrapName(from, trap.names);
+  await channel.setName(name, reason);
+  const { date } = localNow(trap.tz, now);
+  trap.renameLast = date;
+  await updateSettings({ trap_rename_last: date }).catch(() => {});
+  console.log(`[trap] renamed #${from} -> #${name}`);
+  return { from, name };
+}
+
+/** Called every minute: renames once a day at (or after, if the bot was offline) the chosen time. Uses memory only. */
+export async function trapRenameTick(now = new Date()) {
+  if (!trap.active || !trap.channelId || !trap.renameOn) return null;
+  const { date, hm } = localNow(trap.tz, now);
+  if (hm < trap.renameTime || trap.renameLast === date) return null;
+  trap.renameLast = date; // set first so a slow rename can't run twice
+  return renameTrap('Daily spam-trap rename', now);
+}
+
+let renameTimer = null;
+export function startTrapRenamer() {
+  if (renameTimer) return;
+  renameTimer = setInterval(() => trapRenameTick().catch((err) => console.warn('[trap] daily rename failed:', err.message)), 60_000);
+  renameTimer.unref?.();
 }

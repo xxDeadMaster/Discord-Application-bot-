@@ -509,3 +509,9 @@ CREATE TABLE IF NOT EXISTS sentinel_activity (
 );
 
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_raid_enabled BOOLEAN NOT NULL DEFAULT true;
+
+-- Spam trap daily rename (so spam bots can't learn the trap's name)
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS trap_rename_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS trap_rename_time TEXT NOT NULL DEFAULT '04:00';   -- HH:MM in the server timezone
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS trap_rename_last TEXT;                           -- YYYY-MM-DD of the last rename
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS trap_rename_names TEXT[] NOT NULL DEFAULT '{}';  -- empty = built-in list

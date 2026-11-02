@@ -257,3 +257,10 @@ a { color: var(--red-hot); }
 .flash-msg.ok { background: var(--ok-soft); border-color: rgba(63,203,126,.35); color: #BFF3D6; }
 .flash-msg.bad { background: var(--red-soft); border-color: var(--red-line); color: #FFDADB; }
 .stack-form select[multiple] option:checked { background: linear-gradient(var(--red-deep), var(--red-deep)); color: #fff; }
+.sub-block { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.stack-form .field { width: 100%; background: var(--field); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text); padding: 9px 10px; font: inherit; color-scheme: dark; }
+.stack-form input[type=time].field { max-width: 160px; }
+.stack-form textarea.field { resize: vertical; min-height: 90px; font-size: 13px; }
+.stack-form textarea.field::placeholder { color: #6E5C5F; }
+.stack-form .field:focus-visible { outline: 2px solid var(--red-hot); outline-offset: 2px; }
+.stack-form .opt { font-weight: 600; color: var(--muted); opacity: .8; text-transform: none; }

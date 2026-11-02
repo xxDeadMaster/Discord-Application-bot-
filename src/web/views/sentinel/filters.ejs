@@ -14,6 +14,25 @@
       </select>
       <div><button class="btn btn-red" type="submit">Save and post warning</button></div>
     </form>
+
+    <div class="sub-block" id="rename">
+      <div class="card-head" style="margin-bottom: 6px;"><h3>Daily rename</h3><span class="pill <%= rename.on ? 'on' : '' %>"><%= rename.on ? `Every day ${rename.time}` : 'Off' %></span></div>
+      <p class="note-text">Spam bots learn trap names and skip them. A new, normal-looking name every day keeps the trap working. Times are in <%= rename.tz.replace('_', ' ') %>.<% if (rename.last) { %> Last renamed <%= rename.last %>.<% } %></p>
+      <form method="post" action="/sentinel/filters/rename" class="stack-form">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <label class="check"><input type="checkbox" name="trap_rename_enabled" <%= rename.on ? 'checked' : '' %>> Rename it every day</label>
+        <label class="lbl" for="trap_rename_time">At</label>
+        <input class="field" id="trap_rename_time" name="trap_rename_time" type="time" value="<%= rename.time %>" required>
+        <label class="lbl" for="trap_rename_names">Names to pick from <span class="opt">(optional, one per line)</span></label>
+        <textarea class="field" id="trap_rename_names" name="trap_rename_names" rows="4" placeholder="<%= defaultTrapNames.join('\n') %>" aria-describedby="names_help"><%= rename.names.join('\n') %></textarea>
+        <p class="help" id="names_help">Leave empty to use the built-in list (shown faded). Pick names that sound read-only, like "summary" or "archive". A name like "general" would trap real members.</p>
+        <div class="btn-row"><button class="btn btn-red" type="submit">Save</button></div>
+      </form>
+      <form method="post" action="/sentinel/filters/rename-now" class="stack-form" style="margin-top: 8px;">
+        <input type="hidden" name="_csrf" value="<%= csrf %>">
+        <div><button class="btn" type="submit" <%= trap.channelId ? '' : 'disabled' %>>Rename now</button></div>
+      </form>
+    </div>
   </section>
 
   <section class="card" id="gifs">

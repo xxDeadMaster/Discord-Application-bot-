@@ -7,7 +7,7 @@ import { client } from './client.js';
 import { syncProfile } from './profile.js';
 import { handleInterviewChannelDelete, handleVoiceState, loadActiveInterviews } from './interviews.js';
 import { startPanelScheduler } from './panels.js';
-import { handleTrapMessage, loadTrap } from './spamTrap.js';
+import { handleTrapMessage, loadTrap, startTrapRenamer } from './spamTrap.js';
 import { handlePresenceUpdate, loadPresence, setPresenceTracking, startPresenceSaver } from './presence.js';
 import { ROBLOX_COMMANDS, handleRobloxButton, handleRobloxCommand, handleRobloxJoin } from './roblox.js';
 import { handleAutoAnswer, loadAutoAnswers } from './autoAnswers.js';
@@ -193,6 +193,7 @@ client.once(Events.ClientReady, async (c) => {
   await loadLevels().catch((err) => console.error('[levels] load failed:', err));
   startLeveling();
   await loadTrap().catch((err) => console.error('[trap] load failed:', err));
+  startTrapRenamer();
   await loadPresence().catch((err) => console.error('[presence] load failed:', err));
   startPresenceSaver();
   await loadAutoAnswers().catch((err) => console.error('[auto-answers] load failed:', err));

@@ -4,7 +4,7 @@ import express from 'express';
 import { config } from '../config.js';
 import { getOrCreateSecret, getSettings, query, updateSettings } from '../db.js';
 import { loadGifBlock } from '../bot/gifBlock.js';
-import { loadTrap, publishTrap } from '../bot/spamTrap.js';
+import { DEFAULT_TRAP_NAMES, cleanTrapNames, loadTrap, publishTrap, renameTrap } from '../bot/spamTrap.js';
 import { guildOptions } from './routes.js';
 import { staffStatus } from '../bot/presence.js';
 import { staffMembers } from '../bot/staffReport.js';
@@ -197,6 +197,8 @@ sentinelRoutes.get('/sentinel/filters', async (req, res) => {
     title: 'Spam trap & GIFs', active: 'filters',
     channels: guildOptions(res.locals.guild).textChannels,
     trap: { channelId: s.trap_channel_id, posted: Boolean(s.trap_message_id), caught: s.trap_caught || 0 },
+    rename: { on: s.trap_rename_enabled, time: s.trap_rename_time || '04:00', last: s.trap_rename_last, names: s.trap_rename_names || [], tz: s.timezone || 'America/New_York' },
+    defaultTrapNames: DEFAULT_TRAP_NAMES,
     gif: { enabled: s.gif_block_enabled, allowed: s.gif_allowed_channel_ids || [] },
     runner: s.protection_bot === 'orbit' ? 'orbit' : 'sentinel',
   });
@@ -258,4 +260,38 @@ sentinelRoutes.post('/sentinel/filters/runner', async (req, res) => {
     ? `Sentinel now runs the spam trap and GIF blocker. Orbit has stopped running them.${note}`
     : `Orbit now runs the spam trap and GIF blocker (fallback).${note}`);
   res.redirect('/sentinel/filters#runner');
+});
+
+/** Daily rename settings: on/off, time (HH:MM, server timezone), optional own list of names. */
+sentinelRoutes.post('/sentinel/filters/rename', async (req, res) => {
+  const time = String(req.body.trap_rename_time || '').trim();
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) { flash(req, 'error', 'Pick a time like 04:00.'); return res.redirect('/sentinel/filters#rename'); }
+  const on = req.body.trap_rename_enabled === 'on';
+  const names = cleanTrapNames(req.body.trap_rename_names);
+  if (names.length === 1) { flash(req, 'error', 'Add at least 2 names (or leave it empty to use the built-in list), so the name can change every day.'); return res.redirect('/sentinel/filters#rename'); }
+  const s = await getSettings();
+  // Changing the time shouldn't count as "already renamed today" for a later time today
+  await updateSettings({ trap_rename_enabled: on, trap_rename_time: time, trap_rename_names: names, ...(time !== s.trap_rename_time ? { trap_rename_last: null } : {}) });
+  await loadTrap();
+  await sentinelLocal('/reload', {});
+  flash(req, 'success', on
+    ? `The spam trap will get a new name every day at ${time}${names.length ? `, picked from your ${names.length} names` : ''}.${s.trap_channel_id ? '' : ' Pick a trap channel too.'}`
+    : 'Daily rename is off. The trap keeps its current name.');
+  res.redirect('/sentinel/filters#rename');
+});
+
+sentinelRoutes.post('/sentinel/filters/rename-now', async (req, res) => {
+  const s = await getSettings();
+  try {
+    let r;
+    if ((s.protection_bot || 'orbit') === 'orbit') { await loadTrap(); r = await renameTrap('Renamed from the dashboard'); } else {
+      r = await sentinelLocal('/renameTrap', {});
+      if (!r) throw new Error('Sentinel is not reachable right now.');
+      if (!r.ok) throw new Error(r.error || 'Sentinel could not rename the trap.');
+    }
+    flash(req, 'success', `Renamed #${r.from} to #${r.name}.`);
+  } catch (err) {
+    flash(req, 'error', err.message);
+  }
+  res.redirect('/sentinel/filters#rename');
 });

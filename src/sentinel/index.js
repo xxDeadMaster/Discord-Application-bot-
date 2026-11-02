@@ -8,7 +8,7 @@ import { client } from '../bot/client.js';
 import { startHeartbeat } from '../bot/heartbeat.js';
 import { postOffline, postOnline } from '../bot/statusPosts.js';
 import { gifBlockState, handleGifMessage } from '../bot/gifBlock.js';
-import { handleTrapMessage, publishTrap } from '../bot/spamTrap.js';
+import { handleTrapMessage, publishTrap, renameTrap, startTrapRenamer } from '../bot/spamTrap.js';
 import { handleAuditEntry } from './antiNuke.js';
 import { SENTINEL_COMMANDS, handleSentinelCommand } from './commands.js';
 import { handleJoin } from './raid.js';
@@ -27,6 +27,7 @@ async function setUpGuild(guild) {
   await guild.commands.set(SENTINEL_COMMANDS).catch((err) => console.error('[sentinel] could not register commands:', err.message));
   const s = await settings({ force: true });
   startHeartbeat();
+  startTrapRenamer();
   postOnline().catch(() => {});
   await startLocalService(localHandlers(guild)).catch((err) => console.error('[sentinel] local service failed:', err.message));
   console.log(`[sentinel] ready. Anti-nuke ${s.sentinel_antinuke_enabled ? 'on' : 'off'}, raid ${s.sentinel_raid_joins}/${s.sentinel_raid_seconds}s, trap+GIFs run by ${s.protection_bot}`);
@@ -96,6 +97,10 @@ function localHandlers(guild) {
       return b.on ? lockdownOn({ guild, by: by(b), reason: b.reason || 'Started from the dashboard' }) : lockdownOff({ guild, by: by(b) });
     },
     async reload() { await settings({ force: true }); return { ok: true }; },
+    async renameTrap() {
+      await settings({ force: true });
+      try { return { ok: true, ...(await renameTrap('Renamed from the dashboard')) }; } catch (err) { return { ok: false, error: err.message }; }
+    },
     async publishTrap() {
       await settings({ force: true });
       try { return { ok: true, ...(await publishTrap()) }; } catch (err) { return { ok: false, error: err.message }; }
