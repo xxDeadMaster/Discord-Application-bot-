@@ -48,7 +48,7 @@ const SETTINGS_FIELDS = [
   'staff_report_channel_id', 'staff_report_day', 'staff_report_hour', 'staff_report_last',
   'gif_block_enabled', 'gif_allowed_channel_ids',
   'protection_bot', 'sentinel_log_channel_id', 'sentinel_trusted_ids', 'sentinel_antinuke_enabled',
-  'sentinel_raid_joins', 'sentinel_raid_seconds', 'sentinel_auto_lockdown', 'sentinel_lockdown_role_ids', 'sentinel_lockdown_active',
+  'sentinel_raid_joins', 'sentinel_raid_seconds', 'sentinel_auto_lockdown', 'sentinel_lockdown_role_ids', 'sentinel_lockdown_active', 'sentinel_raid_enabled',
 ];
 
 export async function updateSettings(patch, guildId = config.guildId) {

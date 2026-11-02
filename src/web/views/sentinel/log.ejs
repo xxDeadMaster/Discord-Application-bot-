@@ -1,0 +1,41 @@
+<%- include('_head') %>
+<%
+  const kinds = [['', 'All'], ['nuke', 'Anti-nuke'], ['alert', 'Warnings'], ['raid', 'Raids'], ['lockdown', 'Lockdowns'], ['unlock', 'Unlocks']];
+  const shield = '<path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6l7-3z" stroke-linejoin="round"/>';
+  const lock = '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>';
+  const glyph = { nuke: shield, alert: shield, raid: '<path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/>', lockdown: lock, unlock: lock };
+  const icon = (k) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${glyph[k] || shield}</svg>`;
+%>
+<div class="head"><div><h1>Security log</h1><p class="sub">Everything Sentinel caught or did, newest first.</p></div></div>
+<section class="card">
+  <div class="filters" style="margin-bottom: 10px;">
+    <% kinds.forEach(([k, label]) => { %><a href="/sentinel/log<%= k ? `?kind=${k}` : '' %>" class="<%= (kind || '') === k ? 'on' : '' %>" <%= (kind || '') === k ? 'aria-current=page' : '' %>><%= label %></a><% }) %>
+  </div>
+  <% if (!events.length) { %>
+    <div class="calm"><span class="ok-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></span><span>Nothing here yet<small>When Sentinel stops something or someone locks the server, it shows up here.</small></span></div>
+  <% } else { %>
+  <ul class="log">
+    <% events.forEach(e => { const d = e.detail || {}; %>
+      <li>
+        <span class="k <%= e.kind %>"><%- icon(e.kind) %></span>
+        <span>
+          <b><%= e.summary.replace(/^[^\p{L}\p{N}]+/u, '') %></b>
+          <br><span class="meta">
+            <% if (e.actor_tag) { %><%= e.actor_tag %> · <% } %>
+            <% if (e.kind === 'nuke') { %><%= d.count %> <%= d.label || 'actions' %><%= d.names && d.names.length ? ` (${d.names.slice(0, 6).join(', ')}${d.names.length > 6 ? '…' : ''})` : '' %> · <%= d.kicked ? 'bot kicked' : `${(d.removedRoleIds || []).length} role(s) removed` %><%= d.resolved && d.resolved !== 'false' && d.resolved !== false ? ` · ${d.resolved} by ${d.resolvedBy || 'owner'}` : '' %><% } %>
+            <% if (e.kind === 'raid') { %><%= d.joins %> joins in <%= d.seconds %>s · <%= d.newAccounts %> new accounts<%= d.locked ? ' · auto-locked' : '' %><% } %>
+            <% if (e.kind === 'lockdown') { %><%= d.channels %> channels<%= d.reason ? ` · "${d.reason}"` : '' %><% } %>
+            <% if (e.kind === 'unlock') { %><%= d.channels %> channels restored<% } %>
+          </span>
+        </span>
+        <span class="t"><time datetime="<%= new Date(e.created_at).toISOString() %>"><%= new Date(e.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) %></time></span>
+      </li>
+    <% }) %>
+  </ul>
+  <div class="pager">
+    <% if (page > 1) { %><a class="btn btn-sm" href="?<%= kind ? `kind=${kind}&` : '' %>page=<%= page - 1 %>">Newer</a><% } %>
+    <% if (hasMore) { %><a class="btn btn-sm" href="?<%= kind ? `kind=${kind}&` : '' %>page=<%= page + 1 %>">Older</a><% } %>
+  </div>
+  <% } %>
+</section>
+<%- include('_foot') %>

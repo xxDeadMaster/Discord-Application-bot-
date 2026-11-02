@@ -48,11 +48,11 @@ function isTrusted(actorId, guild, s) {
 /** Takes away everything they could keep nuking with. Returns a sentence saying what happened. */
 export async function neutralize(guild, actorId, reason) {
   const member = await guild.members.fetch(actorId).catch(() => null);
-  if (!member) return 'They are no longer in the server.';
+  if (!member) return { text: 'They are no longer in the server.', removed: [] };
   if (member.user?.bot) {
     if (member.kickable) {
       await member.kick(reason).catch(() => null);
-      return 'It is a bot, so Sentinel **kicked it**.';
+      return { text: 'It is a bot, so Sentinel **kicked it**.', removed: [], kicked: true };
     }
   }
   const me = guild.members.me;
@@ -60,8 +60,9 @@ export async function neutralize(guild, actorId, reason) {
   if (removable.length) await member.roles.remove(removable.map((r) => r.id), reason).catch(() => null);
   const fresh = await guild.members.fetch({ user: actorId, force: true }).catch(() => member);
   const stillDangerous = fresh.permissions?.any?.(DANGEROUS);
-  if (stillDangerous) return `Sentinel removed ${removable.length} role(s), but **they still have staff powers** (a role above Sentinel's, or they own a bot role). Remove them by hand **now**.`;
-  return `Sentinel **removed ${removable.length} role(s)** from them, so they can't do more damage.`;
+  const removed = removable.map((r) => r.id);
+  if (stillDangerous) return { text: `Sentinel removed ${removable.length} role(s), but **they still have staff powers** (a role above Sentinel's, or they own a bot role). Remove them by hand **now**.`, removed };
+  return { text: `Sentinel **removed ${removable.length} role(s)** from them, so they can't do more damage.`, removed };
 }
 
 /** Handles one audit log entry. Returns what it did (for tests/logs). */
@@ -86,13 +87,13 @@ export async function handleAuditEntry(entry, guild, now = Date.now()) {
       title: `🛡️ Anti-nuke stopped ${actor.tag || actor.username || actorId}`,
       lines: [
         `${who} had **${c.count} ${label}** in under a minute.`,
-        result,
+        result.text,
         c.names.length ? `\n**Affected:** ${c.names.slice(0, 15).map((n) => `\`${String(n).slice(0, 40)}\``).join(', ')}` : '',
         '\nCheck **Server Settings → Audit Log** to see everything they did. Deleted channels and roles are not restored automatically.',
       ],
-      detail: { action: entry.action, count: c.count, names: c.names.slice(0, 50), result },
+      detail: { action: entry.action, label, count: c.count, names: c.names.slice(0, 50), result: result.text, removedRoleIds: result.removed, kicked: Boolean(result.kicked), resolved: false },
     });
-    return { tripped: true, result };
+    return { tripped: true, result: result.text };
   }
 
   // A bot was added by someone who isn't trusted

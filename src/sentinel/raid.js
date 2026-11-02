@@ -23,6 +23,7 @@ export function recordJoin(member, { joinsLimit, seconds }, now = Date.now()) {
 
 export async function handleJoin(member, now = Date.now()) {
   const s = await settings();
+  if (s.sentinel_raid_enabled === false) return { off: true };
   const r = recordJoin(member, { joinsLimit: s.sentinel_raid_joins || 8, seconds: s.sentinel_raid_seconds || 60 }, now);
   if (!r.startsRaid) return r;
   const fresh = r.recent.filter((j) => j.created && now - j.created < NEW_ACCOUNT_DAYS * 86400000).length;

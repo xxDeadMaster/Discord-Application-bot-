@@ -496,3 +496,16 @@ CREATE TABLE IF NOT EXISTS sentinel_lockdown_saved (
   deny_bits  TEXT NOT NULL DEFAULT '0',
   PRIMARY KEY (channel_id, target_id)
 );
+
+-- Sentinel's hourly activity totals (saved only for hours where something happened) for the 24h / 7d chart.
+CREATE TABLE IF NOT EXISTS sentinel_activity (
+  guild_id TEXT NOT NULL,
+  hour     TIMESTAMPTZ NOT NULL,
+  joins    INTEGER NOT NULL DEFAULT 0,
+  leaves   INTEGER NOT NULL DEFAULT 0,
+  blocked  INTEGER NOT NULL DEFAULT 0,
+  mod      INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (guild_id, hour)
+);
+
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_raid_enabled BOOLEAN NOT NULL DEFAULT true;

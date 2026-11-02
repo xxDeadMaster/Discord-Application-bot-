@@ -1,0 +1,82 @@
+<%- include('_head') %>
+<div class="head"><div><h1>Security overview</h1><p class="sub">What Sentinel sees in the server, as it happens.</p></div></div>
+
+<section class="status st-clear" id="status" aria-live="polite">
+  <div class="ico" id="stIco"></div>
+  <div><h2 id="stTitle">Loading…</h2><p id="stText"></p></div>
+  <div class="acts" id="stActs"></div>
+</section>
+
+<section class="tiles">
+  <div class="tile">
+    <div class="tile-top"><span class="tile-ico" style="background: rgba(91,167,255,.14); color: var(--info);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.8c1.8.8 3 2.6 3.5 5.2"/></svg></span>Joins · last 10 min</div>
+    <p class="tile-num" id="tJoins">–</p><span class="tile-note">Raid alarm at <b id="tRaidLine"><%= raidJoins %> in <%= raidSeconds %>s</b></span>
+  </div>
+  <div class="tile">
+    <div class="tile-top"><span class="tile-ico" style="background: var(--red-soft); color: var(--red-hot);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6l7-3z"/></svg></span>Blocked · 24 hours</div>
+    <p class="tile-num" id="tBlocked">–</p><span class="tile-note">GIFs and spam-trap catches</span>
+  </div>
+  <div class="tile">
+    <div class="tile-top"><span class="tile-ico" style="background: var(--ok-soft); color: var(--ok);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></span>Phone health</div>
+    <div class="meters" id="meters"><div class="meter"><b>–</b><span>Waiting for Sentinel</span></div></div>
+  </div>
+  <div class="tile">
+    <div class="tile-top"><span class="tile-ico" style="background: var(--warn-soft); color: var(--warn);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Last incident</div>
+    <p class="tile-num" id="tLast">–</p><span class="tile-note" id="tLastNote"></span>
+  </div>
+</section>
+
+<div class="grid">
+  <div class="col">
+    <section class="card">
+      <div class="card-head"><h3>Activity</h3>
+        <div class="seg" role="group" aria-label="Time range"><button class="on" data-r="1h" aria-pressed="true">1h</button><button data-r="24h" aria-pressed="false">24h</button><button data-r="7d" aria-pressed="false">7d</button></div>
+      </div>
+      <div class="series" id="series">
+        <button class="ser on" data-k="joins" style="--c: #5BA7FF;" aria-pressed="true"><i></i>Joins</button>
+        <button class="ser on" data-k="blocked" style="--c: #E5484D;" aria-pressed="true"><i></i>Messages blocked</button>
+        <button class="ser" data-k="leaves" style="--c: #B7A9AB;" aria-pressed="false"><i></i>Leaves</button>
+        <button class="ser" data-k="mod" style="--c: #FF9F43;" aria-pressed="false"><i></i>Mod actions</button>
+      </div>
+      <div class="chart" id="chartWrap"><span class="th-label" id="thLabel"></span><svg id="chart" viewBox="0 0 600 170" preserveAspectRatio="none" role="img" aria-label="Activity over time"></svg><div class="tip" id="tip" hidden></div></div>
+      <div class="axis"><span id="axL">60 min ago</span><span>now</span></div>
+    </section>
+
+    <section class="card" id="feedCard">
+      <div class="card-head"><h3>Live activity</h3>
+        <button class="btn btn-sm pause" id="pauseBtn" style="margin-left: auto;" aria-pressed="false"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg><span>Pause</span></button>
+      </div>
+      <div class="filters" id="filters">
+        <button class="on" data-f="all">All</button><button data-f="join">Joins</button><button data-f="blocked">Blocked</button><button data-f="mod">Mod</button><button data-f="nuke">Anti-nuke</button><button data-f="lock">Lockdown</button>
+      </div>
+      <p class="paused-note">Paused · new events are waiting</p>
+      <ul class="feed" id="feed"><li class="feed-empty">Loading…</li></ul>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="card attn-card">
+      <div class="card-head"><h3>Needs attention</h3><span class="muted" id="attnCount"></span></div>
+      <div id="attn"></div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h3>Staff on duty</h3><span class="muted" id="staffCount"></span></div>
+      <ul class="staff" id="staff"></ul>
+    </section>
+    <section class="card">
+      <div class="card-head"><h3>Protection modules</h3><span class="muted" id="modCount"></span></div>
+      <ul class="mods" id="mods"></ul>
+    </section>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <h4 id="dlgTitle"></h4>
+    <p id="dlgText"></p>
+    <div id="dlgReasonWrap" hidden><label for="dlgReason">Reason (shown in the alert)</label><textarea id="dlgReason" maxlength="200"></textarea></div>
+    <div id="dlgTypeWrap"><label for="dlgInput" id="dlgLabel"></label><input id="dlgInput" autocomplete="off"></div>
+    <div class="row"><button class="btn" id="dlgCancel">Cancel</button><button class="btn btn-red" id="dlgOk"></button></div>
+  </div>
+</div>
+<%- include('_foot') %>

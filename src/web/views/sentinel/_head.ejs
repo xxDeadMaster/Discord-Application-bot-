@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · Sentinel</title>
+  <meta name="theme-color" content="#0B0607">
+  <meta name="csrf" content="<%= csrf %>">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6l7-3z' fill='%23E5484D'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/sentinel.css?v=<%= assetVersion %>">
+</head>
+<body>
+<%
+  const ico = {
+    home: '<path d="M3 12l9-8 9 8M5 10v10h14V10"/>',
+    log: '<path d="M7 3h8l4 4v14H7zM11 12h5M11 16h5" stroke-linejoin="round"/>',
+    shield: '<path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6l7-3z" stroke-linejoin="round"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+    back: '<path d="M15 6l-6 6 6 6"/>',
+  };
+  const icon = (n, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ico[n]}</svg>`;
+  const srv = typeof server !== 'undefined' && server ? server : { name: 'Server', icon: null };
+%>
+<div class="app">
+  <aside class="side" aria-label="Sentinel">
+    <div class="brand">
+      <div class="brand-logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF5A60" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6l7-3z"/><path d="M9 12l2 2 4-4" stroke="#fff"/></svg></div>
+      <div><div class="brand-name">Sentinel</div><div class="brand-sub">Security · owner only</div></div>
+    </div>
+    <a class="side-link <%= active === 'overview' ? 'active' : '' %>" href="/sentinel" <%= active === 'overview' ? 'aria-current=page' : '' %>><%- icon('home') %>Security overview<span class="side-count" id="attnSide" hidden></span></a>
+    <a class="side-link <%= active === 'log' ? 'active' : '' %>" href="/sentinel/log" <%= active === 'log' ? 'aria-current=page' : '' %>><%- icon('log') %>Security log</a>
+    <div class="side-label">Settings</div>
+    <a class="side-link" href="/moderation"><%- icon('shield') %>Spam trap &amp; GIFs<span class="side-count" style="background: var(--orbit);">Orbit</span></a>
+    <div class="side-foot"><%- icon('lock', 14) %>Only you can see Sentinel</div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <nav class="switch" aria-label="Bot">
+        <a href="/"><span class="d"></span>Orbit</a>
+        <a href="/sentinel" class="on" aria-current="page"><span class="d"></span>Sentinel</a>
+      </nav>
+      <div class="server"><% if (srv.icon) { %><img src="<%= srv.icon %>" alt=""><% } else { %><i></i><% } %><span><%= srv.name %></span></div>
+      <span class="spacer"></span>
+      <span class="chip health" id="healthChip" title="Sentinel's connection to Discord"><i></i><span id="healthText">Checking Sentinel…</span></span>
+      <span class="chip hide-sm"><%- icon('lock', 13) %>Owner only</span>
+      <span class="avatar" title="<%= user.name %>"><% if (user.avatar) { %><img src="<%= user.avatar %>" alt=""><% } else { %><%= (user.name || '?').slice(0, 1).toUpperCase() %><% } %></span>
+    </header>
+    <nav class="mobile-nav" aria-label="Sentinel pages">
+      <a href="/sentinel" class="<%= active === 'overview' ? 'active' : '' %>">Overview</a>
+      <a href="/sentinel/log" class="<%= active === 'log' ? 'active' : '' %>">Security log</a>
+      <a href="/moderation">Spam trap &amp; GIFs</a>
+    </nav>
+    <main class="page">

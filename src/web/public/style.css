@@ -1006,3 +1006,15 @@ a.ov-feed-row:hover, .ov-list-row:hover { background: var(--hover); text-decorat
 @media (max-width: 720px) { .report-grid { grid-template-columns: 1fr; } }
 select[multiple] { height: auto; min-height: 120px; padding: 6px; background-image: none; }
 select[multiple] option { padding: 6px 8px; border-radius: 6px; }
+
+/* ---------- Orbit / Sentinel switch (owner only) ---------- */
+.bot-switch { display: inline-flex; background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 3px; flex: none; }
+.bot-switch a { display: inline-flex; align-items: center; gap: 7px; padding: 5px 13px; border-radius: 999px; font-weight: 700; font-size: 14px; color: var(--muted); text-decoration: none; }
+.bot-switch a:hover { color: var(--text); }
+.bot-switch .d { width: 8px; height: 8px; border-radius: 50%; background: #E5484D; }
+.bot-switch a.on { background: var(--accent); color: #fff; box-shadow: 0 4px 14px rgba(31, 111, 235, 0.35); }
+.bot-switch a.on .d { background: #fff; }
+@media (max-width: 560px) {
+  .bot-switch a { padding: 5px 10px; font-size: 13px; }
+  .bot-switch .d { display: none; }
+}

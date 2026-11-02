@@ -5,6 +5,10 @@ import { config } from '../config.js';
 import { query } from '../db.js';
 import { client } from '../bot/client.js';
 import { settings } from './state.js';
+import { addFeed } from './live.js';
+
+const FEED_KIND = { nuke: ['nuke', 'bad'], alert: ['nuke', 'warn'], raid: ['raid', 'warn'], lockdown: ['lock', 'bad'], unlock: ['lock', 'ok'] };
+const plain = (t) => String(t).replace(/\*\*/g, '').replace(/<@!?\d+>/g, '').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, '').trim();
 
 export const SENTINEL_RED = 0xd7263d;
 export const SENTINEL_GREEN = 0x2fb27a;
@@ -35,6 +39,8 @@ export async function recentEvents(limit = 20) {
  */
 export async function alert({ kind, title, lines = [], actor = null, detail = {}, color = SENTINEL_RED, pingOwner = true, guild = null }) {
   const event = await recordEvent({ kind, actor, summary: title, detail }).catch((err) => { console.warn('[sentinel] could not save event:', err.message); return null; });
+  const [f, sev] = FEED_KIND[kind] || ['nuke', 'info'];
+  addFeed({ f, sev, who: actor?.username || actor?.tag || 'Sentinel', text: plain(title), meta: plain(lines.find((l) => l && !l.startsWith('\n')) || '').slice(0, 140) });
   const s = await settings();
   const g = guild || client.guilds.cache.get(config.guildId);
   const embed = new EmbedBuilder().setColor(color).setTitle(title).setDescription(lines.join('\n').slice(0, 4000) || null)

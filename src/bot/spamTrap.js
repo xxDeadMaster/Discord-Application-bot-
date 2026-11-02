@@ -60,7 +60,7 @@ function isExempt(member) {
   return [trap.staffRoleId, trap.managerRoleId].some((r) => r && member.roles?.cache?.has(r));
 }
 
-/** Returns true if the message was in the trap channel (so other handlers can skip it). */
+/** Returns truthy if the message was in the trap channel (so other handlers can skip it): 'caught' when someone was removed. */
 export async function handleTrapMessage(message) {
   // Only one bot runs the trap (Settings: protection_bot). The other one ignores it.
   if (!trap.active || !trap.channelId || message.channelId !== trap.channelId) return false;
@@ -94,5 +94,5 @@ export async function handleTrapMessage(message) {
   if (trap.messageId) {
     message.channel.messages.fetch(trap.messageId).then((m) => m.edit(trapMessage())).catch(() => {});
   }
-  return true;
+  return 'caught'; // truthy like the other cases; Sentinel uses it to count catches
 }

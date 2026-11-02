@@ -98,6 +98,12 @@
 
 <header class="topbar">
   <button class="icon-btn topbar-menu" type="button" data-open-sidebar aria-label="Open menu" aria-controls="sidebar"><%- include('icon', { name: 'list' }) %></button>
+  <% if (owner) { %>
+  <nav class="bot-switch" aria-label="Bot">
+    <a href="/" class="on" aria-current="page"><span class="d"></span>Orbit</a>
+    <a href="/sentinel"><span class="d"></span>Sentinel</a>
+  </nav>
+  <% } %>
   <div class="server-pill">
     <% if (srv.icon) { %><img src="<%= srv.icon %>" alt="" width="26" height="26"><% } else { %><span class="server-fallback"><%= srv.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 1) || 'S' %></span><% } %>
     <span class="server-name"><%= srv.name %></span>
