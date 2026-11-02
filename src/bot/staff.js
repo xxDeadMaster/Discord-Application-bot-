@@ -12,7 +12,7 @@ import { modCommandData } from './moderation.js';
 import { robloxCommandData } from './roblox.js';
 import { client, getGuild } from './client.js';
 import {
-  COLORS, ephemeral, footer, isStaff, notice, truncate, unix,
+  COLORS, ephemeral, footer, isStaff, notice, onAccessList, truncate, unix,
 } from './ui.js';
 
 /** 🟥🟥⬛ style meter: filled for active strikes, at least 3 slots. */
@@ -25,6 +25,7 @@ const say = (text, kind = 'info') => ({ content: '', embeds: [notice(text, kind)
 /** Managers issue strikes and approve LOA: Manage Server, or the manager role from Settings. */
 export function isManager(member, settings) {
   if (!member) return false;
+  if (!onAccessList(member, settings)) return false;
   if (member.permissions?.has?.(PermissionFlagsBits.ManageGuild)) return true;
   return Boolean(settings?.manager_role_id && member.roles?.cache?.has(settings.manager_role_id));
 }

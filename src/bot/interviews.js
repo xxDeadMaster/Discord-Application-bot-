@@ -1,11 +1,11 @@
 import {
-  ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, PermissionFlagsBits,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, OverwriteType, PermissionFlagsBits,
 } from 'discord.js';
 import { config } from '../config.js';
 import { getSettings, getSubmission, getSubmissionByInterviewChannel, listActiveInterviews, setInterview } from '../db.js';
 import { refreshCard } from './applications.js';
 import { client, getGuild } from './client.js';
-import { COLORS, answerFields, footer, truncate, withEmoji } from './ui.js';
+import { COLORS, answerFields, footer, pickedStaff, truncate, withEmoji } from './ui.js';
 
 /** If nobody joins an interview channel within this time, it is removed. */
 const UNUSED_TIMEOUT_MS = 30 * 60 * 1000;
@@ -53,7 +53,10 @@ export async function startInterview({ submissionId, staffId, staffTag }) {
       { id: sub.user_id, allow },
     ];
     if (staffId && staffId !== sub.user_id) list.push({ id: staffId, allow });
-    if (settings.staff_role_id) list.push({ id: settings.staff_role_id, allow });
+    const picked = pickedStaff(guild, settings);
+    if (picked) { // owner picked who has Orbit access: only those people, not the whole staff role
+      for (const id of picked) if (id !== sub.user_id && id !== staffId) list.push({ id, type: OverwriteType.Member, allow });
+    } else if (settings.staff_role_id) list.push({ id: settings.staff_role_id, allow });
     return list;
   };
 

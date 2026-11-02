@@ -32,9 +32,9 @@ export async function sentinelLocal(path, body = null) {
   }
 }
 
-/** Only the server owner can see Sentinel. Everyone else gets a plain "not found". */
+/** Only the server owner and the staff they picked for Sentinel can see it. Everyone else gets a plain "not found". */
 function requireOwner(req, res, next) {
-  if (res.locals.isOwner) return next();
+  if (res.locals.isOwner || res.locals.sentinelAccess) return next();
   res.status(404).render('error', { title: 'Not found', message: 'That page does not exist.', user: res.locals.user });
 }
 sentinelRoutes.use('/sentinel', requireOwner);

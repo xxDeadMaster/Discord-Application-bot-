@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { PermissionFlagsBits } from 'discord.js';
 import express from 'express';
 import { client, getGuild } from '../bot/client.js';
-import { inviteUrl, isStaff } from '../bot/ui.js';
+import { accessList, inviteUrl, isStaff } from '../bot/ui.js';
 import { config } from '../config.js';
 import { dashboardCounts, getSettings } from '../db.js';
 
@@ -87,10 +87,17 @@ export async function requireLogin(req, res, next) {
     }
     const member = await guild.members.fetch(req.session.user.id).catch(() => null);
     const settings = await getSettings();
-    if (!isStaff(member, settings)) {
+    const isOwner = Boolean(guild.ownerId) && member?.id === guild.ownerId;
+    const orbitAccess = Boolean(member) && (isOwner || isStaff(member, settings));
+    const sentinelPicks = accessList(settings, 'sentinel');
+    const sentinelAccess = Boolean(member) && (isOwner || sentinelPicks.includes(member.id));
+    if (!orbitAccess && !sentinelAccess) {
+      const listed = accessList(settings, 'orbit').length > 0;
       return res.status(403).render('error', {
         title: 'Staff only',
-        message: settings.staff_role_id
+        message: listed
+          ? "You're not on the staff access list. Ask the server owner if you need access."
+          : settings.staff_role_id
           ? 'You need the staff role in the server to use this dashboard.'
           : 'No staff role is set yet, so only server admins (Manage Server permission) can sign in.',
         user: req.session.user,
@@ -99,7 +106,11 @@ export async function requireLogin(req, res, next) {
     res.locals.user = req.session.user;
     res.locals.member = member;
     res.locals.guild = guild;
-    res.locals.isOwner = Boolean(guild.ownerId) && member.id === guild.ownerId;
+    res.locals.isOwner = isOwner;
+    res.locals.orbitAccess = orbitAccess;
+    res.locals.sentinelAccess = sentinelAccess;
+    // Picked for Sentinel only: they can use the Sentinel pages and nothing else
+    if (!orbitAccess && !req.path.startsWith('/sentinel')) return res.redirect('/sentinel');
     res.locals.isAdmin = member.permissions.has(PermissionFlagsBits.ManageGuild);
     res.locals.isManager = res.locals.isAdmin || Boolean(settings.manager_role_id && member.roles.cache.has(settings.manager_role_id));
     res.locals.navCounts = await dashboardCounts();

@@ -18,6 +18,8 @@
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
     back: '<path d="M15 6l-6 6 6 6"/>',
   };
+  const ownerView = typeof isOwner !== 'undefined' && isOwner;
+  const canOrbit = ownerView || (typeof orbitAccess !== 'undefined' && orbitAccess);
   const icon = (n, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ico[n]}</svg>`;
   const srv = typeof server !== 'undefined' && server ? server : { name: 'Server', icon: null };
 %>
@@ -25,25 +27,25 @@
   <aside class="side" aria-label="Sentinel">
     <div class="brand">
       <div class="brand-logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF5A60" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6l7-3z"/><path d="M9 12l2 2 4-4" stroke="#fff"/></svg></div>
-      <div><div class="brand-name">Sentinel</div><div class="brand-sub">Security · owner only</div></div>
+      <div><div class="brand-name">Sentinel</div><div class="brand-sub">Security</div></div>
     </div>
     <a class="side-link <%= active === 'overview' ? 'active' : '' %>" href="/sentinel" <%= active === 'overview' ? 'aria-current=page' : '' %>><%- icon('home') %>Security overview<span class="side-count" id="attnSide" hidden></span></a>
     <a class="side-link <%= active === 'log' ? 'active' : '' %>" href="/sentinel/log" <%= active === 'log' ? 'aria-current=page' : '' %>><%- icon('log') %>Security log</a>
     <div class="side-label">Protection</div>
     <a class="side-link <%= active === 'filters' ? 'active' : '' %>" href="/sentinel/filters" <%= active === 'filters' ? 'aria-current=page' : '' %>><%- icon('shield') %>Spam trap &amp; GIFs</a>
-    <div class="side-foot"><%- icon('lock', 14) %>Only you can see Sentinel</div>
+    <div class="side-foot"><%- icon('lock', 14) %><%= ownerView ? 'Only you and your picks see this' : 'You were picked for Sentinel' %></div>
   </aside>
 
   <div class="main">
     <header class="top">
       <nav class="switch" aria-label="Bot">
-        <a href="/"><span class="d"></span>Orbit</a>
+        <% if (canOrbit) { %><a href="/"><span class="d"></span>Orbit</a><% } %>
         <a href="/sentinel" class="on" aria-current="page"><span class="d"></span>Sentinel</a>
       </nav>
       <div class="server"><% if (srv.icon) { %><img src="<%= srv.icon %>" alt=""><% } else { %><i></i><% } %><span><%= srv.name %></span></div>
       <span class="spacer"></span>
       <span class="chip health" id="healthChip" title="Sentinel's connection to Discord"><i></i><span id="healthText">Checking Sentinel…</span></span>
-      <span class="chip hide-sm"><%- icon('lock', 13) %>Owner only</span>
+      <span class="chip hide-sm"><%- icon('lock', 13) %><%= ownerView ? 'Owner' : 'Picked staff' %></span>
       <span class="avatar" title="<%= user.name %>"><% if (user.avatar) { %><img src="<%= user.avatar %>" alt=""><% } else { %><%= (user.name || '?').slice(0, 1).toUpperCase() %><% } %></span>
     </header>
     <nav class="mobile-nav" aria-label="Sentinel pages">

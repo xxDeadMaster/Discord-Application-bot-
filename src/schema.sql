@@ -474,6 +474,10 @@ ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_auto_lockdown BOOLEAN NOT
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_lockdown_role_ids TEXT[] NOT NULL DEFAULT '{}'; -- locked besides @everyone
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_lockdown_active BOOLEAN NOT NULL DEFAULT false;
 
+-- Owner-picked staff access. Empty = no restriction (roles/permissions decide, as before).
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS orbit_access_ids TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_access_ids TEXT[] NOT NULL DEFAULT '{}';
+
 -- What Sentinel saw and did (anti-nuke, raids, lockdowns). Feeds the dashboard later.
 CREATE TABLE IF NOT EXISTS sentinel_events (
   id         SERIAL PRIMARY KEY,

@@ -1,6 +1,6 @@
 import {
   ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, ModalBuilder,
-  PermissionFlagsBits, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle,
+  OverwriteType, PermissionFlagsBits, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle,
 } from 'discord.js';
 import {
   addTicketMessage, closeTicket, createTicket, deleteTicket, findOpenTicketForUser, getSettings, getTicket,
@@ -9,7 +9,7 @@ import {
 import { config } from '../config.js';
 import { client, getGuild } from './client.js';
 import {
-  COLORS, dashboardLink, ephemeral, footer, isStaff, notice, optionEmoji, truncate, unix, withEmoji,
+  COLORS, dashboardLink, ephemeral, footer, isStaff, notice, onAccessList, optionEmoji, pickedStaff, truncate, unix, withEmoji,
 } from './ui.js';
 
 /**
@@ -157,7 +157,12 @@ export async function handleOpenModal(interaction) {
     { id: client.user.id, allow: [...perms, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageMessages] },
   ];
   const staffRoles = [...new Set([type?.staff_role_id, settings.staff_role_id].filter(Boolean))];
-  for (const id of staffRoles) overwrites.push({ id, allow: [...perms, PermissionFlagsBits.ManageMessages] });
+  const picked = pickedStaff(guild, settings, staffRoles);
+  if (picked) { // owner picked who has Orbit access: only those people see new tickets, not the whole role
+    for (const id of picked) if (id !== user.id) overwrites.push({ id, type: OverwriteType.Member, allow: [...perms, PermissionFlagsBits.ManageMessages] });
+  } else {
+    for (const id of staffRoles) overwrites.push({ id, allow: [...perms, PermissionFlagsBits.ManageMessages] });
+  }
 
   let channel;
   try {
@@ -193,6 +198,7 @@ export async function handleOpenModal(interaction) {
 
 function isManager(member, settings) {
   if (!member) return false;
+  if (!onAccessList(member, settings)) return false;
   if (member.permissions?.has(PermissionFlagsBits.ManageGuild)) return true;
   return Boolean(settings.manager_role_id && member.roles?.cache?.has(settings.manager_role_id));
 }
@@ -204,7 +210,7 @@ export async function toggleClaim({ ticketId, userId, userTag, member, settings 
   const type = ticket.type_id ? await getTicketType(ticket.type_id) : null;
   const allowed = member === 'dashboard'
     || isStaff(member, settings)
-    || Boolean(type?.staff_role_id && member?.roles?.cache?.has(type.staff_role_id));
+    || Boolean(onAccessList(member, settings) && type?.staff_role_id && member?.roles?.cache?.has(type.staff_role_id));
   if (!allowed) return { ok: false, error: 'Only staff can claim tickets.' };
 
   if (ticket.claimed_by && ticket.claimed_by !== userId) {

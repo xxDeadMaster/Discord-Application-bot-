@@ -6,7 +6,7 @@ import {
 import { addModCase, getSettings, listModCases } from '../db.js';
 import { client } from './client.js';
 import {
-  COLORS, ephemeral, footer, notice, truncate, unix,
+  COLORS, ephemeral, footer, notice, onAccessList, truncate, unix,
 } from './ui.js';
 
 const T = ApplicationCommandOptionType;
@@ -79,6 +79,7 @@ export function prettyMinutes(min) {
 
 function canUse(member, action, settings) {
   if (!member) return false;
+  if (!onAccessList(member, settings)) return false;
   if (member.permissions?.has?.(ACTIONS[action].perm) || member.permissions?.has?.(P.Administrator)) return true;
   return Boolean(settings.manager_role_id && member.roles?.cache?.has(settings.manager_role_id));
 }

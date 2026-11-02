@@ -41,12 +41,15 @@ function isStaff(i, s) {
   const roles = i.member?.roles?.cache;
   return [s.staff_role_id, s.manager_role_id].some((r) => r && roles?.has(r));
 }
+// The owner's Sentinel access list. When it has people, only the owner and those people can use Sentinel.
+const picks = (s) => s.sentinel_access_ids || [];
+const picked = (i, s) => isOwner(i) || picks(s).includes(i.user.id);
 const say = (i, content) => (i.deferred || i.replied ? i.editReply({ content }) : i.reply({ content, flags: ephemeral }));
 
 export async function handleSentinelCommand(i) {
   const s = await settings({ force: true });
   if (i.commandName === 'lockdown') {
-    if (!isStaff(i, s)) return say(i, 'Only staff can use this.');
+    if (picks(s).length ? !picked(i, s) : !isStaff(i, s)) return say(i, picks(s).length ? "You're not on Sentinel's staff access list." : 'Only staff can use this.');
     const sub = i.options.getSubcommand();
     await i.deferReply({ flags: ephemeral });
     if (sub === 'on') {
@@ -62,7 +65,7 @@ export async function handleSentinelCommand(i) {
 
   if (i.commandName !== 'sentinel') return null;
   const sub = i.options.getSubcommand();
-  if (!isAdmin(i)) return say(i, 'Only admins can change Sentinel.');
+  if (picks(s).length ? !picked(i, s) : !isAdmin(i)) return say(i, picks(s).length ? "You're not on Sentinel's staff access list." : 'Only admins can change Sentinel.');
 
   if (sub === 'status') {
     const events = await recentEvents(5);
@@ -84,7 +87,7 @@ export async function handleSentinelCommand(i) {
     return say(i, `Alerts will be posted in ${ch}. Make sure it's staff-only.`);
   }
   if (sub === 'trust' || sub === 'untrust' || sub === 'anti-nuke') {
-    if (!isOwner(i)) return say(i, 'Only the server owner can change this.');
+    if (!picks(s).length && !isOwner(i)) return say(i, 'Only the server owner can change this.');
     if (sub === 'anti-nuke') {
       const on = i.options.getBoolean('on');
       await updateSettings({ sentinel_antinuke_enabled: on });

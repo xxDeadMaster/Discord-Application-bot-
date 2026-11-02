@@ -1018,3 +1018,24 @@ select[multiple] option { padding: 6px 8px; border-radius: 6px; }
   .bot-switch a { padding: 5px 10px; font-size: 13px; }
   .bot-switch .d { display: none; }
 }
+
+/* ---------- Staff access ---------- */
+.access-stats { margin-bottom: 18px; }
+.access-stats .stat:hover { background: var(--card); border-color: var(--border); }
+.access-stats .stat-text strong { font-size: 17px; margin: 2px 0; }
+.access-stats .stat-text .small { white-space: normal; }
+.access-table th.access-col, .access-table td.access-col { text-align: center; width: 110px; }
+.access-table input[type=checkbox] { width: 22px; height: 22px; }
+.access-avatar { width: 32px; height: 32px; border-radius: 50%; flex: none; }
+.access-table tr.is-gone { opacity: 0.6; }
+.access-help h2 { margin-top: 0; }
+.access-help ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; line-height: 1.5; }
+.access-help { margin-bottom: 18px; }
+.access-table .show-sm { display: none; }
+@media (max-width: 640px) {
+  .access-stats { grid-template-columns: 1fr; }
+  .access-table .hide-sm { display: none; }
+  .access-table .show-sm { display: inline; }
+  .access-table th, .access-table td { padding: 12px 10px; white-space: normal; }
+  .access-table th.access-col, .access-table td.access-col { width: 70px; }
+}

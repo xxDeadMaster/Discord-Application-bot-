@@ -56,6 +56,7 @@
     ] },
     { id: 'config', label: 'Configuration', links: [
       ['/settings', 'General settings', 'settings', is('/settings'), 0, admin],
+      ['/access', 'Staff access', 'users', is('/access'), 0, owner],
     ] },
   ].map((g) => ({ ...g, links: g.links.filter((l) => l[5]) })).filter((g) => g.links.length);
   const bellItems = [
@@ -98,7 +99,7 @@
 
 <header class="topbar">
   <button class="icon-btn topbar-menu" type="button" data-open-sidebar aria-label="Open menu" aria-controls="sidebar"><%- include('icon', { name: 'list' }) %></button>
-  <% if (owner) { %>
+  <% if (owner || (typeof sentinelAccess !== 'undefined' && sentinelAccess)) { %>
   <nav class="bot-switch" aria-label="Bot">
     <a href="/" class="on" aria-current="page"><span class="d"></span>Orbit</a>
     <a href="/sentinel"><span class="d"></span>Sentinel</a>
@@ -128,6 +129,7 @@
         <%- include('icon', { name: 'chevronDown', size: 16 }) %>
       </summary>
       <div class="menu-pop">
+        <% if (owner) { %><a class="pop-item" href="/access"><%- include('icon', { name: 'users', size: 16 }) %><span>Staff access</span></a><% } %>
         <% if (admin) { %><a class="pop-item" href="/settings"><%- include('icon', { name: 'settings', size: 16 }) %><span>Settings</span></a><% } %>
         <a class="pop-item" href="/loa"><%- include('icon', { name: 'calendar', size: 16 }) %><span>My leave (LOA)</span></a>
         <form method="post" action="/logout">

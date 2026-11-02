@@ -123,9 +123,36 @@ export function answerFields(answers, { budget = 4800 } = {}) {
   return { fields, cut: cut || answers.length > list.length };
 }
 
+/**
+ * The owner's staff access list for a bot ('orbit' or 'sentinel'). When the list is empty there is no
+ * restriction. When it has people, only the server owner and those people pass, even admins.
+ */
+export const accessList = (settings, bot = 'orbit') => settings?.[bot === 'sentinel' ? 'sentinel_access_ids' : 'orbit_access_ids'] || [];
+export function onAccessList(member, settings, bot = 'orbit') {
+  if (!member) return false;
+  const list = accessList(settings, bot);
+  if (!list.length) return true;
+  const id = member.id || member.user?.id;
+  return (Boolean(member.guild?.ownerId) && id === member.guild.ownerId) || list.includes(id);
+}
+
+/**
+ * When the Orbit access list is on: the picked people who are still staff (staff role, one of `roleIds`,
+ * or Manage Server), for giving them a private channel one by one. null when the list is off.
+ */
+export function pickedStaff(guild, settings, roleIds = []) {
+  const list = accessList(settings, 'orbit');
+  if (!list.length) return null;
+  return list.filter((id) => {
+    const m = guild.members.cache.get(id);
+    return m && !m.user?.bot && (isStaff(m, settings) || roleIds.some((r) => m.roles?.cache?.has(r)));
+  });
+}
+
 /** True if this guild member can review applications and see staff things. */
 export function isStaff(member, settings) {
   if (!member) return false;
+  if (!onAccessList(member, settings)) return false;
   if (member.permissions?.has(PermissionFlagsBits.ManageGuild)) return true;
   return Boolean(settings?.staff_role_id && member.roles?.cache?.has(settings.staff_role_id));
 }

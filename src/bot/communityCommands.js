@@ -5,7 +5,7 @@ import { getSettings, listGiveaways, listPolls } from '../db.js';
 import {
   MAX_POLL_OPTIONS, cancelGiveaway, endGiveaway, endPoll, rerollGiveaway, startGiveaway, startPoll,
 } from './giveaways.js';
-import { ephemeral, notice, truncate, COLORS, footer, progressBar } from './ui.js';
+import { ephemeral, notice, onAccessList, truncate, COLORS, footer, progressBar } from './ui.js';
 import {
   addXp, getXp, leaderboard, levelingConfig, progress, rankOf,
 } from './levels.js';
@@ -118,6 +118,7 @@ export function parseOptions(text) {
 
 function canManage(member, settings) {
   if (!member) return false;
+  if (!onAccessList(member, settings)) return false;
   if (member.permissions?.has?.(PermissionFlagsBits.ManageGuild)) return true;
   return Boolean(settings?.manager_role_id && member.roles?.cache?.has(settings.manager_role_id));
 }

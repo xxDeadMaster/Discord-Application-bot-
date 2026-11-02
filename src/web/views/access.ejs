@@ -1,0 +1,72 @@
+<%- include('partials/head') %>
+<div class="page-head">
+  <div class="page-head-text">
+    <h1>Staff access</h1>
+    <p>Pick exactly who can use each bot. Only you can see this page.</p>
+  </div>
+</div>
+
+<%
+const picked = people.filter(p => !p.isOwner);
+const mode = (list) => list.length
+  ? { cls: 'green', title: `You + ${list.length} picked`, text: "Only these people. Admins who aren't ticked are locked out too." }
+  : { cls: 'warn', title: 'Open to all staff', text: 'Nobody ticked yet, so the staff and manager roles decide (and admins).' };
+const om = mode(orbit), sm = mode(sentinel);
+%>
+<section class="stats access-stats">
+  <div class="stat">
+    <span class="stat-icon <%= om.cls %>"><img src="/static/orbit-logo.png" alt="" width="26" height="26"></span>
+    <span class="stat-text"><span class="stat-label">Orbit</span><strong><%= om.title %></strong><span class="muted small"><%= om.text %></span></span>
+  </div>
+  <div class="stat">
+    <span class="stat-icon <%= sm.cls %>"><%- include('partials/icon', { name: 'shield', size: 20 }) %></span>
+    <span class="stat-text"><span class="stat-label">Sentinel</span><strong><%= sm.title %></strong><span class="muted small"><%= sm.text %></span></span>
+  </div>
+</section>
+
+<section class="card access-help">
+  <h2>What each tick gives</h2>
+  <ul class="muted">
+    <li><strong>Orbit:</strong> signing into this dashboard, and Orbit's staff buttons and commands in Discord (applications, tickets, strikes, LOA, moderation, giveaways and polls). New ticket and interview channels are shared with ticked people only. Their role still decides staff vs manager.</li>
+    <li><strong>Sentinel:</strong> <code>/lockdown</code>, <code>/sentinel</code> (including the trust list) and the Sentinel dashboard. Someone ticked for Sentinel only can sign in but only sees Sentinel.</li>
+    <li>Nobody's Discord roles change. Leave a column empty to go back to "all staff".</li>
+  </ul>
+</section>
+
+<form method="post" action="/access" class="stack">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <section class="card flush">
+    <div class="table-wrap">
+      <table class="access-table">
+        <thead><tr><th>Person</th><th class="hide-sm">In the server</th><th class="access-col">Orbit</th><th class="access-col">Sentinel</th></tr></thead>
+        <tbody>
+          <% people.forEach(p => { %>
+          <tr class="<%= p.gone ? 'is-gone' : '' %>">
+            <td>
+              <span class="row-main">
+                <% if (p.avatar) { %><img class="access-avatar" src="<%= p.avatar %>" alt="" width="32" height="32"><% } else { %><span class="avatar-fallback access-avatar"><%= (p.name || '?').slice(0, 1).toUpperCase() %></span><% } %>
+                <span><strong><%= p.name %></strong><% if (p.isOwner) { %> <span class="owner-tag">You</span><% } %><br><span class="muted small">@<%= p.tag %><span class="show-sm"> · <%= p.role %></span></span></span>
+              </span>
+            </td>
+            <td class="hide-sm"><span class="muted"><%= p.role %></span></td>
+            <% if (p.isOwner) { %>
+              <td class="access-col"><span class="pill pill-open">Always</span></td>
+              <td class="access-col"><span class="pill pill-open">Always</span></td>
+            <% } else { %>
+              <td class="access-col"><input type="checkbox" name="orbit" value="<%= p.id %>" <%= orbit.includes(p.id) ? 'checked' : '' %> aria-label="<%= p.name %> can use Orbit"></td>
+              <td class="access-col"><input type="checkbox" name="sentinel" value="<%= p.id %>" <%= sentinel.includes(p.id) ? 'checked' : '' %> aria-label="<%= p.name %> can use Sentinel"></td>
+            <% } %>
+          </tr>
+          <% }) %>
+          <% if (!picked.length) { %><tr><td colspan="4"><p class="empty-row">No staff found. Set the staff role in Settings first.</p></td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+
+  <div class="actions">
+    <button class="btn btn-primary" type="submit"><%- include('partials/icon', { name: 'check', size: 16 }) %> Save access</button>
+  </div>
+</form>
+<%- include('partials/foot') %>

@@ -50,6 +50,7 @@ const SETTINGS_FIELDS = [
   'protection_bot', 'sentinel_log_channel_id', 'sentinel_trusted_ids', 'sentinel_antinuke_enabled',
   'sentinel_raid_joins', 'sentinel_raid_seconds', 'sentinel_auto_lockdown', 'sentinel_lockdown_role_ids', 'sentinel_lockdown_active', 'sentinel_raid_enabled',
   'trap_rename_enabled', 'trap_rename_time', 'trap_rename_last', 'trap_rename_names',
+  'orbit_access_ids', 'sentinel_access_ids',
 ];
 
 export async function updateSettings(patch, guildId = config.guildId) {
