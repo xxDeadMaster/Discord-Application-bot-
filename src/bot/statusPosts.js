@@ -1,6 +1,8 @@
 // Mission Control posts (through Discord webhooks, since the bots stay in BloxVerse only):
 //  - #bot-status: "Orbit is online" when a bot starts, "Orbit went offline" when it's stopped or restarted.
-//  - #changelog: when new code starts, Orbit posts what changed (the commit titles since the last version).
+//  - updates channel: when new code starts, each bot posts what changed for it (commit titles since its last
+//    version, only commits that touch that bot's files; changes to shared files show up for both).
+//    Each bot has its own webhooks (Sentinel's are in .env.sentinel), so they can post in their own channels.
 // Crashes and a dead phone can't announce themselves; Healthchecks covers those in #incidents.
 // Does nothing unless STATUS_WEBHOOK_URL / CHANGELOG_WEBHOOK_URL are set.
 import fs from 'node:fs';
@@ -37,11 +39,29 @@ export function currentVersion(root = ROOT) {
   }
 }
 
-/** Commit titles between two versions, newest first (needs the git command; returns [] without it). */
-export function commitTitles(from, to, root = ROOT) {
+// Which files belong to which bot, for the per-bot updates post.
+const SENTINEL_ONLY = [
+  'src/sentinel', 'src/web/sentinelRoutes.js', 'src/web/views/sentinel', 'src/web/public/sentinel.css', 'src/web/public/sentinel.js',
+  ':(glob)assets/sentinel-*', '.env.sentinel.example',
+];
+// Code both bots run: changes here are news for both.
+const SHARED = [
+  'src/bot/spamTrap.js', 'src/bot/gifBlock.js', 'src/bot/heartbeat.js', 'src/bot/statusPosts.js', 'src/bot/profile.js',
+  'src/bot/client.js', 'src/db.js', 'src/schema.sql', 'src/config.js', 'package.json', 'ecosystem.config.cjs',
+];
+// Not news for either bot (server art and scripts for Orbit Labs / Mission Control).
+const NEITHER = [':(glob)assets/mission-control-*', ':(glob)scripts/mission-control-*'];
+const exclude = (list) => list.map((p) => (p.startsWith(':(glob)') ? `:(exclude,glob)${p.slice(7)}` : `:(exclude)${p}`));
+export const BOT_PATHS = {
+  orbit: ['.', ...exclude(SENTINEL_ONLY), ...exclude(NEITHER)],
+  sentinel: [...SENTINEL_ONLY, ...SHARED],
+};
+
+/** Commit titles between two versions that touch `paths`, newest first (needs git; returns [] without it). */
+export function commitTitles(from, to, root = ROOT, paths = BOT_PATHS[BOT] || BOT_PATHS.orbit) {
   return new Promise((resolve) => {
     if (!from || !to || from === to) return resolve([]);
-    execFile('git', ['log', '--format=%s', '-n', '15', `${from}..${to}`], { cwd: root, timeout: 5000 }, (err, out) => {
+    execFile('git', ['log', '--format=%s', '-n', '15', `${from}..${to}`, '--', ...paths], { cwd: root, timeout: 5000 }, (err, out) => {
       resolve(err ? [] : out.split('\n').map((l) => l.trim()).filter(Boolean));
     });
   });
@@ -92,21 +112,24 @@ export async function postOffline(reason = 'Stopped or restarting (update or mai
   }, 2500); // short: the bot is shutting down
 }
 
-/** Orbit only: if the code changed since the last start, post the commit titles in #changelog. */
+const VERSION_KEY = BOT === 'sentinel' ? 'deployed_version_sentinel' : 'deployed_version';
+
+/** If this bot's code changed since its last start, post the commit titles in its updates channel. */
 export async function postChangelogIfNew(now = Date.now(), titlesFn = commitTitles) {
   const v = currentVersion();
   if (!v) return { posted: false, reason: 'no version' };
-  const { rows } = await query("SELECT value FROM app_secrets WHERE name = 'deployed_version'");
+  const { rows } = await query('SELECT value FROM app_secrets WHERE name = $1', [VERSION_KEY]);
   const prev = rows[0]?.value || null;
   if (prev === v) return { posted: false, reason: 'same version' };
-  await query("INSERT INTO app_secrets (name, value) VALUES ('deployed_version', $1) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value", [v]);
+  await query('INSERT INTO app_secrets (name, value) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value', [VERSION_KEY, v]);
   if (!prev) return { posted: false, reason: 'first run' }; // nothing to compare with yet
   const titles = await titlesFn(prev, v);
+  if (!titles.length) return { posted: false, reason: `nothing new for ${NAME}` }; // this update only touched the other bot
   const ok = await send(changelogHook(), {
     color: COLOR,
     title: '🚀 Update is live',
     description: [
-      titles.length ? titles.map((t) => `• ${t}`).join('\n') : 'Behind-the-scenes improvements.',
+      titles.map((t) => `• ${t}`).join('\n'),
       '',
       `\`${short(prev)}\` → \`${short(v)}\` · ${ts(now)}`,
     ].join('\n').slice(0, 4000),

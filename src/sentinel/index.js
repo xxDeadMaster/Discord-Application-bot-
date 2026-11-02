@@ -7,7 +7,7 @@ import { migrate, pool } from '../db.js';
 import { client } from '../bot/client.js';
 import { startHeartbeat } from '../bot/heartbeat.js';
 import { syncProfile } from '../bot/profile.js';
-import { postOffline, postOnline } from '../bot/statusPosts.js';
+import { postChangelogIfNew, postOffline, postOnline } from '../bot/statusPosts.js';
 import { gifBlockState, handleGifMessage } from '../bot/gifBlock.js';
 import { handleTrapMessage, publishTrap, renameTrap, startTrapRenamer } from '../bot/spamTrap.js';
 import { handleAuditEntry } from './antiNuke.js';
@@ -30,6 +30,7 @@ async function setUpGuild(guild) {
   startHeartbeat();
   startTrapRenamer();
   postOnline().catch(() => {});
+  postChangelogIfNew().catch((err) => console.warn('[status] changelog failed:', err.message));
   await startLocalService(localHandlers(guild)).catch((err) => console.error('[sentinel] local service failed:', err.message));
   console.log(`[sentinel] ready. Anti-nuke ${s.sentinel_antinuke_enabled ? 'on' : 'off'}, raid ${s.sentinel_raid_joins}/${s.sentinel_raid_seconds}s, trap+GIFs run by ${s.protection_bot}`);
 }
