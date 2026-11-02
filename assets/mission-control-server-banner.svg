@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540"><defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#3B1D7A"/><stop offset="55%" stop-color="#160B33"/><stop offset="100%" stop-color="#05040C"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#9B6DFF" stop-opacity="0.55"/><stop offset="60%" stop-color="#7C4DFF" stop-opacity="0.15"/><stop offset="100%" stop-color="#7C4DFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blue" cx="38%" cy="35%" r="70%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="100%" stop-color="#3D8BFF"/></radialGradient>
+    <radialGradient id="red" cx="38%" cy="35%" r="70%"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="100%" stop-color="#FF4F57"/></radialGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+    <clipPath id="circle"><circle cx="256" cy="256" r="248"/></clipPath>
+
+  <radialGradient id="planet" cx="36%" cy="32%" r="75%"><stop offset="0%" stop-color="#E4D9FF"/><stop offset="45%" stop-color="#9B6DFF"/><stop offset="100%" stop-color="#3A1C86"/></radialGradient>
+  <clipPath id="backA"><rect x="-300" y="-300" width="1112" height="556"/></clipPath><clipPath id="frontA"><rect x="-300" y="256" width="1112" height="600"/></clipPath>
+  
+<linearGradient id="bbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#05040C"/><stop offset="55%" stop-color="#1B0D40"/><stop offset="100%" stop-color="#4A22A0"/></linearGradient>
+<radialGradient id="bglow" cx="79%" cy="50%" r="45%"><stop offset="0%" stop-color="#9B6DFF" stop-opacity="0.45"/><stop offset="100%" stop-color="#9B6DFF" stop-opacity="0"/></radialGradient>
+<pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0 L0 0 0 48" fill="none" stroke="#C9B6FF" stroke-width="1" opacity="0.06"/></pattern>
+<linearGradient id="ttl" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FFFFFF"/><stop offset="100%" stop-color="#D9CCFF"/></linearGradient>
+</defs>
+<rect width="960" height="540" fill="url(#bbg)"/><rect width="960" height="540" fill="url(#grid)"/><rect width="960" height="540" fill="url(#bglow)"/>
+<g fill="#fff"><circle cx="115" cy="97" r="3" opacity="0.6"/><circle cx="317" cy="54" r="2" opacity="0.45"/><circle cx="480" cy="459" r="2.5" opacity="0.4"/><circle cx="211" cy="475" r="2" opacity="0.35"/><circle cx="576" cy="76" r="2" opacity="0.5"/></g>
+<g fill="none" stroke="#9B6DFF" stroke-width="2"><circle cx="760" cy="270" r="205" opacity="0.18"/><circle cx="760" cy="270" r="280" opacity="0.1"/></g>
+<g transform="translate(640.0 140.0) scale(0.5078125)"><g><g clip-path="url(#circle)"><circle cx="256" cy="256" r="248" fill="url(#bg)"/><g fill="#FFFFFF">
+      <circle cx="104" cy="118" r="3" opacity="0.7"/><circle cx="410" cy="110" r="2.5" opacity="0.6"/><circle cx="438" cy="210" r="2" opacity="0.45"/>
+      <circle cx="80" cy="260" r="2" opacity="0.4"/><circle cx="140" cy="436" r="2.5" opacity="0.45"/><circle cx="380" cy="444" r="2" opacity="0.4"/>
+      <path d="M118 176 l4 10 l10 4 l-10 4 l-4 10 l-4 -10 l-10 -4 l10 -4 z" opacity="0.85"/></g><circle cx="256" cy="256" r="200" fill="url(#glow)"/>
+  <g transform="rotate(-28 256 256)"><ellipse cx="256" cy="256" rx="214" ry="64" fill="none" stroke="#3D8BFF" stroke-width="14" opacity="0.45" clip-path="url(#backA)"/></g>
+  <g transform="rotate(28 256 256)"><ellipse cx="256" cy="256" rx="214" ry="64" fill="none" stroke="#FF4F57" stroke-width="14" opacity="0.45" clip-path="url(#backA)"/></g>
+  <circle cx="256" cy="256" r="104" fill="url(#planet)"/>
+  <path d="M168 230 Q256 206 344 236" fill="none" stroke="#FFFFFF" stroke-width="7" opacity="0.25" stroke-linecap="round"/>
+  <path d="M160 276 Q256 252 350 282" fill="none" stroke="#2A1460" stroke-width="7" opacity="0.35" stroke-linecap="round"/>
+  <g transform="rotate(-28 256 256)"><ellipse cx="256" cy="256" rx="214" ry="64" fill="none" stroke="#3D8BFF" stroke-width="16" clip-path="url(#frontA)"/>
+    <circle cx="452" cy="282" r="26" fill="#3D8BFF" opacity="0.55" filter="url(#soft)"/><circle cx="452" cy="282" r="19" fill="url(#blue)"/></g>
+  <g transform="rotate(28 256 256)"><ellipse cx="256" cy="256" rx="214" ry="64" fill="none" stroke="#FF4F57" stroke-width="16" clip-path="url(#frontA)"/>
+    <circle cx="60" cy="282" r="26" fill="#FF4F57" opacity="0.55" filter="url(#soft)"/><circle cx="60" cy="282" r="19" fill="url(#red)"/></g>
+  </g><circle cx="256" cy="256" r="246" fill="none" stroke="#9B6DFF" stroke-width="4" opacity="0.7"/></g></g>
+<text x="56" y="250" font-family="Poppins" font-weight="700" font-size="50" fill="url(#ttl)" letter-spacing="2">MISSION CONTROL</text>
+<text x="60" y="287" font-family="Poppins" font-weight="500" font-size="18" fill="#C9B6FF" letter-spacing="3">STATUS · UPDATES · SUPPORT</text>
+<g transform="translate(60 307)" font-family="Poppins" font-weight="600" font-size="14">
+<rect width="93" height="26" rx="13" fill="#1F6FEB" opacity="0.9"/><text x="46" y="18" text-anchor="middle" fill="#fff">ORBIT</text>
+<rect x="105" width="117" height="26" rx="13" fill="#E5484D" opacity="0.9"/><text x="164" y="18" text-anchor="middle" fill="#fff">SENTINEL</text></g>
+</svg>
