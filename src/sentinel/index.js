@@ -6,6 +6,7 @@ import { config } from '../config.js';
 import { migrate, pool } from '../db.js';
 import { client } from '../bot/client.js';
 import { startHeartbeat } from '../bot/heartbeat.js';
+import { syncProfile } from '../bot/profile.js';
 import { postOffline, postOnline } from '../bot/statusPosts.js';
 import { gifBlockState, handleGifMessage } from '../bot/gifBlock.js';
 import { handleTrapMessage, publishTrap, renameTrap, startTrapRenamer } from '../bot/spamTrap.js';
@@ -35,6 +36,7 @@ async function setUpGuild(guild) {
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`[sentinel] logged in as ${c.user.tag}`);
+  syncProfile(c).catch((err) => console.warn('[profile] sync failed:', err.message));
   for (const g of c.guilds.cache.values()) {
     if (!ours(g.id)) { console.warn(`[sentinel] leaving ${g.name}`); await g.leave().catch(() => {}); }
   }

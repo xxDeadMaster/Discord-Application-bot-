@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1360" height="480" viewBox="0 0 1360 480" role="img" aria-label="Sentinel banner">
+  <defs>
+    <linearGradient id="bbg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#070304"/>
+      <stop offset="55%" stop-color="#2A070C"/>
+      <stop offset="100%" stop-color="#8E1C21"/>
+    </linearGradient>
+    <radialGradient id="bglow" cx="78%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#FF5A60" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#E5484D" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF5A60" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#FF5A60" stop-opacity="0.32"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF7378"/>
+      <stop offset="100%" stop-color="#D3343A"/>
+    </linearGradient>
+    <linearGradient id="right" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#B8232A"/>
+      <stop offset="100%" stop-color="#6E1015"/>
+    </linearGradient>
+    <linearGradient id="bring" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#E5484D" stop-opacity="0"/>
+      <stop offset="40%" stop-color="#FF8A8F"/>
+      <stop offset="70%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E5484D" stop-opacity="0.2"/>
+    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0 L0 0 0 48" fill="none" stroke="#FF8A8F" stroke-width="1" opacity="0.07"/>
+    </pattern>
+  </defs>
+  <rect width="1360" height="480" fill="url(#bbg)"/>
+  <rect width="1360" height="480" fill="url(#grid)"/>
+  <rect width="1360" height="480" fill="url(#bglow)"/>
+  <g fill="#FFFFFF">
+    <circle cx="180" cy="90" r="3" opacity="0.55"/><circle cx="420" cy="60" r="2" opacity="0.45"/>
+    <circle cx="640" cy="130" r="2.5" opacity="0.45"/><circle cx="300" cy="380" r="2" opacity="0.35"/>
+    <circle cx="840" cy="60" r="2" opacity="0.55"/><circle cx="560" cy="420" r="2" opacity="0.35"/>
+    <path d="M1250 70 l5 13 l13 5 l-13 5 l-5 13 l-5 -13 l-13 -5 l13 -5 z" opacity="0.8"/>
+  </g>
+  <!-- radar centred on the shield -->
+  <g fill="none" stroke="#FF5A60" stroke-width="2">
+    <circle cx="1100" cy="250" r="140" opacity="0.22"/>
+    <circle cx="1100" cy="250" r="230" opacity="0.15"/>
+    <circle cx="1100" cy="250" r="330" opacity="0.10"/>
+    <circle cx="1100" cy="250" r="440" opacity="0.07"/>
+  </g>
+  <path d="M1100 250 L650 250 A450 450 0 0 1 720 10 Z" fill="url(#sweep)" transform="rotate(180 1100 250) scale(-1 1) translate(-2200 0)"/>
+  <!-- orbit-style rings (matches Orbit's banner) -->
+  <ellipse cx="900" cy="300" rx="620" ry="120" transform="rotate(-10 900 300)" fill="none" stroke="url(#bring)" stroke-width="8"/>
+  <ellipse cx="900" cy="300" rx="520" ry="96" transform="rotate(-10 900 300)" fill="none" stroke="#E5484D" stroke-width="3" opacity="0.3"/>
+  <!-- blips -->
+  <circle cx="760" cy="150" r="5" fill="#FFB3B6" opacity="0.9"/>
+  <circle cx="870" cy="360" r="4" fill="#FFB3B6" opacity="0.6"/>
+  <!-- shield -->
+  <g transform="translate(1100 250) scale(0.78) translate(-256 -263)" stroke-linejoin="round">
+    <path d="M256 108 L256 418 C190 392 146 340 140 268 L140 160 Z" fill="url(#left)"/>
+    <path d="M256 108 L372 160 L372 268 C366 340 322 392 256 418 Z" fill="url(#right)"/>
+    <path d="M256 108 L372 160 L372 268 C366 340 322 392 256 418 C190 392 146 340 140 268 L140 160 Z" fill="none" stroke="#FFFFFF" stroke-width="7" opacity="0.95"/>
+    <path d="M206 262 L244 300 L312 222" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

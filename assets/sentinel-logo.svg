@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Sentinel logo">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#5A0F16"/>
+      <stop offset="55%" stop-color="#26070B"/>
+      <stop offset="100%" stop-color="#0A0405"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF5A60" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#E5484D" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#E5484D" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF6B70"/>
+      <stop offset="100%" stop-color="#D3343A"/>
+    </linearGradient>
+    <linearGradient id="right" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#B8232A"/>
+      <stop offset="100%" stop-color="#6E1015"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FFC9CB"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#E5484D"/>
+      <stop offset="45%" stop-color="#FFC2C4"/>
+      <stop offset="60%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E5484D"/>
+    </linearGradient>
+    <radialGradient id="dot" cx="38%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FFB3B6"/>
+    </radialGradient>
+    <linearGradient id="sweep" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF5A60" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#FF5A60" stop-opacity="0.38"/>
+    </linearGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+    <clipPath id="circle"><circle cx="256" cy="256" r="248"/></clipPath>
+    <clipPath id="backHalf"><rect x="-200" y="-200" width="912" height="480"/></clipPath>
+    <clipPath id="frontHalf"><rect x="-200" y="280" width="912" height="500"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#circle)">
+    <circle cx="256" cy="256" r="248" fill="url(#bg)"/>
+    <!-- radar rings + sweep -->
+    <g fill="none" stroke="#FF5A60" stroke-width="2">
+      <circle cx="256" cy="262" r="120" opacity="0.16"/>
+      <circle cx="256" cy="262" r="175" opacity="0.12"/>
+      <circle cx="256" cy="262" r="228" opacity="0.08"/>
+    </g>
+    <path d="M256 262 L375.2 71.2 A225 225 0 0 1 470.0 192.5 Z" fill="url(#sweep)"/>
+    <!-- stars -->
+    <g fill="#FFFFFF">
+      <circle cx="104" cy="122" r="3" opacity="0.7"/>
+      <circle cx="430" cy="196" r="2" opacity="0.45"/>
+      <circle cx="86" cy="250" r="2" opacity="0.4"/>
+      <circle cx="150" cy="430" r="2.5" opacity="0.45"/>
+      <circle cx="372" cy="440" r="2" opacity="0.4"/>
+      <path d="M392 120 l4 10 l10 4 l-10 4 l-4 10 l-4 -10 l-10 -4 l10 -4 z" opacity="0.85"/>
+    </g>
+    <circle cx="256" cy="262" r="215" fill="url(#glow)"/>
+
+    <!-- ring: back half -->
+    <g transform="rotate(-16 256 290)">
+      <ellipse cx="256" cy="290" rx="230" ry="74" fill="none" stroke="#E5484D" stroke-width="20" opacity="0.4" clip-path="url(#backHalf)"/>
+    </g>
+
+    <!-- 3D shield -->
+    <g stroke-linejoin="round" transform="translate(256 262) scale(1.08) translate(-256 -262)">
+      <!-- left (lit) face -->
+      <path d="M256 108 L256 418 C190 392 146 340 140 268 L140 160 Z" fill="url(#left)"/>
+      <!-- right (shadow) face -->
+      <path d="M256 108 L372 160 L372 268 C366 340 322 392 256 418 Z" fill="url(#right)"/>
+      <!-- bevel / rim -->
+      <path d="M256 108 L372 160 L372 268 C366 340 322 392 256 418 C190 392 146 340 140 268 L140 160 Z" fill="none" stroke="url(#rim)" stroke-width="7"/>
+      <path d="M256 108 L256 418" stroke="#FFB0B3" stroke-width="3" opacity="0.55"/>
+      <!-- inner panel -->
+      <path d="M256 146 L340 184 L340 266 C335 320 304 358 256 380 C208 358 177 320 172 266 L172 184 Z" fill="#000000" opacity="0.18"/>
+      <!-- check mark -->
+      <path d="M206 262 L244 300 L312 222" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <!-- ring: front half (over the shield) -->
+    <g transform="rotate(-16 256 290)">
+      <ellipse cx="256" cy="290" rx="230" ry="74" fill="none" stroke="#FF5A60" stroke-width="32" opacity="0.3" filter="url(#soft)" clip-path="url(#frontHalf)"/>
+      <ellipse cx="256" cy="290" rx="230" ry="74" fill="none" stroke="url(#ring)" stroke-width="21" stroke-linecap="round" clip-path="url(#frontHalf)"/>
+      <!-- scanning dot -->
+      <circle cx="455" cy="327" r="30" fill="#FF5A60" opacity="0.5" filter="url(#soft)"/>
+      <circle cx="455" cy="327" r="21" fill="url(#dot)"/>
+    </g>
+  </g>
+  <circle cx="256" cy="256" r="246" fill="none" stroke="#E5484D" stroke-width="4" opacity="0.6"/>
+</svg>
