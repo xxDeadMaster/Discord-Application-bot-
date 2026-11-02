@@ -1,7 +1,12 @@
 import 'dotenv/config';
 
+// Which bot this process is: 'orbit' (default, bot + dashboard) or 'sentinel' (security bot, no dashboard).
+export const BOT = process.env.BOT === 'sentinel' ? 'sentinel' : 'orbit';
+
 // SESSION_SECRET is optional: if it's not set, one is generated and saved in the database.
-const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'GUILD_ID', 'DATABASE_URL'];
+const required = BOT === 'sentinel'
+  ? ['DISCORD_TOKEN', 'GUILD_ID', 'DATABASE_URL']
+  : ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'GUILD_ID', 'DATABASE_URL'];
 const missing = required.filter((k) => !process.env[k]);
 if (missing.length) {
   console.error(`Missing environment variables: ${missing.join(', ')}. See .env.example.`);

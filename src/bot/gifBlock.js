@@ -1,18 +1,19 @@
 // GIF blocker: deletes GIFs (GIF picker / Tenor, Giphy, .gif links and uploads) outside the allowed channels.
 // Only the server owner is skipped. Checks messages Orbit already receives, so it costs nothing extra.
+import { BOT } from '../config.js';
 import { getSettings } from '../db.js';
 
-let cfg = { enabled: false, allowed: new Set() };
+let cfg = { enabled: false, allowed: new Set(), active: BOT === 'orbit' };
 const lastNotice = new Map(); // `${channelId}:${userId}` -> ms (one notice per person per channel every 30s)
 const NOTICE_SECONDS = 5;
 
 export async function loadGifBlock() {
   const s = await getSettings();
-  cfg = { enabled: Boolean(s.gif_block_enabled), allowed: new Set(s.gif_allowed_channel_ids || []) };
+  cfg = { enabled: Boolean(s.gif_block_enabled), allowed: new Set(s.gif_allowed_channel_ids || []), active: (s.protection_bot || 'orbit') === BOT };
   return cfg;
 }
 
-export const gifBlockState = () => ({ enabled: cfg.enabled, allowed: [...cfg.allowed] });
+export const gifBlockState = () => ({ enabled: cfg.enabled, allowed: [...cfg.allowed], active: cfg.active });
 
 const GIF_LINK = /(?:https?:\/\/)?(?:[\w-]+\.)*(?:tenor\.com|giphy\.com|gfycat\.com|klipy\.com)\/\S+|https?:\/\/\S+?\.gifv?(?:[?#]\S*)?(?=\s|$|>)/i;
 
@@ -31,7 +32,8 @@ export function hasGif(message) {
 
 /** Returns true when the message was a GIF and got deleted. */
 export async function handleGifMessage(message, now = Date.now()) {
-  if (!cfg.enabled || message.author?.bot || !message.guild) return false;
+  // Only one bot runs the blocker (Settings: protection_bot). The other one ignores it.
+  if (!cfg.enabled || !cfg.active || message.author?.bot || !message.guild) return false;
   if (cfg.allowed.has(message.channelId) || cfg.allowed.has(message.channel?.parentId)) return false;
   if (message.author.id === message.guild.ownerId) return false;
   if (!hasGif(message)) return false;

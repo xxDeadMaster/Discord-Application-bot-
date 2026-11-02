@@ -2,18 +2,19 @@
 // so anyone (who isn't staff) posting here is removed and their last hour of messages deleted.
 // Costs nothing extra: it checks the channel ID of messages Orbit already receives.
 import { EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { BOT } from '../config.js';
 import { getSettings, updateSettings } from '../db.js';
 import { client } from './client.js';
 import { recordAutoCase } from './moderation.js';
 import { COLORS, footer } from './ui.js';
 
 // Kept in memory so normal messages never touch the database.
-let trap = { channelId: null, messageId: null, caught: 0, staffRoleId: null, managerRoleId: null };
+let trap = { channelId: null, messageId: null, caught: 0, staffRoleId: null, managerRoleId: null, active: BOT === 'orbit' };
 const recent = new Set(); // users being handled right now (spam bots send many messages at once)
 
 export async function loadTrap() {
   const s = await getSettings();
-  trap = { channelId: s.trap_channel_id, messageId: s.trap_message_id, caught: s.trap_caught || 0, staffRoleId: s.staff_role_id, managerRoleId: s.manager_role_id };
+  trap = { channelId: s.trap_channel_id, messageId: s.trap_message_id, caught: s.trap_caught || 0, staffRoleId: s.staff_role_id, managerRoleId: s.manager_role_id, active: (s.protection_bot || 'orbit') === BOT };
   return trap;
 }
 
@@ -61,7 +62,8 @@ function isExempt(member) {
 
 /** Returns true if the message was in the trap channel (so other handlers can skip it). */
 export async function handleTrapMessage(message) {
-  if (!trap.channelId || message.channelId !== trap.channelId) return false;
+  // Only one bot runs the trap (Settings: protection_bot). The other one ignores it.
+  if (!trap.active || !trap.channelId || message.channelId !== trap.channelId) return false;
   if (message.author?.bot || message.webhookId || message.system) return true;
   if (message.id === trap.messageId) return true;
   if (isExempt(message.member)) return true; // staff testing: leave it alone

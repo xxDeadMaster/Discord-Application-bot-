@@ -54,6 +54,7 @@ staffRoutes.get('/moderation', requireManager, async (req, res) => {
     actions: ACTIONS, prettyMinutes, channels: guildOptions(res.locals.guild).textChannels, logChannelId: settings.mod_log_channel_id,
     trap: { channelId: settings.trap_channel_id, posted: Boolean(settings.trap_message_id), caught: settings.trap_caught || 0 },
     gif: { enabled: settings.gif_block_enabled, allowed: settings.gif_allowed_channel_ids || [] },
+    protectionBot: settings.protection_bot || 'orbit',
   });
 });
 
@@ -75,6 +76,18 @@ staffRoutes.post('/moderation/gifs', requireManager, async (req, res) => {
   await loadGifBlock();
   flash(req, 'success', enabled ? `GIF blocker is on.${ids.length ? ` GIFs are still allowed in ${ids.length} channel${ids.length === 1 ? '' : 's'}.` : ''}` : 'GIF blocker is off.');
   res.redirect('/moderation#gifs');
+});
+
+// Which bot runs the spam trap + GIF blocker. Orbit switches right away; Sentinel picks it up within 2 minutes.
+staffRoutes.post('/moderation/protection-bot', requireManager, async (req, res) => {
+  if (!res.locals.isAdmin) { flash(req, 'error', 'Only admins can change this.'); return res.redirect('/moderation'); }
+  const bot = req.body.protection_bot === 'sentinel' ? 'sentinel' : 'orbit';
+  await updateSettings({ protection_bot: bot });
+  await Promise.all([loadTrap(), loadGifBlock()]);
+  flash(req, 'success', bot === 'sentinel'
+    ? 'The spam trap and GIF blocker now run on Sentinel (it picks this up within 2 minutes). Orbit has stopped running them.'
+    : 'The spam trap and GIF blocker now run on Orbit.');
+  res.redirect('/moderation');
 });
 
 staffRoutes.post('/moderation/spam-trap', requireManager, async (req, res) => {

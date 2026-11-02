@@ -462,3 +462,37 @@ CREATE TABLE IF NOT EXISTS staff_online_time (
 -- GIF blocker: delete GIFs outside the allowed channels
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS gif_block_enabled BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS gif_allowed_channel_ids TEXT[] NOT NULL DEFAULT '{}';
+
+-- Sentinel (security bot on the phone). protection_bot decides which bot runs the spam trap + GIF blocker.
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS protection_bot TEXT NOT NULL DEFAULT 'orbit';  -- 'orbit' or 'sentinel'
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_log_channel_id TEXT;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_trusted_ids TEXT[] NOT NULL DEFAULT '{}';      -- skipped by anti-nuke
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_antinuke_enabled BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_raid_joins INTEGER NOT NULL DEFAULT 8;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_raid_seconds INTEGER NOT NULL DEFAULT 60;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_auto_lockdown BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_lockdown_role_ids TEXT[] NOT NULL DEFAULT '{}'; -- locked besides @everyone
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS sentinel_lockdown_active BOOLEAN NOT NULL DEFAULT false;
+
+-- What Sentinel saw and did (anti-nuke, raids, lockdowns). Feeds the dashboard later.
+CREATE TABLE IF NOT EXISTS sentinel_events (
+  id         SERIAL PRIMARY KEY,
+  guild_id   TEXT NOT NULL,
+  kind       TEXT NOT NULL,          -- nuke | raid | lockdown | unlock | alert
+  actor_id   TEXT,
+  actor_tag  TEXT,
+  summary    TEXT NOT NULL DEFAULT '',
+  detail     JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sentinel_events_recent ON sentinel_events (guild_id, created_at DESC);
+
+-- Channel permissions saved before a lockdown, so /lockdown off puts them back exactly.
+CREATE TABLE IF NOT EXISTS sentinel_lockdown_saved (
+  channel_id TEXT NOT NULL,
+  target_id  TEXT NOT NULL,          -- role id
+  existed    BOOLEAN NOT NULL,       -- false = there was no overwrite, so delete it on unlock
+  allow_bits TEXT NOT NULL DEFAULT '0',
+  deny_bits  TEXT NOT NULL DEFAULT '0',
+  PRIMARY KEY (channel_id, target_id)
+);

@@ -6,7 +6,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node --max-old-space-size=160 src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "sentinel": "node --max-old-space-size=128 src/sentinel/index.js"
   },
   "engines": {
     "node": ">=20"
