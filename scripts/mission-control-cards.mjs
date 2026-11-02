@@ -26,7 +26,7 @@ const CARDS = {
           '📣 **#announcements** · news about the bots',
           '📝 **#changelog** · every update, posted automatically',
           '🟢 **#bot-status** · when a bot goes online or offline',
-          `🚨 ${INCIDENTS} · alerts if a bot stops answering`,
+          `${INCIDENTS} · alerts if a bot stops answering`,
           '❓ **#help** · questions · 🐞 **#bug-reports** · 💡 **#suggestions**',
         ].join('\n'),
       },
