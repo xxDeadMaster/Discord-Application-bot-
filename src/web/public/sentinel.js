@@ -195,7 +195,7 @@
     const dot = { online: 'd-on', idle: 'd-idle', dnd: 'd-dnd' };
     const on = d.staff.filter((s) => s.status !== 'offline').length;
     $('staffCount').textContent = `${on} online`;
-    $('staff').innerHTML = d.staff.slice(0, 8).map((s) => `<li><span class="ini">${esc((s.name.match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase())}${dot[s.status] ? `<span class="dot ${dot[s.status]}"></span>` : ''}</span><span style="${s.status === 'offline' ? 'color: var(--muted)' : ''}">${esc(s.name)}</span><span class="role">${esc(s.role)}</span></li>`).join('') || '<li class="feed-empty">No staff role set in Orbit.</li>';
+    $('staff').innerHTML = d.staff.slice(0, 8).map((s) => `<li><span class="ini">${esc((s.name.match(/[\p{L}\p{N}]/u) || ['?'])[0].toUpperCase())}${dot[s.status] ? `<span class="dot ${dot[s.status]}"></span>` : ''}</span><span class="nm" title="${esc(s.name)}" style="${s.status === 'offline' ? 'color: var(--muted)' : ''}">${esc(s.name)}</span><span class="role" title="${esc(s.role)}">${esc(s.role)}</span></li>`).join('') || '<li class="feed-empty">No staff role set in Orbit.</li>';
   }
 
   /* ---------- Modules ---------- */

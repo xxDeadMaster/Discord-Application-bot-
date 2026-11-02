@@ -238,3 +238,5 @@ a { color: var(--red-hot); }
 .st-off .ico { background: var(--raised); color: var(--warn); }
 .feed li.feed-empty { display: block; }
 .btn[disabled] { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.staff .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.staff .role { flex: none; max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

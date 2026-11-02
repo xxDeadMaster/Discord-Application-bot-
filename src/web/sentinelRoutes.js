@@ -58,6 +58,9 @@ export async function historySeries(range, hourNow, now = Date.now()) {
   return series;
 }
 
+/** Divider roles are names made mostly of lines/symbols, e.g. "──── MODERATION TEAM ────". */
+export const isDivider = (name) => /[─━═⎯╭╮╰╯┃│]{2,}|[─━═⎯]{2,}|-{3,}|_{3,}/.test(name) || !/[\p{L}\p{N}]/u.test(name);
+
 const ago = (d) => (d ? Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 60000)) : null);
 
 /** Everything the overview needs, refreshed every few seconds by the page. */
@@ -84,8 +87,11 @@ async function liveData(req, res) {
   const staff = staffMembers(guild, s).map((m) => {
     const member = guild.members.cache.get(m.id);
     const st = staffStatus(member);
-    const top = member?.roles?.highest;
-    return { name: m.name, owner: Boolean(m.isOwner), status: st.status, role: m.isOwner ? 'Owner' : (top && top.id !== guild.id ? top.name : 'Staff') };
+    // Highest real role: skip @everyone and divider roles like "──── STAFF ────"
+    const real = [...(member?.roles?.cache?.values() || [])]
+      .filter((r) => r.id !== guild.id && !isDivider(r.name))
+      .sort((a, b) => b.position - a.position)[0];
+    return { name: m.name, owner: Boolean(m.isOwner), status: st.status, role: m.isOwner ? 'Owner' : (real ? real.name : 'Staff') };
   }).sort((a, b) => (a.status === 'offline') - (b.status === 'offline') || b.owner - a.owner);
   const ch = (id) => (id ? guild.channels.cache.get(id)?.name : null);
 
