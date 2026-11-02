@@ -157,6 +157,10 @@ export function isStaff(member, settings) {
   return Boolean(settings?.staff_role_id && member.roles?.cache?.has(settings.staff_role_id));
 }
 
+// Staff commands are hidden in Discord's command list for members without Manage Messages (staff have it).
+// Orbit still checks the staff role and the access list itself.
+export const STAFF_ONLY = String(PermissionFlagsBits.ManageMessages);
+
 export const ephemeral = 64; // MessageFlags.Ephemeral
 
 /** Small one-line message embed: notice('Check your DMs!', 'success'). */

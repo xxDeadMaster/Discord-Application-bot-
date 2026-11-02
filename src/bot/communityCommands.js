@@ -5,7 +5,7 @@ import { getSettings, listGiveaways, listPolls } from '../db.js';
 import {
   MAX_POLL_OPTIONS, cancelGiveaway, endGiveaway, endPoll, rerollGiveaway, startGiveaway, startPoll,
 } from './giveaways.js';
-import { ephemeral, notice, onAccessList, truncate, COLORS, footer, progressBar } from './ui.js';
+import { STAFF_ONLY, ephemeral, notice, onAccessList, truncate, COLORS, footer, progressBar } from './ui.js';
 import {
   addXp, getXp, leaderboard, levelingConfig, progress, rankOf,
 } from './levels.js';
@@ -29,6 +29,7 @@ export const levelCommandData = [
   { name: 'leaderboard', description: 'Top 10 members by XP' },
   {
     name: 'xp',
+    default_member_permissions: STAFF_ONLY,
     description: 'Give or take XP (managers)',
     options: [
       { type: T.Subcommand, name: 'give', description: 'Give XP, e.g. for winning an event',
@@ -49,6 +50,7 @@ export const levelCommandData = [
 export const communityCommandData = [
   {
     name: 'giveaway',
+    default_member_permissions: STAFF_ONLY,
     description: 'Run a giveaway',
     options: [
       { type: T.Subcommand, name: 'start', description: 'Start a giveaway',
@@ -67,6 +69,7 @@ export const communityCommandData = [
   },
   {
     name: 'poll',
+    default_member_permissions: STAFF_ONLY,
     description: 'Run a poll',
     options: [
       { type: T.Subcommand, name: 'create', description: 'Start a poll',

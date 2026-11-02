@@ -12,7 +12,7 @@ import { modCommandData } from './moderation.js';
 import { robloxCommandData } from './roblox.js';
 import { client, getGuild } from './client.js';
 import {
-  COLORS, ephemeral, footer, isStaff, notice, onAccessList, truncate, unix,
+  COLORS, STAFF_ONLY, ephemeral, footer, isStaff, notice, onAccessList, truncate, unix,
 } from './ui.js';
 
 /** 🟥🟥⬛ style meter: filled for active strikes, at least 3 slots. */
@@ -360,6 +360,7 @@ export const commandData = [
   {
     name: 'strike',
     description: 'Staff strikes',
+    default_member_permissions: STAFF_ONLY,
     options: [
       { type: ApplicationCommandOptionType.Subcommand, name: 'add', description: 'Give a staff member a strike',
         options: [
@@ -375,6 +376,7 @@ export const commandData = [
   {
     name: 'loa',
     description: 'Leave of absence',
+    default_member_permissions: STAFF_ONLY,
     options: [
       { type: ApplicationCommandOptionType.Subcommand, name: 'request', description: 'Go on leave (you get the LOA role on your first day)' },
       { type: ApplicationCommandOptionType.Subcommand, name: 'view', description: 'See your LOA, with a button to come back early' },
