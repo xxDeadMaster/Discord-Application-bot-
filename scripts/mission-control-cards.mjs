@@ -1,5 +1,5 @@
 // Posts (or updates) the Mission Control info cards through a webhook.
-//   MC_WEBHOOK=<webhook url> node scripts/mission-control-cards.mjs welcome|rules|bots [--edit <messageId>]
+//   MC_WEBHOOK=<webhook url> node scripts/mission-control-cards.mjs welcome|rules|soon|bots [--edit <messageId>]
 // The webhook posts in whatever channel it is set to in Discord (Server Settings → Integrations → Webhooks).
 // To change a card later: edit the text below, then run with --edit and the message ID to update it in place.
 const RAW = 'https://raw.githubusercontent.com/xxDeadMaster/Discord-Application-bot-/main/assets';
@@ -46,6 +46,21 @@ const CARDS = {
       "**6. Follow Discord's rules.** [Terms](https://discord.com/terms) and [Community Guidelines](https://discord.com/guidelines).",
     ].join('\n\n'),
     footer: { text: 'Breaking the rules can get you removed. Thanks for keeping Mission Control clean.' },
+  }],
+
+  soon: [{
+    color: PURPLE,
+    title: '🗺️ Coming soon',
+    description: [
+      "What's on the way for Orbit and Sentinel. No dates yet: each one shows up in #changelog the day it goes live.",
+    ].join('\n'),
+    fields: [
+      { name: '🌍 Orbit goes public', value: 'Any server will be able to add Orbit for applications, tickets and staff tools.' },
+      { name: '🖥️ Dashboard upgrades', value: 'More of the bots you can set up and manage from the web, no commands needed.' },
+      { name: '🛡️ More Sentinel protection', value: 'New ways to spot and stop attacks before they do damage.' },
+      { name: '📱 Server phone health', value: "The phone that runs both bots will report its battery and temperature here, so problems show up early." },
+    ],
+    footer: { text: 'Got an idea? Post it in #suggestions.' },
   }],
 
   bots: [
