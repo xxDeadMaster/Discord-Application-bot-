@@ -14,6 +14,7 @@ import { handleAutoAnswer, loadAutoAnswers } from './autoAnswers.js';
 import { startStaffReport } from './staffReport.js';
 import { gifBlockState, handleGifMessage, loadGifBlock } from './gifBlock.js';
 import { startHeartbeat } from './heartbeat.js';
+import { postChangelogIfNew, postOnline } from './statusPosts.js';
 import { handleCommand, handleLoaButton, handleLoaModal, loadLoaSchedule, registerCommands } from './staff.js';
 import {
   handleChannelDelete, handleClaimButton, handleCloseButton, handleCloseCancel, handleCloseConfirm, handleKeepOpen,
@@ -198,6 +199,8 @@ client.once(Events.ClientReady, async (c) => {
   startStaffReport();
   await loadGifBlock().catch((err) => console.error('[gif block] load failed:', err));
   startHeartbeat();
+  postOnline().catch(() => {});
+  postChangelogIfNew().catch((err) => console.warn('[status] changelog failed:', err.message));
 });
 
 client.on(Events.Error, (err) => console.error('[discord]', err));

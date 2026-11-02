@@ -6,6 +6,7 @@ import { startWeb } from './web/server.js';
 import { flushSnapshot } from './bot/counters.js';
 import { flushLevels } from './bot/levels.js';
 import { flushPresence } from './bot/presence.js';
+import { postOffline } from './bot/statusPosts.js';
 
 async function main() {
   await migrate();
@@ -18,6 +19,7 @@ async function main() {
 
 async function shutdown(signal) {
   console.log(`[app] ${signal} received, shutting down`);
+  await postOffline().catch(() => {});
   // Save XP that hasn't been written yet (it is otherwise saved once an hour)
   await flushLevels().then((n) => n && console.log(`[levels] saved ${n} member(s) before shutdown`)).catch((err) => console.warn('[levels] save on shutdown failed:', err.message));
   await flushSnapshot().catch((err) => console.warn('[snapshot] save on shutdown failed:', err.message));

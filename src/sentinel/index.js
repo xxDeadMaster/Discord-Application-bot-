@@ -6,6 +6,7 @@ import { config } from '../config.js';
 import { migrate, pool } from '../db.js';
 import { client } from '../bot/client.js';
 import { startHeartbeat } from '../bot/heartbeat.js';
+import { postOffline, postOnline } from '../bot/statusPosts.js';
 import { gifBlockState, handleGifMessage } from '../bot/gifBlock.js';
 import { handleTrapMessage } from '../bot/spamTrap.js';
 import { handleAuditEntry } from './antiNuke.js';
@@ -26,6 +27,7 @@ async function setUpGuild(guild) {
   await guild.commands.set(SENTINEL_COMMANDS).catch((err) => console.error('[sentinel] could not register commands:', err.message));
   const s = await settings({ force: true });
   startHeartbeat();
+  postOnline().catch(() => {});
   await startLocalService(localHandlers(guild)).catch((err) => console.error('[sentinel] local service failed:', err.message));
   console.log(`[sentinel] ready. Anti-nuke ${s.sentinel_antinuke_enabled ? 'on' : 'off'}, raid ${s.sentinel_raid_joins}/${s.sentinel_raid_seconds}s, trap+GIFs run by ${s.protection_bot}`);
 }
@@ -137,6 +139,7 @@ client.on(Events.Error, (err) => console.error('[discord]', err));
 
 async function shutdown(signal) {
   console.log(`[sentinel] ${signal}, shutting down`);
+  await postOffline().catch(() => {});
   await flushNow();
   await client.destroy().catch(() => {});
   await pool.end().catch(() => {});

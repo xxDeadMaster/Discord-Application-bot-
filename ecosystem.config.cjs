@@ -16,6 +16,7 @@ module.exports = {
       node_args: '--env-file=.env.sentinel --max-old-space-size=128',
       max_memory_restart: '200M',
       exp_backoff_restart_delay: 2000,
+      kill_timeout: 6000, // time to post "went offline" and save the hour's totals
     },
   ],
 };
